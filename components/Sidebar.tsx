@@ -68,14 +68,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onToggle]);
 
-  // Prevent sidebar open gesture if horizontal scroll lock is active (mobile)
-  const safeOnToggle = useCallback(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 640 && window.__sidebarGestureLock) {
-      // Ignore sidebar open if lock is set
-      return;
-    }
-    onToggle();
-  }, [onToggle]);
+  // Removed sidebar swipe/gesture open logic. Sidebar now only opens via button click.
 
 
 

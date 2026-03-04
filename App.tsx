@@ -145,27 +145,7 @@ const App: React.FC = () => {
     }
   }, [user]);
 
-  useEffect(() => {
-    const handleTouchStart = (e: TouchEvent) => {
-      touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    };
-    const handleTouchEnd = (e: TouchEvent) => {
-      if (!touchStartRef.current) return;
-      const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
-      const dy = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
-      if (dy < 100) {
-        if (dx > 80 && !isSidebarOpen) setIsSidebarOpen(true); 
-        else if (dx < -80 && isSidebarOpen) setIsSidebarOpen(false); 
-      }
-      touchStartRef.current = null;
-    };
-    window.addEventListener('touchstart', handleTouchStart, { passive: true });
-    window.addEventListener('touchend', handleTouchEnd, { passive: true });
-    return () => {
-      window.removeEventListener('touchstart', handleTouchStart);
-      window.removeEventListener('touchend', handleTouchEnd);
-    };
-  }, [isSidebarOpen]);
+  // Removed sidebar swipe gesture logic. Sidebar can now only be toggled by button.
 
   const activeSession = sessions.find(s => s.id === activeSessionId);
 
