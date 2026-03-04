@@ -15,7 +15,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dis
 interface MessageInputProps {
   onSendMessage: (content: string, image?: MessageImage, docs?: AttachedDocument[]) => void;
   onStop: () => void;
-  isDisabled: boolean;
+  isDisabled: boolean; // Kept for stop button, but input will not be disabled
   preferredModel?: AIModel | 'auto';
   onModelChange?: (model: AIModel | 'auto') => void;
   activeSessionId?: string;
@@ -30,6 +30,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   activeSessionId 
 }) => {
   const [input, setInput] = useState('');
+  const [promptQueue, setPromptQueue] = useState<Array<{content: string, image?: MessageImage, docs?: AttachedDocument[] }>>([]);
   const [attachedImage, setAttachedImage] = useState<MessageImage | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [attachedDocs, setAttachedDocs] = useState<AttachedDocument[]>([]);
@@ -62,10 +63,10 @@ const MessageInput: React.FC<MessageInputProps> = ({
 
   // Focus input on session change or load (desktop only)
   useEffect(() => {
-    if (!isDisabled && textareaRef.current && window.innerWidth >= 1024) {
+    if (textareaRef.current && window.innerWidth >= 1024) {
       textareaRef.current.focus();
     }
-  }, [activeSessionId, isDisabled]);
+  }, [activeSessionId]);
 
   const modelColors: Record<string, string> = {
     'auto': 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40',
@@ -501,8 +502,14 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
     const trimmedInput = input.trim();
-    if ((trimmedInput || attachedImage || attachedDocs.length > 0) && !isDisabled && !isProcessing) {
-      onSendMessage(trimmedInput, attachedImage || undefined, attachedDocs);
+    if ((trimmedInput || attachedImage || attachedDocs.length > 0) && !isProcessing) {
+      if (!isDisabled) {
+        // If not streaming, send immediately
+        onSendMessage(trimmedInput, attachedImage || undefined, attachedDocs);
+      } else {
+        // If streaming, queue the prompt
+        setPromptQueue(prev => [...prev, { content: trimmedInput, image: attachedImage || undefined, docs: attachedDocs }]);
+      }
       setInput('');
       setAttachedImage(null);
       setImagePreview(null);
@@ -539,6 +546,16 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
   // Style helpers for ChatGPT-like input and helper text
   const inputPlaceholderClass = "text-[1.08rem] sm:text-[1.08rem] font-normal text-[var(--text-secondary)]";
   const helperTextClass = "text-[12px] sm:text-[13px] text-[var(--text-secondary)]/60 mt-2 mb-1 leading-relaxed text-center";
+
+  // Effect: When streaming ends and there is a queued prompt, send it automatically
+  useEffect(() => {
+    if (!isDisabled && promptQueue.length > 0 && !isProcessing) {
+      const next = promptQueue[0];
+      setPromptQueue(prev => prev.slice(1));
+      onSendMessage(next.content, next.image, next.docs);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDisabled, promptQueue, isProcessing]);
 
   return (
     <div className="p-3 sm:p-4 bg-[var(--bg-primary)] relative pb-safe flex-shrink-0 z-[35] transition-all">
@@ -807,7 +824,8 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
               inputPlaceholderClass +
               " flex-1 bg-transparent text-[var(--text-primary)] py-2.5 sm:py-3 px-1 sm:px-2 focus:outline-none resize-none transition-all placeholder:text-[var(--text-secondary)]/40 text-[15px] sm:text-base leading-relaxed overflow-hidden overflow-y-auto"
             }
-            disabled={isDisabled}
+            // Input is never disabled, only the send/stop button is
+            disabled={false}
             rows={1}
             aria-label="Chat message input"
           />

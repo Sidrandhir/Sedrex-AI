@@ -182,7 +182,19 @@ function computeConfidence(
 // Clear, debuggable, covers all user types.
 // ═══════════════════════════════════════════════════════════════════
 
+// NexusIntent is internal, map to QueryIntent for type compatibility
 type NexusIntent = "live" | "technical" | "analytical" | "general";
+
+// Map NexusIntent to QueryIntent for API compatibility
+function mapNexusIntentToQueryIntent(intent: NexusIntent): QueryIntent {
+  switch (intent) {
+    case "live": return "live";
+    case "technical": return "coding";
+    case "analytical": return "reasoning";
+    case "general": return "general";
+    default: return "general";
+  }
+}
 
 // ── Signal sets — each term is a hard trigger ─────────────────────
 const LIVE_SIGNALS = new Set([
@@ -285,7 +297,7 @@ export function routePrompt(
   };
 
   const route = routes[intent];
-  return { ...route, confidence: 0.95, complexity, intent };
+  return { ...route, confidence: 0.95, complexity, intent: mapNexusIntentToQueryIntent(intent) };
 }
 
 function estimateComplexity(
@@ -710,22 +722,37 @@ async function processRequest(
           explanation: `Direct routing to ${manualModel}.`,
           confidence:  1.0,
           complexity:  estimateComplexity(prompt, classifyIntent(prompt, hasImage, hasDocs), hasDocs),
-          intent:      classifyIntent(prompt, hasImage, hasDocs),
+          intent:      mapNexusIntentToQueryIntent(classifyIntent(prompt, hasImage, hasDocs)),
         }
-      : routePrompt(prompt, hasImage, hasDocs);
+      : (() => {
+          const r = routePrompt(prompt, hasImage, hasDocs);
+          return { ...r, intent: mapNexusIntentToQueryIntent(r.intent as NexusIntent) };
+        })();
 
   onRouting?.(routing);
 
-  const intent        = routing.intent as NexusIntent;
+  const intent        = routing.intent as QueryIntent;
+  // Map QueryIntent back to NexusIntent for internal logic
+  function mapQueryIntentToNexusIntent(qi: QueryIntent): NexusIntent {
+    switch (qi) {
+      case "live": return "live";
+      case "coding": return "technical";
+      case "reasoning": return "analytical";
+      case "general": return "general";
+      default: return "general";
+    }
+  }
+  const nexusIntent = mapQueryIntentToNexusIntent(intent);
   const isProductQuery = [...PRODUCT_SIGNALS].some((k) => prompt.toLowerCase().includes(k));
-  const useSearch     = intent === "live" || isProductQuery;
-  const useProModel   = (intent === "technical" || intent === "analytical") && routing.complexity > 0.65;
+  // Enable live search for all queries that may require up-to-date data
+  const useSearch     = intent === "live" || isProductQuery || nexusIntent === "analytical" || nexusIntent === "general";
+  const useProModel   = (nexusIntent === "technical" || nexusIntent === "analytical") && routing.complexity > 0.65;
   const engine        = useProModel ? MODELS.PRO : MODELS.FLASH;
 
   // ── Build request ───────────────────────────────────────────────
-  const systemInstruction = buildSystemInstruction(intent, personification, isProductQuery);
-  const genConfig         = getGenerationConfig(intent, routing.complexity);
-  const contents          = buildHistory(history, intent);
+  const systemInstruction = buildSystemInstruction(nexusIntent, personification, isProductQuery);
+  const genConfig         = getGenerationConfig(nexusIntent, routing.complexity);
+  const contents          = buildHistory(history, nexusIntent);
 
   // Assemble current message parts
   const parts: any[] = [];
