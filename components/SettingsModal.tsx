@@ -18,7 +18,7 @@ interface SettingsModalProps {
   theme: 'light' | 'dark';
 }
 
-type TabType = 'general' | 'personification' | 'subscription' | 'usage' | 'data';
+type TabType = 'general' | 'personification' | 'usage' | 'data';
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ 
   isOpen, 
@@ -148,7 +148,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           
           <TabButton id="general" label="General" icon={Icons.Robot} tooltip="Theme and Language" />
           <TabButton id="personification" label="Custom AI" icon={Icons.Sparkles} tooltip="Custom Instructions" />
-          <TabButton id="subscription" label="Plan" icon={Icons.CreditCard} tooltip="Your Plan" />
+          {/* <TabButton id="subscription" label="Plan" icon={Icons.CreditCard} tooltip="Your Plan" /> */}
           <TabButton id="usage" label="Usage" icon={Icons.BarChart} tooltip="Usage Stats" />
           <TabButton id="data" label="Data" icon={Icons.Database} tooltip="Your Data" />
           
@@ -165,7 +165,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Mobile Tab Selector */}
         <div className="sm:hidden flex items-center gap-1 overflow-x-auto px-3 py-2 bg-[var(--bg-tertiary)]/20 border-b border-[var(--border)] custom-scrollbar">
           <div className="flex gap-1 overflow-x-auto flex-1">
-            {(['general', 'personification', 'subscription', 'usage', 'data'] as TabType[]).map(tab => (
+            {(['general', 'personification', 'usage', 'data'] as TabType[]).map(tab => (
               <button
                 key={tab}
                 onClick={() => {
@@ -272,30 +272,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             )}
 
-            {activeTab === 'subscription' && (
-              <div className="space-y-4 sm:space-y-8 animate-in slide-in-from-bottom-2 w-full max-w-2xl">
-                <div className="p-6 sm:p-10 bg-gradient-to-br from-[var(--accent)]/10 to-indigo-500/10 border border-[var(--border)] rounded-lg sm:rounded-[2.5rem] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all">
-                   <div className="space-y-1 sm:space-y-2 w-full">
-                     <p className="text-[11px] sm:text-[13px] font-black uppercase tracking-widest text-[var(--accent)]">Your Plan</p>
-                     <h4 className="text-2xl sm:text-4xl font-black tracking-tighter uppercase text-[var(--text-primary)]">{user.tier} Membership</h4>
-                     <ul className="text-[12px] sm:text-[13px] text-[var(--text-secondary)] font-medium mt-3 sm:mt-6 space-y-2 sm:space-y-3 opacity-80">
-                        <li className="flex items-center gap-2">• {user.tier === 'pro' ? 'Unlimited' : '50'} messages per month</li>
-                        <li className="flex items-center gap-2">• {user.tier === 'pro' ? 'All AI Models' : 'Standard Access'}</li>
-                        <li className="flex items-center gap-2">• Priority Support</li>
-                     </ul>
-                   </div>
-                   <Icons.Shield className={`w-12 sm:w-20 h-12 sm:h-20 flex-shrink-0 ${user.tier === 'pro' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]/10 opacity-20'}`} />
-                </div>
-                {user.tier === 'free' && (
-                  <button 
-                    onClick={onUpgrade} 
-                    className="w-full py-3 sm:py-5 bg-[var(--accent)] text-white text-[12px] sm:text-[13px] font-black uppercase tracking-[0.15em] sm:tracking-[0.2em] rounded-lg sm:rounded-2xl shadow-xl shadow-[var(--accent)]/20 active:scale-95 transition-all hover:brightness-110"
-                  >
-                    Upgrade to Pro Plan
-                  </button>
-                )}
-              </div>
-            )}
+            {/* {activeTab === 'subscription' && (
+              ...subscription tab content...
+            )} */}
 
             {activeTab === 'usage' && (
               <div className="space-y-4 sm:space-y-8 animate-in slide-in-from-bottom-2 w-full max-w-2xl">

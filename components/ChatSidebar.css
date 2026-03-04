@@ -1,0 +1,54 @@
+.sidebar-section {
+  margin-bottom: 1.1em;
+}
+.sidebar-section-header {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.01em;
+  padding: 0.15em 0.2em 0.15em 0;
+  user-select: none;
+  margin-bottom: 0.2em;
+  transition: color 0.15s;
+}
+.sidebar-arrow {
+  display: inline-block;
+  font-size: 13px;
+  margin-left: 0.5em;
+  font-weight: 600;
+  vertical-align: middle;
+}
+.sidebar-beta-badge {
+  color: #FFD600;
+  font-weight: 700;
+  font-size: 11px;
+  margin-left: 6px;
+  letter-spacing: 0.05em;
+}
+.sidebar-chats-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin-bottom: 0.7em;
+  margin-left: 0.1em;
+  letter-spacing: 0.01em;
+}
+.sidebar-session-list,
+.sidebar-session-list-simple {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sidebar-session-list-simple > div {
+  margin: 0;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.25;
+  padding: 6px 10px;
+  font-weight: 400;
+}

@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef, memo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import './ChatSidebar.css';
 import { ChatSession, UserStats, User } from '../types';
 import { Icons } from '../constants';
 
@@ -7,8 +8,8 @@ interface SidebarProps {
   activeSessionId: string;
   onNewChat: () => void;
   onSelectSession: (id: string) => void;
-  view: 'chat' | 'dashboard' | 'pricing' | 'billing' | 'admin';
-  onSetView: (view: 'chat' | 'dashboard' | 'pricing' | 'billing' | 'admin') => void;
+  view: 'chat' | 'dashboard' | 'admin';
+  onSetView: (view: 'chat' | 'dashboard' | 'admin') => void;
   stats: UserStats | null;
   onDeleteSession: (id: string) => void;
   onRenameSession: (id: string, newTitle: string) => void;
@@ -96,6 +97,10 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const favorites = filteredSessions.filter(s => s.isFavorite);
   const regular = filteredSessions.filter(s => !s.isFavorite);
+
+  // Dropdown state for sections
+  const [showFavorites, setShowFavorites] = useState(true);
+  const [showChats, setShowChats] = useState(true);
 
   const startEditing = (e: React.MouseEvent, s: ChatSession) => {
     e.stopPropagation();
@@ -251,7 +256,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <h1 className="text-[14px] font-black tracking-tight text-[var(--text-primary)] uppercase">NEXUS AI</h1>
                 {/* BEGIN: Beta Badge (remove this block to remove Beta label) */}
-                <span style={{ color: '#FFD600', fontWeight: 700, fontSize: '11px', marginLeft: 6, letterSpacing: '0.05em' }}>Beta</span>
+                <span className="sidebar-beta-badge">Beta</span>
                 {/* END: Beta Badge */}
               </div>
             )}
@@ -291,27 +296,31 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        <div className={`flex-1 overflow-y-auto px-4 space-y-8 custom-scrollbar ${!isOpen && window.innerWidth >= 640 ? 'hidden' : ''}`}>
-          {favorites.length > 0 && (
-            <div>
-
-              <div className="space-y-1">{favorites.map(renderSessionItem)}</div>
+        <div className={`flex-1 overflow-y-auto px-4 custom-scrollbar ${!isOpen && window.innerWidth >= 640 ? 'hidden' : ''}`}> 
+          {/* Favorites Section */}
+          <div className="sidebar-section">
+            <div className="sidebar-section-header" onClick={() => setShowFavorites(v => !v)}>
+              Favorites
+              <span className="sidebar-arrow">{showFavorites ? 'v' : '>'}</span>
             </div>
-          )}
-          <div>
-
-            <div className="space-y-1">{regular.map(renderSessionItem)}</div>
+            {showFavorites && favorites.length > 0 && (
+              <div className="sidebar-session-list sidebar-session-list-simple">{favorites.map(renderSessionItem)}</div>
+            )}
+          </div>
+          {/* Chats Section */}
+          <div className="sidebar-section">
+            <div className="sidebar-section-header" onClick={() => setShowChats(v => !v)}>
+              History
+              <span className="sidebar-arrow">{showChats ? 'v' : '>'}</span>
+            </div>
+            {showChats && (
+              <div className="sidebar-session-list sidebar-session-list-simple">{regular.map(renderSessionItem)}</div>
+            )}
           </div>
         </div>
 
         <div className="p-4 mt-auto border-t border-[var(--border)] space-y-4 pb-safe">
-          {isOpen && user.tier === 'free' && (
-            <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl">
-              <h4 className="text-[12px] font-bold text-amber-500 tracking-wide mb-1">Nexus Pro</h4>
-              <p className="text-[12px] text-[var(--text-secondary)] mb-3">Get unlimited messages.</p>
-              <button onClick={() => { onSetView('pricing'); if (window.innerWidth < 640) onToggle(); }} className="w-full py-2.5 bg-amber-500 text-white text-[12px] font-bold rounded-lg active:scale-95 transition-transform">Upgrade Now</button>
-            </div>
-          )}
+          {/* Billing/Upgrade hidden in beta */}
 
           <button 
             onClick={() => { onOpenSettings(); if (window.innerWidth < 640) onToggle(); }}

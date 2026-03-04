@@ -420,14 +420,30 @@ const App: React.FC = () => {
             view === 'chat' && activeSession ? (
               <>
                 <ChatArea session={activeSession} isLoading={isLoading} routingInfo={routingInfo} onExport={handleExportChat} onShare={() => {}} onModelChange={handleModelChange} onToggleSidebar={() => setIsSidebarOpen(true)} isSidebarOpen={isSidebarOpen} onRegenerate={handleRegenerate} onEditMessage={handleEditMessage} onFeedback={handleFeedback} theme={theme} onThemeToggle={handleThemeToggle} onSuggestionClick={(txt) => handleSendMessage(txt)} />
-                <MessageInput 
-                  onSendMessage={handleSendMessage}
-                  onStop={() => abortControllerRef.current?.abort()}
-                  isDisabled={isLoading} // Only disables stop/send button, not input
-                  preferredModel={activeSession.preferredModel}
-                  onModelChange={handleModelChange}
-                  activeSessionId={activeSessionId}
-                />
+                {activeSession.messages.length === 0 ? (
+                  <div className="message-input-center-container">
+                    <div className="message-input-center-content">
+                      <h2 className="message-input-center-heading">Hello! How Can I help you?</h2>
+                      <MessageInput 
+                        onSendMessage={handleSendMessage}
+                        onStop={() => abortControllerRef.current?.abort()}
+                        isDisabled={isLoading}
+                        preferredModel={activeSession.preferredModel}
+                        onModelChange={handleModelChange}
+                        activeSessionId={activeSessionId}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <MessageInput 
+                    onSendMessage={handleSendMessage}
+                    onStop={() => abortControllerRef.current?.abort()}
+                    isDisabled={isLoading}
+                    preferredModel={activeSession.preferredModel}
+                    onModelChange={handleModelChange}
+                    activeSessionId={activeSessionId}
+                  />
+                )}
               </>
             ) : view === 'dashboard' ? (
               <Suspense fallback={<LazyFallback />}><Dashboard stats={userStats!} onUpgrade={() => setView('pricing')} /></Suspense>

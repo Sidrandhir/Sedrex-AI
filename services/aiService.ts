@@ -509,12 +509,17 @@ function buildSystemInstruction(
     general:    MODE_GENERAL,
   };
 
+  // Shopping/ecommerce enhancement
+  const shoppingPrompt = `\nSHOPPING/E-COMMERCE RULES:\n- For any shopping, product, or ecommerce query, always include:\n  1. At least one product image (as a direct image URL, shown above the product name).\n  2. A direct product link to a top retailer (Amazon, Flipkart, Croma, Tata Cliq, Reliance Digital, Walmart, Best Buy, etc.) immediately next to the product name, formatted as markdown: [Buy on Amazon](https://amazon.in/product).\n  3. The product link must be styled in green (use <span style=\"color:#10b981\">[Buy on Amazon](https://amazon.in/product)</span> in markdown).\n  4. A video review link if available, shown as [Watch Video](https://youtube.com/...).\n- Prefer Indian retailers if user is in India or mentions INR, Flipkart, Croma, Tata Cliq, etc.\n- If no image or video is available, say so clearly.\n- Suggestions should include: 'Show product images', 'View product video', 'Compare prices on Flipkart', etc.\n- Example format:\n  ![Product Name](https://image-url.jpg)\n  **Product Name** <span style=\"color:#10b981\">[Buy on Amazon](https://amazon.in/product)</span>\n  [Watch Video](https://youtube.com/...)`;
+
   const parts = [
     CORE_PROMPT,
     FORMAT_RULES,
     modeMap[intent],
     FAIL_FORWARD,
     ARTIFACT_MODE,
+    shoppingPrompt,
+    `IMPORTANT: Always answer ONLY the current user question. Never include or repeat answers to previous questions unless the user explicitly asks for a summary or reference. Do not reference or restate any previous question or answer unless requested.`,
     `CONTEXT\nCurrent date/time: ${new Date().toUTCString()}`,
   ];
 
@@ -791,6 +796,13 @@ async function processRequest(
       let usage    = { totalTokenCount: 0, promptTokenCount: 0, candidatesTokenCount: 0 };
       const groundingChunks: GroundingChunk[] = [];
 
+      // Show 'thinking...' loader for long/complex queries
+      const isLongOrComplex = prompt.length > 120 || routing.complexity > 0.7;
+      if (onStreamChunk && isLongOrComplex) {
+        onStreamChunk('Thinking...');
+        await sleep(1200 + Math.floor(Math.random() * 1200)); // 1.2–2.4s delay
+      }
+
       if (onStreamChunk) {
         const stream = await ai.models.generateContentStream({
           model:    engine,
@@ -807,6 +819,7 @@ async function processRequest(
           if (gc) groundingChunks.push(...(gc as GroundingChunk[]));
         }
       } else {
+        if (isLongOrComplex) await sleep(1200 + Math.floor(Math.random() * 1200));
         const response = await ai.models.generateContent({
           model:    engine,
           contents,
@@ -897,10 +910,16 @@ export const generateFollowUpSuggestions = async (
   try {
     const ai      = new GoogleGenAI({ apiKey });
     const trimmed = lastMsg.slice(0, 800);
+    // If the topic is shopping or ecommerce, enhance the prompt
+    const isShopping = /shop|shopping|ecommerce|buy|purchase|order|cart|checkout|product|deal|discount|price|amazon|flipkart|ebay|walmart|best buy/i.test(intent + ' ' + lastMsg);
+    const extra = isShopping
+      ? '\nIf relevant, also suggest images, videos, or links that would help the user get a clearer understanding of the product or platform.'
+      : '';
     const response = await ai.models.generateContent({
       model:    MODELS.FLASH,
-      contents: `Given this AI response about "${intent}", suggest 3 specific follow-up questions a professional user would genuinely ask next. Return a JSON array of strings only — no markdown, no preamble.\n\n"${trimmed}"`,
-      config:   { maxOutputTokens: 256 },
+      contents:
+        `Given this AI response about "${intent}", suggest 3 very short, direct follow-up questions a user is most likely to ask next. Each question should be 6 words or less, focused, and actionable. Prioritize the most natural next step, not generic or broad questions.${extra} Return a JSON array of strings only — no markdown, no preamble.\n\n"${trimmed}"`,
+      config:   { maxOutputTokens: 128 },
     });
     const raw = (response.text ?? "").replace(/```json|```/g, "").trim();
     return (JSON.parse(raw) as string[]).slice(0, 3);

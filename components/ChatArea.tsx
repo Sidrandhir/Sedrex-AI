@@ -938,7 +938,11 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* Scroll-to-bottom button */}
       {showScrollBtn && (
-        <button className="scroll-to-bottom-btn-center" onClick={scrollToBottom} aria-label="Scroll to latest">
+        <button
+          className={`scroll-to-bottom-btn-center${isSidebarOpen ? ' scroll-to-bottom-btn-shifted' : ''}`}
+          onClick={scrollToBottom}
+          aria-label="Scroll to latest"
+        >
           <svg viewBox="0 0 24 24" style={{ width: 16, height: 16 }} fill="none" stroke="currentColor" strokeWidth="2.5">
             <path d="M7 13l5 5 5-5M7 6l5 5 5-5" />
           </svg>
