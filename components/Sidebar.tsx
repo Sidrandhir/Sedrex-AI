@@ -8,16 +8,17 @@ interface SidebarProps {
   activeSessionId: string;
   onNewChat: () => void;
   onSelectSession: (id: string) => void;
-  view: 'chat' | 'dashboard' | 'admin';
-  onSetView: (view: 'chat' | 'dashboard' | 'admin') => void;
+  view: 'chat' | 'dashboard' | 'admin' | 'pricing' | 'billing';
+  onSetView: (view: 'chat' | 'dashboard' | 'admin' | 'pricing' | 'billing') => void;
   stats: UserStats | null;
   onDeleteSession: (id: string) => void;
   onRenameSession: (id: string, newTitle: string) => void;
   onToggleFavorite: (id: string) => void;
   onOpenSettings: () => void;
-  searchInputRef: React.RefObject<HTMLInputElement>;
+  searchInputRef: React.RefObject<HTMLInputElement | null>;
   isOpen: boolean;
   onToggle: () => void;
+  onOpenCommandPalette: () => void;
   user: User;
 }
 
@@ -36,6 +37,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   searchInputRef,
   isOpen,
   onToggle,
+  onOpenCommandPalette,
   user
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -90,6 +92,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const favorites = filteredSessions.filter(s => s.isFavorite);
   const regular = filteredSessions.filter(s => !s.isFavorite);
+  const hasSearch = debouncedSearch.trim().length > 0;
+  const hasNoSearchResults = hasSearch && filteredSessions.length === 0;
 
   // Dropdown state for sections
   const [showFavorites, setShowFavorites] = useState(true);
@@ -271,6 +275,19 @@ const Sidebar: React.FC<SidebarProps> = ({
             <Icons.Plus />
             {isOpen && <span className="truncate uppercase tracking-widest text-[12px] sm:text-[11px]">New Chat</span>}
           </button>
+
+          {/* Collapsed-only command palette highlighter */}
+          {!isOpen && window.innerWidth >= 640 && (
+            <button
+              onClick={onOpenCommandPalette}
+              aria-label="Open command palette"
+              data-nexus-tooltip="Open command palette (Ctrl/Cmd + K)"
+              className="mt-3 w-10 rounded-xl border border-emerald-500/45 bg-emerald-500/10 p-1.5 text-center text-[9px] font-black uppercase leading-tight tracking-wide text-emerald-400 shadow-[0_0_0_1px_rgba(16,185,129,0.2)] transition-all hover:bg-emerald-500/15"
+            >
+              <span className="block">Ctrl</span>
+              <span className="block text-[11px]">K</span>
+            </button>
+          )}
         </div>
 
         {isOpen && (
@@ -285,11 +302,42 @@ const Sidebar: React.FC<SidebarProps> = ({
                 onChange={handleSearchChange}
                 className="w-full bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl py-3 pl-10 pr-4 text-[13px] font-medium outline-none focus:border-emerald-500/50"
               />
+              {searchTerm.trim() && (
+                <button
+                  aria-label="Clear chat search"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setDebouncedSearch('');
+                    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+                    searchInputRef.current?.focus();
+                  }}
+                  className="absolute inset-y-0 right-3 flex items-center text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                >
+                  <Icons.X className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
         )}
 
         <div className={`flex-1 overflow-y-auto px-4 custom-scrollbar ${!isOpen && window.innerWidth >= 640 ? 'hidden' : ''}`}> 
+          {hasNoSearchResults && (
+            <div className="mb-4 rounded-xl border border-[var(--border)] bg-[var(--bg-primary)] p-3">
+              <p className="text-[12px] font-semibold text-[var(--text-primary)]">No chats found</p>
+              <p className="mt-1 text-[11px] text-[var(--text-secondary)]">No match for "{debouncedSearch}".</p>
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setDebouncedSearch('');
+                  searchInputRef.current?.focus();
+                }}
+                className="mt-2 text-[11px] font-semibold text-emerald-500 hover:text-emerald-400"
+              >
+                Clear search
+              </button>
+            </div>
+          )}
+
           {/* Favorites Section */}
           <div className="sidebar-section">
             <div className="sidebar-section-header" onClick={() => setShowFavorites(v => !v)}>
@@ -298,6 +346,11 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
             {showFavorites && favorites.length > 0 && (
               <div className="sidebar-session-list sidebar-session-list-simple">{favorites.map(renderSessionItem)}</div>
+            )}
+            {showFavorites && favorites.length === 0 && !hasNoSearchResults && (
+              <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--bg-primary)]/50 px-3 py-2 text-[11px] text-[var(--text-secondary)]">
+                Pin chats to keep your favorites here.
+              </div>
             )}
           </div>
           {/* Recent Chats Section */}
@@ -308,6 +361,17 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
             {showChats && (
               <div className="sidebar-session-list sidebar-session-list-simple">{regular.map(renderSessionItem)}</div>
+            )}
+            {showChats && regular.length === 0 && !hasNoSearchResults && (
+              <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--bg-primary)]/50 px-3 py-3">
+                <p className="text-[11px] font-semibold text-[var(--text-primary)]">No recent chats yet.</p>
+                <button
+                  onClick={() => { onNewChat(); onSetView('chat'); }}
+                  className="mt-1 text-[11px] font-semibold text-emerald-500 hover:text-emerald-400"
+                >
+                  Start your first chat
+                </button>
+              </div>
             )}
           </div>
         </div>

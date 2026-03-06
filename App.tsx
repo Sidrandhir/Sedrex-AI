@@ -16,6 +16,7 @@ import { Routes, Route, Link } from 'react-router-dom';
 import Privacy from './components/Privacy';
 import Terms from './components/Terms';
 import Contact from './components/Contact';
+import CommandPalette from './components/CommandPalette';
 import { isSupabaseConfigured as initialConfigured, supabase } from './services/supabaseClient';
 
 // Lazy-load heavy components that aren't needed on initial render
@@ -50,6 +51,7 @@ const App: React.FC = () => {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showSurvey, setShowSurvey] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('nexus_theme') as 'light' | 'dark') || 'dark');
   const [userSettings, setUserSettings] = useState(() => {
     const saved = localStorage.getItem('nexus_user_settings');
@@ -58,6 +60,7 @@ const App: React.FC = () => {
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const touchStartRef = useRef<{ x: number, y: number } | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const addToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
     const id = Math.random().toString(36).substr(2, 9);
@@ -83,6 +86,18 @@ const App: React.FC = () => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('nexus_theme', theme);
   }, [theme]);
+
+  // Opens command palette globally with Ctrl/Cmd + K
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'k') return;
+      e.preventDefault();
+      setIsCommandPaletteOpen(true);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleThemeToggle = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
 
@@ -393,7 +408,7 @@ const App: React.FC = () => {
     <ErrorBoundary>
       <div className="flex h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden font-sans relative">
       {showSurvey && <Suspense fallback={<LazyFallback />}><OnboardingSurvey onComplete={handleSurveyComplete} userName={user.personification || user.email} /></Suspense>}
-      <Sidebar sessions={sessions} activeSessionId={activeSessionId} onNewChat={handleNewChat} onSelectSession={handleSelectSession} view={view} onSetView={setView} stats={userStats} onDeleteSession={handleDeleteSession} onRenameSession={handleRenameSession} onToggleFavorite={handleToggleFavorite} onOpenSettings={() => setIsSettingsOpen(true)} searchInputRef={null as any} isOpen={isSidebarOpen} onToggle={() => setIsSidebarOpen(!isSidebarOpen)} user={user} />
+      <Sidebar sessions={sessions} activeSessionId={activeSessionId} onNewChat={handleNewChat} onSelectSession={handleSelectSession} view={view} onSetView={setView} stats={userStats} onDeleteSession={handleDeleteSession} onRenameSession={handleRenameSession} onToggleFavorite={handleToggleFavorite} onOpenSettings={() => setIsSettingsOpen(true)} searchInputRef={searchInputRef} isOpen={isSidebarOpen} onToggle={() => setIsSidebarOpen(!isSidebarOpen)} onOpenCommandPalette={() => setIsCommandPaletteOpen(true)} user={user} />
       <main className="flex-1 flex flex-col min-w-0 relative">
         <Routes>
           <Route path="/" element={
@@ -450,6 +465,17 @@ const App: React.FC = () => {
       
       {showOnboarding && <Suspense fallback={<LazyFallback />}><MobileOnboarding onComplete={completeOnboarding} /></Suspense>}
       <Suspense fallback={null}><SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userSettings={userSettings} onSave={(s) => { setUserSettings(s); localStorage.setItem('nexus_user_settings', JSON.stringify(s)); }} onPurgeHistory={() => api.purgeAllConversations().then(() => { setSessions([]); setActiveSessionId(''); })} onUpgrade={() => { setIsSettingsOpen(false); setView('pricing'); }} onLogout={handleLogout} user={user} stats={userStats} onThemeToggle={handleThemeToggle} theme={theme} /></Suspense>
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onNewChat={handleNewChat}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        onGoChat={() => setView('chat')}
+        onGoDashboard={() => setView('dashboard')}
+        onGoPricing={() => setView('pricing')}
+        onGoBilling={() => setView('billing')}
+        onToggleTheme={handleThemeToggle}
+      />
       <Toast toasts={toasts} onRemove={removeToast} />
       </div>
     </ErrorBoundary>
