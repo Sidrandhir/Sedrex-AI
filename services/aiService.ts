@@ -99,6 +99,54 @@ const MAX_CONCURRENT_REQUESTS = Number(process.env.NEXUS_MAX_CONCURRENT_REQUESTS
 const MAX_QUEUED_REQUESTS = Number(process.env.NEXUS_MAX_QUEUED_REQUESTS ?? 1000);
 const requestQueue = new KeyedConcurrentQueue(MAX_CONCURRENT_REQUESTS, MAX_QUEUED_REQUESTS);
 
+const REQUEST_RATE_WINDOW_MS = Number(process.env.NEXUS_RATE_WINDOW_MS ?? 60_000);
+const REQUEST_RATE_MAX = Number(process.env.NEXUS_RATE_MAX_PER_WINDOW ?? 30);
+
+const API_KEY_COOLDOWN_MS = Number(process.env.NEXUS_API_KEY_COOLDOWN_MS ?? 30_000);
+const apiKeyPool = [
+  process.env.GEMINI_KEY_1,
+  process.env.GEMINI_KEY_2,
+  process.env.GEMINI_KEY_3,
+  process.env.GEMINI_KEY_4,
+  process.env.GEMINI_KEY_5,
+  process.env.GEMINI_KEY_6,
+  process.env.API_KEY,
+  process.env.GEMINI_API_KEY,
+].filter((k): k is string => !!k && k.trim().length > 0);
+
+let apiKeyIndex = 0;
+const apiKeyCooling = new Map<string, number>();
+
+function getApiKey(): string {
+  if (apiKeyPool.length === 0) return "";
+
+  const now = Date.now();
+  for (let i = 0; i < apiKeyPool.length; i++) {
+    const idx = (apiKeyIndex + i) % apiKeyPool.length;
+    const key = apiKeyPool[idx];
+    const cooldownUntil = apiKeyCooling.get(key) ?? 0;
+    if (cooldownUntil <= now) {
+      apiKeyIndex = (idx + 1) % apiKeyPool.length;
+      return key;
+    }
+  }
+
+  // All keys are in cooldown; use round-robin anyway as last resort.
+  const fallback = apiKeyPool[apiKeyIndex % apiKeyPool.length];
+  apiKeyIndex = (apiKeyIndex + 1) % apiKeyPool.length;
+  return fallback;
+}
+
+function markApiKeyFailure(key: string): void {
+  if (!key) return;
+  apiKeyCooling.set(key, Date.now() + API_KEY_COOLDOWN_MS);
+}
+
+function markApiKeySuccess(key: string): void {
+  if (!key) return;
+  apiKeyCooling.delete(key);
+}
+
 const RESPONSE_CACHE_TTL_MS = Number(process.env.NEXUS_RESPONSE_CACHE_TTL_MS ?? 45_000);
 const CIRCUIT_FAIL_THRESHOLD = Number(process.env.NEXUS_CIRCUIT_FAIL_THRESHOLD ?? 6);
 const CIRCUIT_FAIL_WINDOW_MS = Number(process.env.NEXUS_CIRCUIT_FAIL_WINDOW_MS ?? 30_000);
@@ -107,6 +155,20 @@ const CIRCUIT_OPEN_MS = Number(process.env.NEXUS_CIRCUIT_OPEN_MS ?? 20_000);
 type CacheEntry = { value: NexusResponse; expiresAt: number };
 const responseCache = new Map<string, CacheEntry>();
 const inFlightByFingerprint = new Map<string, Promise<NexusResponse>>();
+const clientRequestWindows = new Map<string, number[]>();
+
+function isClientRateLimited(clientId: string): boolean {
+  const now = Date.now();
+  const list = clientRequestWindows.get(clientId) ?? [];
+  const kept = list.filter((ts) => now - ts <= REQUEST_RATE_WINDOW_MS);
+  if (kept.length >= REQUEST_RATE_MAX) {
+    clientRequestWindows.set(clientId, kept);
+    return true;
+  }
+  kept.push(now);
+  clientRequestWindows.set(clientId, kept);
+  return false;
+}
 
 const circuitState = {
   openUntil: 0,
@@ -822,12 +884,23 @@ function parseEmbeddedJson(raw: string): any | null {
     // Try to parse first JSON object embedded in a larger string.
   }
 
-  const start = direct.indexOf("{");
-  const end = direct.lastIndexOf("}");
-  if (start >= 0 && end > start) {
-    const maybeJson = direct.slice(start, end + 1);
+  const objStart = direct.indexOf("{");
+  const objEnd = direct.lastIndexOf("}");
+  if (objStart >= 0 && objEnd > objStart) {
+    const maybeJson = direct.slice(objStart, objEnd + 1);
     try {
       return JSON.parse(maybeJson);
+    } catch {
+      // continue and try array extraction
+    }
+  }
+
+  const arrStart = direct.indexOf("[");
+  const arrEnd = direct.lastIndexOf("]");
+  if (arrStart >= 0 && arrEnd > arrStart) {
+    const maybeArray = direct.slice(arrStart, arrEnd + 1);
+    try {
+      return JSON.parse(maybeArray);
     } catch {
       return null;
     }
@@ -913,6 +986,17 @@ export const getAIResponse = async (
   signal?:          AbortSignal,
   queueKey = "global",
 ): Promise<NexusResponse> => {
+  const clientId = (queueKey?.split(":")[0] || "global").trim() || "global";
+  if (isClientRateLimited(clientId)) {
+    const limitedRoute = routePrompt(prompt, !!image, documents.length > 0);
+    onRouting?.(limitedRoute);
+    return buildSafeModeResponse(
+      prompt,
+      limitedRoute,
+      "You sent too many requests in a short time. Please wait a few seconds and retry.",
+    );
+  }
+
   const fingerprint = buildFingerprint(prompt, history, manualModel, documents);
   const now = Date.now();
   const cached = responseCache.get(fingerprint);
@@ -1034,16 +1118,16 @@ async function processRequest(
   };
 
   // ── API key ─────────────────────────────────────────────────────
-  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || "";
-  if (!apiKey) {
+  if (apiKeyPool.length === 0) {
     throw new Error("Gemini API key not configured. Set GEMINI_API_KEY in your environment.");
   }
-  const ai = new GoogleGenAI({ apiKey });
 
   // ── Retry loop with exponential backoff ─────────────────────────
   let lastError: unknown;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const currentApiKey = getApiKey();
+    const ai = new GoogleGenAI({ apiKey: currentApiKey });
     try {
       let fullText = "";
       let usage    = { totalTokenCount: 0, promptTokenCount: 0, candidatesTokenCount: 0 };
@@ -1085,6 +1169,7 @@ async function processRequest(
       const content    = postProcess(fullText);
       const confidence = computeConfidence(intent, routing.complexity, useSearch);
       const latency    = Date.now() - startTime;
+      markApiKeySuccess(currentApiKey);
       markSuccess();
 
       // Emit observability event
@@ -1118,6 +1203,10 @@ async function processRequest(
       const msgRaw = ((err as Error).message ?? "");
       const msg    = msgRaw.toLowerCase();
       const isRetryable = isRetryableMessage(msg);
+
+      if (isRetryable) {
+        markApiKeyFailure(currentApiKey);
+      }
 
       if (isRetryable && attempt < MAX_RETRIES - 1) {
         markRetryableFailure();
@@ -1169,9 +1258,9 @@ export const generateFollowUpSuggestions = async (
   lastMsg: string,
   intent:  string,
 ): Promise<string[]> => {
-  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || "";
-  if (!apiKey) return [];
+  if (apiKeyPool.length === 0) return [];
   try {
+    const apiKey = getApiKey();
     const ai      = new GoogleGenAI({ apiKey });
     const trimmed = lastMsg.slice(0, 800);
     // If the topic is shopping or ecommerce, enhance the prompt
@@ -1186,16 +1275,27 @@ export const generateFollowUpSuggestions = async (
       config:   { maxOutputTokens: 128 },
     });
     const raw = (response.text ?? "").replace(/```json|```/g, "").trim();
-    return (JSON.parse(raw) as string[]).slice(0, 3);
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.slice(0, 3);
+      }
+    } catch {
+      const repaired = parseEmbeddedJson(raw);
+      if (Array.isArray(repaired)) {
+        return repaired.slice(0, 3);
+      }
+    }
+    return [];
   } catch {
     return [];
   }
 };
 
 export const generateChatTitle = async (firstMessage: string): Promise<string> => {
-  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || "";
-  if (!apiKey) return "New Session";
+  if (apiKeyPool.length === 0) return "New Session";
   try {
+    const apiKey = getApiKey();
     const ai      = new GoogleGenAI({ apiKey });
     const trimmed = firstMessage.slice(0, 1_000);
     const response = await ai.models.generateContent({
