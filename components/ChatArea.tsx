@@ -452,7 +452,7 @@ const EnhancedTable = ({ children }: any) => {
 
 // ── Inline code style (shared) ────────────────────────────────────
 const inlineCodeStyle: React.CSSProperties = {
-  fontFamily: "'JetBrains Mono', 'Fira Code', ui-monospace, monospace",
+  fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
   fontSize: '0.875em',
   fontWeight: 500,
   padding: '0.15em 0.45em',
@@ -665,7 +665,7 @@ const MessageItem = memo(
 
             {/* Markdown body */}
             {msg.content && (
-              <div className="markdown-body">
+              <div className="markdown-body response-text">
                 <ReactMarkdown remarkPlugins={remarkPlugins} components={mdComponents}>
                   {typeof msg.content === 'string' ? msg.content : String(msg.content ?? '')}
                 </ReactMarkdown>
