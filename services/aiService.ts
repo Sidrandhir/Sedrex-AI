@@ -423,6 +423,7 @@ const TECHNICAL_STRONG = new Set([
 ]);
 
 const MATH_PATTERNS = /\b(solve|calculate|how far|how long|how much|how many|what is \d|percentage|ratio|average|probability|km\/h|mph|m\/s|km\s|miles?\s)\b/i;
+const TABLE_PATTERNS = /\b(build.{0,12}table|create.{0,12}table|make.{0,12}table|comparison table|compare .{0,40} vs|side[- ]by[- ]side|breakdown of|rank(?:ing)? of|tabular|matrix|grid)\b/i;
 
 // Analytical = deep thinking, strategy, comparison, research
 const ANALYTICAL_SIGNALS = new Set([
@@ -449,6 +450,9 @@ export function classifyIntent(
   // Real-time data — highest priority
   if ([...LIVE_SIGNALS].some((k) => p.includes(k))) return "live";
   if ([...PRODUCT_SIGNALS].some((k) => p.includes(k))) return "live";
+
+  // Table/comparison requests require structured analytical output and higher token budget.
+  if (TABLE_PATTERNS.test(prompt)) return "analytical";
 
   // Technical: code, math, physics, engineering
   if (p.includes("```") || MATH_PATTERNS.test(p)) return "technical";
@@ -736,7 +740,8 @@ interface GenConfig {
   useThinking: boolean;
 }
 
-function getGenerationConfig(intent: NexusIntent, complexity: number): GenConfig {
+function getGenerationConfig(intent: NexusIntent, complexity: number, prompt: string): GenConfig {
+  const isTablePrompt = TABLE_PATTERNS.test(prompt) || /\b(table|comparison|vs|versus|matrix|grid|breakdown)\b/i.test(prompt);
   const temp: Record<NexusIntent, number> = {
     technical:  0.1,
     analytical: 0.35,
@@ -749,13 +754,14 @@ function getGenerationConfig(intent: NexusIntent, complexity: number): GenConfig
     technical:  [1024, 12288],
     analytical: [2048, 10240],
     live:       [512,  3072],
-    general:    [512,  4096],
+    general:    isTablePrompt ? [2048, 8192] : [512, 4096],
   };
 
   const [min, max] = budget[intent];
+  const complexityFloor = isTablePrompt ? Math.max(complexity, 0.5) : complexity;
   return {
     temperature: temp[intent],
-    maxTokens:   Math.round(min + (max - min) * complexity),
+    maxTokens:   Math.round(min + (max - min) * complexityFloor),
     useThinking: (intent === "analytical" || intent === "technical") && complexity > 0.65,
   };
 }
@@ -864,6 +870,19 @@ function postProcess(raw: string): string {
       }
     }
     if (deduped.length < blocks.length) t = deduped.join("\n\n");
+  }
+
+  // If markdown table appears truncated, warn clearly instead of ending abruptly.
+  const lines = t.split("\n");
+  const tableLines = lines.filter((l) => l.trim().startsWith("|"));
+  if (tableLines.length >= 2) {
+    const lastMeaningfulLine = [...lines].reverse().find((l) => l.trim().length > 0) ?? "";
+    const hasHeaderSeparator = tableLines.some((l) => /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(l.trim()));
+    const oddPipeCount = (lastMeaningfulLine.match(/\|/g) ?? []).length % 2 === 1;
+    const looksTruncatedTable = lastMeaningfulLine.trim().startsWith("|") && (!hasHeaderSeparator || oddPipeCount);
+    if (looksTruncatedTable && !/table was cut off/i.test(t)) {
+      t += "\n\n> Table was cut off due to response length. Type \"continue table\" to get the remaining rows.";
+    }
   }
 
   const cleaned = t.trim();
@@ -986,6 +1005,7 @@ export const getAIResponse = async (
   queueKey = "global",
 ): Promise<NexusResponse> => {
   const clientId = (queueKey?.split(":")[0] || "global").trim() || "global";
+  const isTablePrompt = TABLE_PATTERNS.test(prompt);
   if (isClientRateLimited(clientId)) {
     const limitedRoute = routePrompt(prompt, !!image, documents.length > 0);
     onRouting?.(limitedRoute);
@@ -999,13 +1019,17 @@ export const getAIResponse = async (
   const fingerprint = buildFingerprint(prompt, history, manualModel, documents);
   const now = Date.now();
   const cached = responseCache.get(fingerprint);
-  if (cached && cached.expiresAt > now) {
+  if (!isTablePrompt && cached && cached.expiresAt > now) {
     onRouting?.(cached.value.routingContext);
     return cached.value;
   }
 
   const inFlight = inFlightByFingerprint.get(fingerprint);
-  if (inFlight) return inFlight;
+  if (inFlight && !isTablePrompt) return inFlight;
+
+  const effectiveQueueKey = isTablePrompt
+    ? `${queueKey}:tbl:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 7)}`
+    : queueKey;
 
   const work = requestQueue
     .add(() =>
@@ -1013,10 +1037,10 @@ export const getAIResponse = async (
         prompt, history, manualModel, onRouting,
         image, documents, personification, onStreamChunk, signal,
       ),
-      queueKey,
+      effectiveQueueKey,
     )
     .then((res) => {
-      if (res.routingContext.intent !== "live") {
+      if (res.routingContext.intent !== "live" && !isTablePrompt) {
         responseCache.set(fingerprint, { value: res, expiresAt: Date.now() + RESPONSE_CACHE_TTL_MS });
       }
       return res;
@@ -1085,6 +1109,7 @@ async function processRequest(
   const useSearch     = intent === "live" || isProductQuery || freshnessSignals.test(prompt);
   const useProModel   = (nexusIntent === "technical" || nexusIntent === "analytical") && routing.complexity > 0.65;
   const engine        = useProModel ? MODELS.PRO : MODELS.FLASH;
+  const isTablePrompt = TABLE_PATTERNS.test(prompt);
 
   if (isCircuitOpen()) {
     return buildSafeModeResponse(prompt, routing, "High load protection is active. Please retry in a few seconds.");
@@ -1092,7 +1117,7 @@ async function processRequest(
 
   // ── Build request ───────────────────────────────────────────────
   const systemInstruction = buildSystemInstruction(nexusIntent, personification, isProductQuery);
-  const genConfig         = getGenerationConfig(nexusIntent, routing.complexity);
+  const genConfig         = getGenerationConfig(nexusIntent, routing.complexity, prompt);
   const contents          = buildHistory(history, nexusIntent);
 
   // Assemble current message parts
@@ -1106,10 +1131,9 @@ async function processRequest(
   parts.push({ text: prompt });
   contents.push({ role: "user", parts });
 
-  const modelConfig: any = {
+  const baseModelConfig: any = {
     systemInstruction,
     temperature:     genConfig.temperature,
-    maxOutputTokens: genConfig.maxTokens,
     ...(useSearch && { tools: [{ googleSearch: {} }] }),
     ...(genConfig.useThinking && engine === MODELS.PRO && {
       thinkingConfig: { thinkingBudget: Math.min(Math.round(genConfig.maxTokens * 0.35), 4096) },
@@ -1123,14 +1147,19 @@ async function processRequest(
 
   // ── Retry loop with exponential backoff ─────────────────────────
   let lastError: unknown;
+  let dynamicMaxTokens = isTablePrompt
+    ? Math.max(genConfig.maxTokens, 2048)
+    : genConfig.maxTokens;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const currentApiKey = getApiKey();
     const ai = new GoogleGenAI({ apiKey: currentApiKey });
     try {
       let fullText = "";
+      let finishReason = "";
       let usage    = { totalTokenCount: 0, promptTokenCount: 0, candidatesTokenCount: 0 };
       const groundingChunks: GroundingChunk[] = [];
+      const modelConfig = { ...baseModelConfig, maxOutputTokens: dynamicMaxTokens };
 
       // Stream a quick progress hint without adding artificial delay.
       const isLongOrComplex = prompt.length > 120 || routing.complexity > 0.7;
@@ -1150,6 +1179,8 @@ async function processRequest(
           fullText += text;
           onStreamChunk(text);
           if (chunk.usageMetadata) usage = chunk.usageMetadata as typeof usage;
+          const fr = String(chunk.candidates?.[0]?.finishReason ?? "");
+          if (fr) finishReason = fr;
           const gc = chunk.candidates?.[0]?.groundingMetadata?.groundingChunks;
           if (gc) groundingChunks.push(...(gc as GroundingChunk[]));
         }
@@ -1161,8 +1192,15 @@ async function processRequest(
         });
         fullText = response.text ?? "";
         usage    = (response.usageMetadata as typeof usage) ?? usage;
+        finishReason = String(response.candidates?.[0]?.finishReason ?? "");
         const gc = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
         if (gc) groundingChunks.push(...(gc as GroundingChunk[]));
+      }
+
+      if (isTablePrompt && /max/i.test(finishReason) && attempt < MAX_RETRIES - 1) {
+        dynamicMaxTokens = Math.min(Math.round(dynamicMaxTokens * 1.7), 12288);
+        await sleep(Math.min(600 * (attempt + 1), 2500));
+        continue;
       }
 
       const content    = postProcess(fullText);
@@ -1258,8 +1296,9 @@ export const generateFollowUpSuggestions = async (
   intent:  string,
 ): Promise<string[]> => {
   if (apiKeyPool.length === 0) return [];
+  let apiKey = "";
   try {
-    const apiKey = getApiKey();
+    apiKey = getApiKey();
     const ai      = new GoogleGenAI({ apiKey });
     const trimmed = lastMsg.slice(0, 800);
     // If the topic is shopping or ecommerce, enhance the prompt
@@ -1277,24 +1316,29 @@ export const generateFollowUpSuggestions = async (
     try {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
+        markApiKeySuccess(apiKey);
         return parsed.slice(0, 3);
       }
     } catch {
       const repaired = parseEmbeddedJson(raw);
       if (Array.isArray(repaired)) {
+        markApiKeySuccess(apiKey);
         return repaired.slice(0, 3);
       }
     }
+    markApiKeySuccess(apiKey);
     return [];
   } catch {
+    markApiKeyFailure(apiKey);
     return [];
   }
 };
 
 export const generateChatTitle = async (firstMessage: string): Promise<string> => {
   if (apiKeyPool.length === 0) return "New Session";
+  let apiKey = "";
   try {
-    const apiKey = getApiKey();
+    apiKey = getApiKey();
     const ai      = new GoogleGenAI({ apiKey });
     const trimmed = firstMessage.slice(0, 1_000);
     const response = await ai.models.generateContent({
@@ -1302,14 +1346,17 @@ export const generateChatTitle = async (firstMessage: string): Promise<string> =
       contents: `Summarize this message as a professional 3–5 word chat title. Return ONLY the title text. No quotes. No period.\n\n"${trimmed}"`,
       config:   { maxOutputTokens: 32 },
     });
-    return (
+    const title = (
       (response.text ?? "")
         .trim()
         .replace(/['"]/g, "")
         .replace(/\.$/, "")
       || "New Session"
     );
+    markApiKeySuccess(apiKey);
+    return title;
   } catch {
+    markApiKeyFailure(apiKey);
     return "New Session";
   }
 };
