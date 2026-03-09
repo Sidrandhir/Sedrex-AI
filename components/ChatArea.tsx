@@ -712,6 +712,17 @@ const MessageItem = memo(
                   ? <Icons.VolumeX className="icon-14" />
                   : <Icons.Volume2 className="icon-14" />}
               </button>
+              
+              {/* TODO: TEMPORARY FEEDBACK FORM BUTTON — Remove entire this section when feedback form not needed */}
+              <button
+                className="message-action-btn feedback-form-btn"
+                onClick={() => window.open('https://forms.gle/SB93bLtFPjvJnRNRA', '_blank')}
+                title="Send feedback"
+              >
+                Feedback Form
+              </button>
+              {/* END TEMPORARY FEEDBACK FORM */}
+
               <div className="message-action-divider" />
               <button
                 className={`message-action-btn${msg.feedback === 'good' ? ' active-good' : ''}`}

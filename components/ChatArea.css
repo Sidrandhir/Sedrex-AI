@@ -680,6 +680,26 @@
   color: var(--accent, #10a37f);
   animation: pulse-speak 1.8s ease-in-out infinite;
 }
+
+/* TODO: TEMPORARY FEEDBACK FORM BUTTON STYLE — Remove this section when feedback form not needed */
+.message-action-btn.feedback-form-btn {
+  width: auto;
+  padding: 6px 12px;
+  height: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: #FFD600;
+  border: 2px solid #FFD600;
+  background: transparent;
+  transition: all var(--nx-transition);
+}
+.message-action-btn.feedback-form-btn:hover {
+  color: #000;
+  background: #FFD600;
+  border-color: #FFD600;
+}
+/* END TEMPORARY FEEDBACK FORM BUTTON */
+
 .message-action-divider {
   width: 1px;
   height: 14px;
