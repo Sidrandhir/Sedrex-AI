@@ -291,7 +291,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
               <ul className="pain-list">
                 <li><span className="pain-icon-good">⚡</span>One input. Best answer. First try. Every time.</li>
                 <li><span className="pain-icon-good">🧠</span>Nexus reads your intent — you never pick a model.</li>
-                <li><span className="pain-icon-good">💰</span>One subscription. Full coverage. $29/mo.</li>
+                <li><span className="pain-icon-good">💰</span>One subscription. Full coverage.</li>
                 <li><span className="pain-icon-good">🎯</span>Stay in one place. Stay in flow. Stay productive.</li>
               </ul>
             </div>
@@ -345,7 +345,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
               <div className="m-stat-divider"></div>
               <div className="m-stat">
                 <span className="m-stat-num">1</span>
-                <span className="m-stat-label">subscription instead of three</span>
+                <span className="m-stat-label">subscription instead of multiple</span>
               </div>
               <div className="m-stat-divider"></div>
               <div className="m-stat">
