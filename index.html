@@ -25,9 +25,7 @@
   <!-- Preload critical fonts to prevent FOUT/CLS -->
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-  <!-- Tailwind: load async to unblock rendering (fixes LCP) -->
-  <!-- Tailwind CSS is bundled via PostCSS in production. Remove CDN. -->
-  <link rel="stylesheet" href="/dist/output.css">
+  <!-- Tailwind CSS is bundled via PostCSS main.tsx import; styles loaded from index.css -->
   <style>
     :root {
       --bg-primary: #171717;

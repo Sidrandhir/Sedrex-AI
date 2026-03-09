@@ -1068,6 +1068,12 @@ async function processRequest(
   onStreamChunk?:   (text: string) => void,
   signal?:          AbortSignal,
 ): Promise<NexusResponse> {
+  // FIX 4: Check if signal was already aborted before processing
+  // This prevents aborted requests from entering the queue and falsely tripping circuit breaker
+  if (signal?.aborted) {
+    throw new DOMException("Request aborted before processing", "AbortError");
+  }
+
   const startTime = Date.now();
 
   // ── Routing ─────────────────────────────────────────────────────
@@ -1174,7 +1180,10 @@ async function processRequest(
           config:   modelConfig,
         });
         for await (const chunk of stream) {
-          if (signal?.aborted) break;
+          // FIX 5: Throw AbortError instead of breaking to avoid returning partial response
+          if (signal?.aborted) {
+            throw new DOMException("Stream aborted by user", "AbortError");
+          }
           const text = chunk.text ?? "";
           fullText += text;
           onStreamChunk(text);
@@ -1246,7 +1255,10 @@ async function processRequest(
       }
 
       if (isRetryable && attempt < MAX_RETRIES - 1) {
-        markRetryableFailure();
+        // FIX 3: Only count real API failures, not abort signals
+        if ((err as any)?.name !== "AbortError") {
+          markRetryableFailure();
+        }
         const backoff = Math.min(1500 * 2 ** attempt, 20_000);
         console.warn(`[Nexus] Retryable error (attempt ${attempt + 1}/${MAX_RETRIES}). Retry in ${backoff}ms…`);
         await sleep(backoff);
@@ -1275,7 +1287,10 @@ async function processRequest(
         throw err;
       }
 
-      if (isRetryable) markRetryableFailure();
+      // FIX 3: Only count real API failures, not abort signals
+      if (isRetryable && (err as any)?.name !== "AbortError") {
+        markRetryableFailure();
+      }
       return buildSafeModeResponse(prompt, routing, normalizeErrorMessage(err));
     }
   }
