@@ -11,7 +11,7 @@ import {
 import { logError } from "./analyticsService";
 
 // ═══════════════════════════════════════════════════════════════════
-// NEXUS AI — PRODUCTION ENGINE v4.0
+// VERITAS AI — PRODUCTION ENGINE v4.0
 //
 // Built for: analysts, researchers, consultants, engineers, founders,
 // mathematicians, teachers, students — anyone who validates before acting.
@@ -1337,7 +1337,7 @@ export const generateFollowUpSuggestions = async (
       ? '\nIf relevant, also suggest images, videos, or links that would help the user get a clearer understanding of the product or platform.'
       : '';
     const response = await ai.models.generateContent({
-      model:    MODELS.FLASH_LITE,
+      model:    MODELS.FLASH,
       contents:
         `Given this AI response about "${intent}", suggest 3 very short, direct follow-up questions a user is most likely to ask next. Each question should be 6 words or less, focused, and actionable. Prioritize the most natural next step, not generic or broad questions.${extra} Return a JSON array of strings only — no markdown, no preamble.\n\n"${trimmed}"`,
       config:   { maxOutputTokens: 128 },
@@ -1372,7 +1372,7 @@ export const generateChatTitle = async (firstMessage: string): Promise<string> =
     const ai      = new GoogleGenAI({ apiKey });
     const trimmed = firstMessage.slice(0, 1_000);
     const response = await ai.models.generateContent({
-      model:    MODELS.FLASH_LITE,
+      model:    MODELS.FLASH,
       contents: `Summarize this message as a professional 3–5 word chat title. Return ONLY the title text. No quotes. No period.\n\n"${trimmed}"`,
       config:   { maxOutputTokens: 32 },
     });
