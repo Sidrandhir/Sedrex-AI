@@ -27,7 +27,7 @@ import { logError } from "./analyticsService";
 // ── Models ────────────────────────────────────────────────────────
 const MODELS = {
   FLASH: "gemini-2.5-flash",
-  FLASH_LITE: "gemini-2.0-flash-lite",
+  FLASH_LITE: "gemini-1.5-flash-8b", // Changed from non-existent gemini-2.0-flash-lite
   PRO:   "gemini-2.5-pro",
 } as const;
 
