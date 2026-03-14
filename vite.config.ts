@@ -15,6 +15,23 @@ export default defineConfig(({ mode }) => {
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY),
         'process.env.VITE_SUPABASE_URL': JSON.stringify(env.SUPABASE_URL || env.VITE_SUPABASE_URL),
         'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY),
+        // NEXUS AI Configuration
+        'process.env.NEXUS_MAX_CONCURRENT_REQUESTS': JSON.stringify(env.NEXUS_MAX_CONCURRENT_REQUESTS || '3'),
+        'process.env.NEXUS_MAX_QUEUED_REQUESTS': JSON.stringify(env.NEXUS_MAX_QUEUED_REQUESTS || '1000'),
+        'process.env.NEXUS_RATE_WINDOW_MS': JSON.stringify(env.NEXUS_RATE_WINDOW_MS || '60000'),
+        'process.env.NEXUS_RATE_MAX_PER_WINDOW': JSON.stringify(env.NEXUS_RATE_MAX_PER_WINDOW || '12'),
+        'process.env.NEXUS_API_KEY_COOLDOWN_MS': JSON.stringify(env.NEXUS_API_KEY_COOLDOWN_MS || '60000'),
+        'process.env.NEXUS_CIRCUIT_FAIL_THRESHOLD': JSON.stringify(env.NEXUS_CIRCUIT_FAIL_THRESHOLD || '10'),
+        'process.env.NEXUS_CIRCUIT_FAIL_WINDOW_MS': JSON.stringify(env.NEXUS_CIRCUIT_FAIL_WINDOW_MS || '30000'),
+        'process.env.NEXUS_CIRCUIT_OPEN_MS': JSON.stringify(env.NEXUS_CIRCUIT_OPEN_MS || '20000'),
+        'process.env.NEXUS_RESPONSE_CACHE_TTL_MS': JSON.stringify(env.NEXUS_RESPONSE_CACHE_TTL_MS || '45000'),
+        // API Keys
+        'process.env.GEMINI_KEY_1': JSON.stringify(env.GEMINI_KEY_1),
+        'process.env.GEMINI_KEY_2': JSON.stringify(env.GEMINI_KEY_2),
+        'process.env.GEMINI_KEY_3': JSON.stringify(env.GEMINI_KEY_3),
+        'process.env.GEMINI_KEY_4': JSON.stringify(env.GEMINI_KEY_4),
+        'process.env.GEMINI_KEY_5': JSON.stringify(env.GEMINI_KEY_5),
+        'process.env.GEMINI_KEY_6': JSON.stringify(env.GEMINI_KEY_6),
       },
       resolve: {
         alias: {

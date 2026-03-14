@@ -26,7 +26,8 @@ import { logError } from "./analyticsService";
 
 // ── Models ────────────────────────────────────────────────────────
 const MODELS = {
-  FLASH: "gemini-2.0-flash",
+  FLASH: "gemini-2.5-flash",
+  FLASH_LITE: "gemini-2.0-flash-lite",
   PRO:   "gemini-2.5-pro",
 } as const;
 
@@ -111,7 +112,21 @@ const apiKeyPool = [
   process.env.GEMINI_KEY_5,
   process.env.GEMINI_KEY_6,
   process.env.GEMINI_API_KEY,
-].filter((k): k is string => !!k && k.trim().length > 0);
+].filter((k): k is string => {
+  // Filter out undefined, empty, placeholder, or expired keys
+  if (!k || k.trim().length === 0) return false;
+  if (k.includes('your_') || k.includes('_here') || k.includes('Example')) return false;
+  if (k === 'AIzaSyD8F5m-fAzWWUrTlLVTNEq_izOCvtZtPe0') return false; // Known expired key
+  if (!k.startsWith('AIza')) return false; // Must be valid Google API key format
+  return true;
+});
+
+// Diagnostic: Log API key pool size and validation
+console.log("[Nexus] API key pool size:", apiKeyPool.length);
+if (apiKeyPool.length === 0) {
+  console.error("[Nexus] ❌ No valid Gemini API keys found! Please add valid keys to .env.local");
+  console.error("[Nexus] Get keys from: https://makersuite.google.com/app/apikey");
+}
 
 let apiKeyIndex = 0;
 const apiKeyCooling = new Map<string, number>();
@@ -1322,7 +1337,7 @@ export const generateFollowUpSuggestions = async (
       ? '\nIf relevant, also suggest images, videos, or links that would help the user get a clearer understanding of the product or platform.'
       : '';
     const response = await ai.models.generateContent({
-      model:    MODELS.FLASH,
+      model:    MODELS.FLASH_LITE,
       contents:
         `Given this AI response about "${intent}", suggest 3 very short, direct follow-up questions a user is most likely to ask next. Each question should be 6 words or less, focused, and actionable. Prioritize the most natural next step, not generic or broad questions.${extra} Return a JSON array of strings only — no markdown, no preamble.\n\n"${trimmed}"`,
       config:   { maxOutputTokens: 128 },
@@ -1357,7 +1372,7 @@ export const generateChatTitle = async (firstMessage: string): Promise<string> =
     const ai      = new GoogleGenAI({ apiKey });
     const trimmed = firstMessage.slice(0, 1_000);
     const response = await ai.models.generateContent({
-      model:    MODELS.FLASH,
+      model:    MODELS.FLASH_LITE,
       contents: `Summarize this message as a professional 3–5 word chat title. Return ONLY the title text. No quotes. No period.\n\n"${trimmed}"`,
       config:   { maxOutputTokens: 32 },
     });
