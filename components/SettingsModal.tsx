@@ -1,104 +1,122 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Icons } from '../constants';
-import NexusLogo from '../public/nexus-logo-modern.svg';
-import { User, UserStats, AIModel } from '../types';
+import { User, UserStats } from '../types';
 import { api } from '../services/apiService';
 
+// ══════════════════════════════════════════════════════════════════
+// SEDREX — SETTINGS MODAL
+// Gold (#c9a84c) theme · Verification-First Intelligence
+// ══════════════════════════════════════════════════════════════════
+
 interface SettingsModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  userSettings: any;
-  onSave: (settings: any) => void;
-  onPurgeHistory: () => Promise<void>;
-  onUpgrade: () => void;
-  onLogout: () => void;
-  user: User;
-  stats: UserStats | null;
-  onThemeToggle: () => void;
-  theme: 'light' | 'dark';
+  isOpen:          boolean;
+  onClose:         () => void;
+  userSettings:    any;
+  onSave:          (settings: any) => void;
+  onPurgeHistory:  () => Promise<void>;
+  onUpgrade:       () => void;
+  onLogout:        () => void;
+  user:            User;
+  stats:           UserStats | null;
+  onThemeToggle:   () => void;
+  theme:           'light' | 'dark';
 }
 
 type TabType = 'general' | 'personification' | 'usage' | 'data';
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  userSettings, 
-  onSave, 
+const TAB_LABELS: Record<TabType, string> = {
+  general:         'General',
+  personification: 'Custom AI',
+  usage:           'Usage',
+  data:            'Data',
+};
+
+// ── Inline SEDREX S logomark ───────────────────────────────────────
+const SedrexMark = ({ size = 20 }: { size?: number }) => (
+  <svg viewBox="0 0 20 20" fill="none" style={{ width: size, height: size, flexShrink: 0 }}>
+    <rect width="20" height="20" rx="5" fill="rgba(201,168,76,0.1)" stroke="rgba(201,168,76,0.3)" strokeWidth="1"/>
+    <path d="M14 6H8C6.9 6 6 6.9 6 8V9C6 10.1 6.9 11 8 11H12C13.1 11 14 11.9 14 13V14C14 15.1 13.1 16 12 16H6"
+      stroke="#c9a84c" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+);
+
+// ── Gold accent style ──────────────────────────────────────────────
+const goldActive = {
+  background: 'var(--accent, #c9a84c)',
+  color:      '#020408',
+  boxShadow:  '0 4px 20px rgba(201,168,76,0.25)',
+} as React.CSSProperties;
+
+const SettingsModal: React.FC<SettingsModalProps> = ({
+  isOpen,
+  onClose,
+  userSettings,
+  onSave,
   onPurgeHistory,
   onUpgrade,
   onLogout,
-  user, 
+  user,
   stats,
   onThemeToggle,
-  theme
+  theme,
 }) => {
-  const [activeTab, setActiveTab] = useState<TabType>('general');
-  const [personification, setPersonification] = useState(userSettings?.personification || '');
-  const [responseStyle, setResponseStyle] = useState(userSettings?.responseStyle || 'balanced');
-  const [language, setLanguage] = useState(userSettings?.language || 'en');
-  const [isPurging, setIsPurging] = useState(false);
-  const [showPurgeConfirm, setShowPurgeConfirm] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  
+  const [activeTab,         setActiveTab]         = useState<TabType>('general');
+  const [personification,   setPersonification]   = useState(userSettings?.personification || '');
+  const [responseStyle,     setResponseStyle]     = useState(userSettings?.responseStyle || 'balanced');
+  const [language,          setLanguage]          = useState(userSettings?.language || 'en');
+  const [isPurging,         setIsPurging]         = useState(false);
+  const [showPurgeConfirm,  setShowPurgeConfirm]  = useState(false);
+  const [isSaving,          setIsSaving]          = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
 
+  // ── Effects ───────────────────────────────────────────────────
   useEffect(() => {
-    if (isOpen) {
-      api.getPreferences().then(prefs => {
-        if (prefs.custom_instructions) setPersonification(prefs.custom_instructions);
-        if (prefs.response_format) setResponseStyle(prefs.response_format);
-        if (prefs.language) setLanguage(prefs.language);
-      });
+    if (!isOpen) return;
 
-      // Escape key to close
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') onClose();
-      };
-      document.addEventListener('keydown', handleKeyDown);
-
-      // Android back button — push a history entry so popstate fires
-      window.history.pushState({ modal: 'settings' }, '');
-      const handlePopState = () => onClose();
-      window.addEventListener('popstate', handlePopState);
-
-      return () => {
-        document.removeEventListener('keydown', handleKeyDown);
-        window.removeEventListener('popstate', handlePopState);
-      };
-    }
-    
-    // Update progress bar widths from data attributes
-    const progressBars = document.querySelectorAll('.progress-bar-fill[data-progress]');
-    progressBars.forEach((bar: Element) => {
-      const element = bar as HTMLElement;
-      const progress = element.getAttribute('data-progress');
-      if (progress) {
-        element.style.width = `${progress}%`;
-      }
+    api.getPreferences().then(prefs => {
+      if (prefs.custom_instructions) setPersonification(prefs.custom_instructions);
+      if (prefs.response_format)     setResponseStyle(prefs.response_format);
+      if (prefs.language)            setLanguage(prefs.language);
     });
-  }, [isOpen, stats]);
 
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleKey);
+
+    window.history.pushState({ modal: 'settings' }, '');
+    const handlePop = () => onClose();
+    window.addEventListener('popstate', handlePop);
+
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      window.removeEventListener('popstate', handlePop);
+    };
+  }, [isOpen, onClose]);
+
+  // Update progress bar widths
+  useEffect(() => {
+    document.querySelectorAll('.sx-progress-fill[data-progress]').forEach((el) => {
+      const bar = el as HTMLElement;
+      const pct = bar.getAttribute('data-progress');
+      if (pct) setTimeout(() => { bar.style.width = `${pct}%`; }, 100);
+    });
+  }, [activeTab, stats]);
+
+  if (!isOpen) return null;
+
+  // ── Handlers ──────────────────────────────────────────────────
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) onClose();
   };
-
-  if (!isOpen) return null;
 
   const handleSaveAll = async () => {
     setIsSaving(true);
     const updated = { personification, responseStyle, language, theme };
     try {
-      await api.updatePreferences({
-        persona: personification,
-        responseStyle,
-        language,
-        theme
-      });
+      await api.updatePreferences({ persona: personification, responseStyle, language, theme });
       onSave(updated);
       onClose();
     } catch (err) {
-      console.error("Failed to sync preferences:", err);
+      console.error('Failed to sync preferences:', err);
     } finally {
       setIsSaving(false);
     }
@@ -114,264 +132,443 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const TabButton = ({ id, label, icon: Icon }: { id: TabType, label: string, icon: any, tooltip?: string }) => (
-    <button
-      onClick={() => {
-        setActiveTab(id);
-        setShowPurgeConfirm(false);
-      }}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[12px] font-black uppercase tracking-widest transition-all ${
-        activeTab === id 
-          ? 'bg-[var(--accent)] text-white shadow-lg shadow-[var(--accent)]/20' 
-          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'
-      }`}
-    >
-      <Icon className="w-3.5 h-3.5" />
-      {label}
-    </button>
+  const switchTab = (id: TabType) => { setActiveTab(id); setShowPurgeConfirm(false); };
+
+  // ── Tab button ─────────────────────────────────────────────────
+  const TabBtn = ({ id, label, icon: Icon }: { id: TabType; label: string; icon: any }) => {
+    const active = activeTab === id;
+    return (
+      <button
+        onClick={() => switchTab(id)}
+        style={active ? goldActive : undefined}
+        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+          active
+            ? 'font-black text-[12px] uppercase tracking-widest'
+            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] text-[12px] font-black uppercase tracking-widest'
+        }`}
+      >
+        <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+        {label}
+      </button>
+    );
+  };
+
+  // ── GENERAL TAB ────────────────────────────────────────────────
+  const GeneralTab = () => (
+    <div className="space-y-5 animate-in slide-in-from-bottom-2 w-full max-w-2xl">
+
+      {/* Appearance */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 sm:p-8 rounded-2xl border border-[var(--border)] bg-[var(--bg-tertiary)]/20">
+        <div>
+          <h4 className="font-black text-xs uppercase tracking-widest text-[var(--text-primary)] mb-1">Appearance</h4>
+          <p className="text-[12px] text-[var(--text-secondary)]">Switch between light and dark mode.</p>
+        </div>
+        <button
+          onClick={onThemeToggle}
+          className="w-full sm:w-auto px-5 py-2.5 bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl text-[12px] font-black uppercase tracking-widest transition-all text-[var(--text-primary)] hover:border-[var(--accent)]/40 hover:text-[var(--accent)] active:scale-95 flex-shrink-0"
+        >
+          {theme === 'dark' ? '☀️  Light' : '🌙  Dark'}
+        </button>
+      </div>
+
+      {/* Language */}
+      <div className="p-5 sm:p-8 rounded-2xl border border-[var(--border)] bg-[var(--bg-tertiary)]/10">
+        <label
+          htmlFor="language-select"
+          className="font-black text-xs uppercase tracking-widest text-[var(--text-primary)] block mb-3"
+        >
+          Language
+        </label>
+        <select
+          id="language-select"
+          value={language}
+          onChange={e => setLanguage(e.target.value)}
+          className="w-full bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl p-3 text-sm font-bold outline-none text-[var(--text-primary)] transition-all cursor-pointer"
+          style={{ '--tw-ring-color': 'var(--accent)' } as any}
+          onFocus={e => (e.target.style.borderColor = 'rgba(201,168,76,0.4)')}
+          onBlur={e  => (e.target.style.borderColor = '')}
+        >
+          <option value="en">English (Global)</option>
+          <option value="hi">हिन्दी</option>
+          <option value="es">Español</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="ja">日本語</option>
+          <option value="zh">中文</option>
+        </select>
+      </div>
+
+      {/* Account info */}
+      <div className="p-5 sm:p-8 rounded-2xl border border-[var(--border)] bg-[var(--bg-tertiary)]/10">
+        <h4 className="font-black text-xs uppercase tracking-widest text-[var(--text-primary)] mb-4">Account</h4>
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-[14px] font-black text-[#020408] flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg, #c9a84c, #8a6820)' }}
+          >
+            {user.email.charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <p className="text-[13px] font-bold text-[var(--text-primary)] truncate">{user.email}</p>
+            <p
+              className="text-[10px] font-black uppercase tracking-widest"
+              style={{ color: 'var(--accent, #c9a84c)' }}
+            >
+              {user.tier} plan
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 
-  return (
-    <div 
-      onClick={handleBackdropClick}
-      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-4 animate-in fade-in duration-300"
-    >
-      <div 
-        ref={modalRef}
-        className="bg-[var(--bg-secondary)] w-full max-w-4xl max-h-[90vh] rounded-2xl sm:rounded-[2.5rem] border border-[var(--border)] shadow-2xl flex flex-col sm:flex-row overflow-hidden animate-in zoom-in-95 duration-200"
-      >
-        {/* Sidebar - Hidden on mobile, visible on sm+ */}
-        <div className="hidden sm:flex w-72 bg-[var(--bg-tertiary)]/40 border-r border-[var(--border)] p-6 sm:p-8 flex-col gap-2 transition-colors flex-shrink-0">
-          <div className="mb-4 sm:mb-6 px-2 sm:px-4">
-            <h2 className="text-lg sm:text-xl font-black tracking-tighter text-[var(--text-primary)]">Settings</h2>
+  // ── CUSTOM AI TAB ──────────────────────────────────────────────
+  const CustomAITab = () => (
+    <div className="space-y-5 animate-in slide-in-from-bottom-2 w-full max-w-2xl">
+
+      {/* Instructions */}
+      <div className="space-y-2">
+        <label className="text-[11px] font-black uppercase tracking-widest text-[var(--text-secondary)] px-1 block">
+          Custom Instructions
+        </label>
+        <textarea
+          value={personification}
+          onChange={e => setPersonification(e.target.value)}
+          rows={5}
+          placeholder="Tell SEDREX how you'd like it to respond. For example: 'Be concise and use bullet points' or 'I am a medical researcher — use technical terminology'..."
+          className="w-full bg-[var(--bg-primary)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 text-sm font-medium outline-none resize-none leading-relaxed text-[var(--text-primary)] transition-all placeholder:text-[var(--text-secondary)] placeholder:opacity-40"
+          onFocus={e => (e.target.style.borderColor = 'rgba(201,168,76,0.4)')}
+          onBlur={e  => (e.target.style.borderColor = '')}
+        />
+        <p className="text-[11px] text-[var(--text-secondary)] px-1">
+          These instructions are sent with every message to personalize SEDREX's responses.
+        </p>
+      </div>
+
+      {/* Response style */}
+      <div className="space-y-3">
+        <label className="text-[11px] font-black uppercase tracking-widest text-[var(--text-secondary)] px-1 block">
+          Response Style
+        </label>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+          {(['balanced', 'concise', 'detailed', 'creative'] as const).map(style => {
+            const active = responseStyle === style;
+            return (
+              <button
+                key={style}
+                onClick={() => setResponseStyle(style)}
+                style={active ? goldActive : undefined}
+                className={`p-3 sm:p-4 rounded-xl border text-[11px] font-black uppercase tracking-widest transition-all active:scale-95 ${
+                  active
+                    ? ''
+                    : 'bg-[var(--bg-tertiary)]/20 border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent)]/30 hover:text-[var(--text-primary)]'
+                }`}
+              >
+                {style}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[11px] text-[var(--text-secondary)] px-1">
+          Controls the length and format of SEDREX's answers.
+        </p>
+      </div>
+    </div>
+  );
+
+  // ── USAGE TAB ──────────────────────────────────────────────────
+  const UsageTab = () => {
+    const total    = stats?.totalMessagesSent   ?? 0;
+    const monthly  = stats?.monthlyMessagesSent ?? 0;
+    const limit    = stats?.monthlyMessagesLimit ?? 0;
+    const tokens   = stats?.tokensEstimated     ?? 0;
+    const pct      = limit > 0 ? Math.min(Math.round((monthly / limit) * 100), 100) : 0;
+
+    return (
+      <div className="space-y-5 animate-in slide-in-from-bottom-2 w-full max-w-2xl">
+
+        {/* Stats grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[
+            { label: 'Total Messages', value: total.toLocaleString() },
+            { label: 'Est. Tokens Used', value: tokens.toLocaleString() },
+          ].map(item => (
+            <div key={item.label} className="p-5 sm:p-7 bg-[var(--bg-tertiary)]/30 rounded-2xl border border-[var(--border)]">
+              <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-2 opacity-70">
+                {item.label}
+              </p>
+              <p className="text-3xl sm:text-4xl font-black text-[var(--text-primary)] tracking-tighter">
+                {item.value}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {/* Monthly usage bar */}
+        <div className="p-5 sm:p-8 bg-[var(--bg-tertiary)]/10 border border-[var(--border)] rounded-2xl">
+          <div className="flex justify-between items-center mb-3">
+            <h4 className="text-[11px] font-black uppercase tracking-widest text-[var(--text-secondary)]">
+              Monthly Usage
+            </h4>
+            <span
+              className="text-[11px] font-black"
+              style={{ color: pct > 80 ? '#e84a6a' : 'var(--accent, #c9a84c)' }}
+            >
+              {monthly}/{limit > 0 ? limit : '∞'}
+            </span>
           </div>
-          
-          <TabButton id="general" label="General" icon={Icons.Robot} tooltip="Theme and Language" />
-          <TabButton id="personification" label="Custom AI" icon={Icons.Sparkles} tooltip="Custom Instructions" />
-          {/* <TabButton id="subscription" label="Plan" icon={Icons.CreditCard} tooltip="Your Plan" /> */}
-          <TabButton id="usage" label="Usage" icon={Icons.BarChart} tooltip="Usage Stats" />
-          <TabButton id="data" label="Data" icon={Icons.Database} tooltip="Your Data" />
-          
-          <div className="mt-auto">
-             <button 
-               onClick={onLogout} 
-               className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 sm:py-4 rounded-xl sm:rounded-2xl text-[12px] sm:text-[13px] font-black uppercase tracking-widest text-red-500 hover:bg-red-500/10 transition-all active:scale-95"
-             >
-                <Icons.LogOut className="w-3.5 sm:w-4 h-3.5 sm:h-4 flex-shrink-0" /> Log Out
-             </button>
+          <div className="w-full h-2.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
+            <div
+              className="sx-progress-fill h-full rounded-full transition-all duration-1000 ease-out"
+              data-progress={pct}
+              style={{
+                width: 0,
+                background: pct > 80
+                  ? 'linear-gradient(90deg, #e84a6a, #ff6b8a)'
+                  : 'linear-gradient(90deg, #c9a84c, #e8c96a)',
+              }}
+            />
           </div>
         </div>
 
-        {/* Mobile Tab Selector */}
-        <div className="sm:hidden flex items-center gap-1 overflow-x-auto px-3 py-2 bg-[var(--bg-tertiary)]/20 border-b border-[var(--border)] custom-scrollbar">
-          <div className="flex gap-1 overflow-x-auto flex-1">
-            {(['general', 'personification', 'usage', 'data'] as TabType[]).map(tab => (
+        {/* Model distribution */}
+        {stats?.modelUsage && Object.keys(stats.modelUsage).length > 0 && (
+          <div className="p-5 sm:p-8 bg-[var(--bg-tertiary)]/10 border border-[var(--border)] rounded-2xl">
+            <h4 className="text-[11px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-5 opacity-70">
+              Model Distribution
+            </h4>
+            <div className="space-y-4">
+              {Object.entries(stats.modelUsage).map(([model, count]) => {
+                const pctModel = total > 0 ? Math.round(((count as number) / total) * 100) : 0;
+                return (
+                  <div key={model}>
+                    <div className="flex justify-between text-[11px] font-bold mb-1.5">
+                      <span className="text-[var(--text-primary)] truncate">{model}</span>
+                      <span className="text-[var(--text-secondary)] ml-2 flex-shrink-0">{pctModel}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
+                      <div
+                        className="sx-progress-fill h-full rounded-full transition-all duration-1000 ease-out"
+                        data-progress={pctModel}
+                        style={{
+                          width: 0,
+                          background: 'linear-gradient(90deg, #c9a84c, #e8c96a)',
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── DATA TAB ───────────────────────────────────────────────────
+  const DataTab = () => (
+    <div className="space-y-4 animate-in slide-in-from-bottom-2 w-full max-w-2xl">
+
+      {/* Export */}
+      <button
+        onClick={() => {}}
+        className="w-full p-5 sm:p-7 bg-[var(--bg-tertiary)]/20 border border-[var(--border)] rounded-2xl flex items-center justify-between gap-3 group transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--bg-tertiary)]/30 active:scale-[0.99]"
+      >
+        <div className="text-left flex-1 min-w-0">
+          <h4 className="font-black text-xs uppercase tracking-widest text-[var(--text-primary)] mb-1">
+            Export Chat History
+          </h4>
+          <p className="text-[12px] text-[var(--text-secondary)] opacity-70">
+            Download all your conversations as Markdown.
+          </p>
+        </div>
+        <Icons.Download className="w-5 h-5 text-[var(--text-secondary)] opacity-40 group-hover:opacity-80 group-hover:text-[var(--accent)] transition-all flex-shrink-0" />
+      </button>
+
+      {/* Delete data */}
+      <div
+        className={`p-5 sm:p-7 border rounded-2xl transition-all ${
+          showPurgeConfirm
+            ? 'bg-red-500/8 border-red-500/30'
+            : 'bg-[var(--bg-tertiary)]/10 border-[var(--border)]'
+        }`}
+      >
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-0">
+          <div className="flex-1 min-w-0">
+            <h4 className={`font-black text-xs uppercase tracking-widest mb-1 ${showPurgeConfirm ? 'text-red-400' : 'text-[var(--text-primary)]'}`}>
+              Delete All Data
+            </h4>
+            <p className="text-[12px] text-[var(--text-secondary)] opacity-70">
+              Permanently delete all your conversations. This cannot be undone.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowPurgeConfirm(p => !p)}
+            className={`px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all active:scale-95 whitespace-nowrap flex-shrink-0 ${
+              showPurgeConfirm
+                ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
+            }`}
+          >
+            {showPurgeConfirm ? 'Cancel' : 'Delete Data'}
+          </button>
+        </div>
+
+        {showPurgeConfirm && (
+          <div className="mt-5 flex gap-3 flex-col sm:flex-row animate-in slide-in-from-top-2">
+            <p className="text-[12px] text-red-300 mb-2 sm:hidden">
+              This will permanently delete all your conversations. Are you sure?
+            </p>
+            <button
+              disabled={isPurging}
+              onClick={handlePurge}
+              className="flex-1 py-3 bg-red-600 text-white rounded-xl text-[11px] font-black uppercase tracking-widest shadow-lg shadow-red-600/20 active:scale-95 transition-all disabled:opacity-50"
+            >
+              {isPurging ? 'Deleting...' : 'Yes, Delete Everything'}
+            </button>
+            <button
+              onClick={() => setShowPurgeConfirm(false)}
+              className="px-6 py-3 bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-xl text-[11px] font-black uppercase border border-[var(--border)] active:scale-95 transition-all"
+            >
+              Keep Data
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // ── RENDER ─────────────────────────────────────────────────────
+  return (
+    <div
+      onClick={handleBackdropClick}
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-4 animate-in fade-in duration-300"
+    >
+      <div
+        ref={modalRef}
+        className="bg-[var(--bg-secondary)] w-full max-w-4xl max-h-[90vh] rounded-2xl sm:rounded-[2.5rem] border border-[var(--border)] shadow-2xl flex flex-col sm:flex-row overflow-hidden animate-in zoom-in-95 duration-200"
+        style={{ boxShadow: '0 0 80px rgba(201,168,76,0.06), 0 25px 60px rgba(0,0,0,0.5)' }}
+      >
+
+        {/* ── Desktop sidebar ────────────────────────────────── */}
+        <div className="hidden sm:flex w-64 bg-[var(--bg-tertiary)]/30 border-r border-[var(--border)] p-6 flex-col gap-1.5 flex-shrink-0">
+
+          {/* Logo + title */}
+          <div className="mb-5 px-2">
+            <div className="flex items-center gap-2 mb-1">
+              <SedrexMark size={18} />
+              <span style={{
+                fontFamily:    'IBM Plex Mono, monospace',
+                fontSize:      10,
+                fontWeight:    900,
+                letterSpacing: 4,
+                textTransform: 'uppercase',
+                color:         'var(--accent, #c9a84c)',
+              }}>
+                SEDREX
+              </span>
+            </div>
+            <h2 className="text-lg font-black tracking-tighter text-[var(--text-primary)]">Settings</h2>
+          </div>
+
+          <TabBtn id="general"         label="General"   icon={Icons.Robot}    />
+          <TabBtn id="personification" label="Custom AI" icon={Icons.Sparkles} />
+          <TabBtn id="usage"           label="Usage"     icon={Icons.BarChart} />
+          <TabBtn id="data"            label="Data"      icon={Icons.Database} />
+
+          {/* Logout */}
+          <div className="mt-auto">
+            <button
+              onClick={onLogout}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[12px] font-black uppercase tracking-widest text-red-400 hover:bg-red-500/10 transition-all active:scale-95"
+            >
+              <Icons.LogOut className="w-3.5 h-3.5 flex-shrink-0" />
+              Log Out
+            </button>
+          </div>
+        </div>
+
+        {/* ── Mobile tab bar ──────────────────────────────────── */}
+        <div className="sm:hidden flex items-center gap-1 overflow-x-auto px-3 py-2 border-b border-[var(--border)] bg-[var(--bg-tertiary)]/20 custom-scrollbar">
+          <div className="flex gap-1 flex-1 overflow-x-auto">
+            {(Object.keys(TAB_LABELS) as TabType[]).map(tab => (
               <button
                 key={tab}
-                onClick={() => {
-                  setActiveTab(tab);
-                  setShowPurgeConfirm(false);
-                }}
+                onClick={() => switchTab(tab)}
+                style={activeTab === tab ? { ...goldActive, borderRadius: 8 } : undefined}
                 className={`whitespace-nowrap flex-shrink-0 px-3 py-2 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all ${
-                  activeTab === tab 
-                    ? 'bg-[var(--accent)] text-white shadow-lg' 
-                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                  activeTab === tab ? '' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
                 }`}
               >
-                {tab === 'general' ? 'General' : tab === 'personification' ? 'Custom AI' : tab === 'subscription' ? 'Plan' : tab === 'usage' ? 'Usage' : 'Data'}
+                {TAB_LABELS[tab]}
               </button>
             ))}
           </div>
           <button
             onClick={onLogout}
-            data-nexus-tooltip="Logout"
-            className="flex-shrink-0 p-2 rounded-lg text-red-500 hover:bg-red-500/10 transition-all active:scale-95 border border-red-500/20"
+            className="flex-shrink-0 p-2 rounded-lg text-red-400 hover:bg-red-500/10 transition-all border border-red-500/20 ml-1"
             title="Logout"
           >
             <Icons.LogOut className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        <div className="flex-1 flex flex-col bg-[var(--bg-primary)] transition-colors overflow-hidden">
-          <header className="px-4 sm:px-10 py-4 sm:py-8 border-b border-[var(--border)] flex justify-between items-center bg-[var(--bg-secondary)]/30 backdrop-blur-md flex-shrink-0">
-            <div className="space-y-0.5 sm:space-y-1 min-w-0">
-              <h3 className="text-lg sm:text-2xl font-black tracking-tighter capitalize text-[var(--text-primary)] truncate">{activeTab}</h3>
+        {/* ── Main content ────────────────────────────────────── */}
+        <div className="flex-1 flex flex-col bg-[var(--bg-primary)] overflow-hidden">
+
+          {/* Header */}
+          <header className="px-5 sm:px-10 py-4 sm:py-7 border-b border-[var(--border)] flex justify-between items-center bg-[var(--bg-secondary)]/30 backdrop-blur-md flex-shrink-0">
+            <div>
+              <h3 className="text-lg sm:text-2xl font-black tracking-tighter text-[var(--text-primary)]">
+                {TAB_LABELS[activeTab]}
+              </h3>
+              <p style={{
+                fontFamily:    'IBM Plex Mono, monospace',
+                fontSize:      9,
+                letterSpacing: 3,
+                textTransform: 'uppercase',
+                color:         'var(--accent, #c9a84c)',
+                marginTop:     2,
+              }}>
+                SEDREX · Verification-First Intelligence
+              </p>
             </div>
-            <button 
-              onClick={onClose} 
+            <button
+              onClick={onClose}
               aria-label="Close settings"
-              title="Close settings"
-              className="p-2 sm:p-2.5 hover:bg-[var(--bg-tertiary)] rounded-lg sm:rounded-2xl transition-all active:scale-90 border border-[var(--border)] text-[var(--text-primary)] flex-shrink-0 ml-2"
+              className="p-2.5 hover:bg-[var(--bg-tertiary)] rounded-xl transition-all active:scale-90 border border-[var(--border)] text-[var(--text-primary)] flex-shrink-0 ml-4"
             >
-              <Icons.X className="w-4 sm:w-5 h-4 sm:h-5" />
+              <Icons.X className="w-4 h-4" />
             </button>
           </header>
 
-          <div className="flex-1 overflow-y-auto p-4 sm:p-10 custom-scrollbar">
-            {activeTab === 'general' && (
-              <div className="space-y-4 sm:space-y-8 animate-in slide-in-from-bottom-2 w-full max-w-2xl">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 sm:p-8 bg-[var(--bg-tertiary)]/20 border border-[var(--border)] rounded-lg sm:rounded-[2rem] transition-colors">
-                   <div className="space-y-1 flex-1">
-                     <h4 className="font-black text-xs sm:text-sm uppercase tracking-tight text-[var(--text-primary)]">Appearance</h4>
-                     <p className="text-[12px] sm:text-[13px] text-[var(--text-secondary)] font-medium">Switch between light and dark mode.</p>
-                   </div>
-                   <button 
-                    onClick={onThemeToggle} 
-                    className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg sm:rounded-xl text-[12px] sm:text-[13px] font-black uppercase tracking-widest transition-all text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] shadow-sm active:scale-95 flex-shrink-0"
-                   >
-                      {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
-                   </button>
-                </div>
-                <div className="p-4 sm:p-8 bg-indigo-500/5 border border-indigo-500/10 rounded-lg sm:rounded-[2rem] transition-colors">
-                   <label htmlFor="language-select" className="font-black text-xs sm:text-sm uppercase tracking-tight mb-2 text-[var(--text-primary)] block">Language</label>
-                   <select 
-                    id="language-select"
-                    value={language}
-                    onChange={(e) => setLanguage(e.target.value)}
-                    aria-label="Select interface language"
-                    className="w-full bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg sm:rounded-2xl p-3 sm:p-4 text-xs sm:text-sm font-bold outline-none text-[var(--text-primary)] focus:border-[var(--accent)] transition-all cursor-pointer"
-                  >
-                    <option value="en">English (Global)</option>
-                    <option value="es">Español</option>
-                    <option value="fr">Français</option>
-                    <option value="de">Deutsch</option>
-                  </select>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'personification' && (
-              <div className="space-y-4 sm:space-y-8 animate-in slide-in-from-bottom-2 w-full max-w-2xl">
-                <div className="space-y-2 sm:space-y-3">
-                  <label className="text-[11px] sm:text-[13px] font-black uppercase tracking-widest text-[var(--text-secondary)] px-1">Custom Instructions</label>
-                  <textarea 
-                    value={personification}
-                    onChange={(e) => setPersonification(e.target.value)}
-                    className="w-full h-32 sm:h-40 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg sm:rounded-2xl p-3 sm:p-6 text-xs sm:text-sm font-medium focus:border-[var(--accent)] outline-none resize-none leading-relaxed text-[var(--text-primary)] caret-[var(--accent)] transition-all placeholder:text-[var(--text-secondary)] placeholder:opacity-40"
-                    placeholder="Tell the AI how you'd like it to respond. For example: 'Be concise and use bullet points' or 'Explain things simply like I'm a beginner'..."
-                  />
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[11px] sm:text-[13px] font-black uppercase tracking-widest text-[var(--text-secondary)] px-1">Response Style</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
-                    {['balanced', 'concise', 'detailed', 'creative'].map(style => (
-                      <button 
-                        key={style}
-                        onClick={() => setResponseStyle(style)}
-                        className={`p-3 sm:p-5 rounded-lg sm:rounded-2xl border text-[11px] sm:text-[13px] font-black uppercase tracking-widest transition-all active:scale-[0.98] ${
-                          responseStyle === style 
-                          ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-lg shadow-[var(--accent)]/20' 
-                          : 'bg-[var(--bg-tertiary)]/20 border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)]/30'
-                        }`}
-                      >
-                        {style}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* {activeTab === 'subscription' && (
-              ...subscription tab content...
-            )} */}
-
-            {activeTab === 'usage' && (
-              <div className="space-y-4 sm:space-y-8 animate-in slide-in-from-bottom-2 w-full max-w-2xl">
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6">
-                    <div className="p-4 sm:p-8 bg-[var(--bg-tertiary)]/30 rounded-lg sm:rounded-[2rem] border border-[var(--border)] flex flex-col justify-center transition-colors">
-                       <p className="text-[11px] sm:text-[13px] font-black uppercase text-[var(--text-secondary)] tracking-widest mb-2 opacity-60">Total Tokens</p>
-                       <p className="text-2xl sm:text-4xl font-black text-[var(--text-primary)] tracking-tighter">{stats?.tokensEstimated.toLocaleString() || 0}</p>
-                    </div>
-                    <div className="p-4 sm:p-8 bg-[var(--bg-tertiary)]/30 rounded-lg sm:rounded-[2rem] border border-[var(--border)] flex flex-col justify-center transition-colors">
-                       <p className="text-[11px] sm:text-[13px] font-black uppercase text-[var(--text-secondary)] tracking-widest mb-2 opacity-60">Total Messages</p>
-                       <p className="text-2xl sm:text-4xl font-black text-[var(--text-primary)] tracking-tighter">{stats?.totalMessagesSent || 0}</p>
-                    </div>
-                 </div>
-                 <div className="p-4 sm:p-10 bg-[var(--bg-tertiary)]/10 border border-[var(--border)] rounded-lg sm:rounded-[2.5rem] transition-colors">
-                    <h4 className="text-[11px] sm:text-[13px] font-black uppercase text-[var(--text-secondary)] tracking-widest mb-4 sm:mb-8 opacity-60">Model Usage</h4>
-                    <div className="space-y-4 sm:space-y-6">
-                       {Object.entries(stats?.modelUsage || {}).map(([model, count]) => {
-                         const percent = stats?.totalMessagesSent ? Math.round(((count as number) / stats.totalMessagesSent) * 100) : 0;
-                         return (
-                           <div key={model} className="space-y-2 sm:space-y-3">
-                              <div className="flex justify-between text-[11px] sm:text-[13px] font-black uppercase tracking-tight">
-                                 <span className="text-[var(--text-primary)] truncate">{model}</span>
-                                 <span className="text-[var(--text-secondary)] whitespace-nowrap ml-2">{percent}%</span>
-                              </div>
-                              <div className="w-full h-2 bg-[var(--bg-tertiary)] rounded-full overflow-hidden shadow-inner">
-                                 <div className="progress-bar-fill bg-[var(--accent)] h-full transition-all duration-1000 ease-out" data-progress={percent} />
-                              </div>
-                           </div>
-                         );
-                       })}
-                    </div>
-                 </div>
-              </div>
-            )}
-
-            {activeTab === 'data' && (
-              <div className="space-y-3 sm:space-y-6 animate-in slide-in-from-bottom-2 w-full max-w-2xl">
-                <button 
-                  onClick={() => {}} 
-                  className="w-full p-4 sm:p-8 bg-[var(--bg-tertiary)]/20 border border-[var(--border)] rounded-lg sm:rounded-[2rem] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 group transition-all hover:bg-[var(--bg-tertiary)]/40 active:scale-[0.99]"
-                >
-                   <div className="text-left flex-1 min-w-0">
-                      <h4 className="font-black text-xs sm:text-sm uppercase tracking-tight text-[var(--text-primary)]">Export Chat History</h4>
-                      <p className="text-[12px] sm:text-[13px] text-[var(--text-secondary)] font-medium opacity-60 line-clamp-2">Download your conversations as JSON or CSV.</p>
-                   </div>
-                   <Icons.Download className="w-5 sm:w-6 h-5 sm:h-6 text-[var(--text-secondary)] opacity-40 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                </button>
-                <div className={`p-4 sm:p-8 border rounded-lg sm:rounded-[2rem] transition-all ${showPurgeConfirm ? 'bg-red-500/10 border-red-500/30 shadow-2xl shadow-red-500/10' : 'bg-[var(--bg-tertiary)]/20 border-[var(--border)]'}`}>
-                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                      <div className="space-y-1 flex-1 min-w-0">
-                        <h4 className={`font-black text-xs sm:text-sm uppercase tracking-tight ${showPurgeConfirm ? 'text-red-500' : 'text-[var(--text-primary)]'}`}>Delete All Data</h4>
-                        <p className="text-[12px] sm:text-[13px] text-[var(--text-secondary)] font-medium opacity-60">Permanently delete all your conversations.</p>
-                      </div>
-                      <button 
-                        onClick={() => setShowPurgeConfirm(!showPurgeConfirm)} 
-                        className={`px-4 sm:px-8 py-2 sm:py-3 rounded-lg sm:rounded-xl text-[11px] sm:text-[13px] font-black uppercase transition-all active:scale-95 whitespace-nowrap flex-shrink-0 ${showPurgeConfirm ? 'bg-red-500 text-white' : 'bg-red-500/10 text-red-500 hover:bg-red-500/20'}`}
-                      >
-                        {showPurgeConfirm ? 'Cancel' : 'Delete Data'}
-                      </button>
-                   </div>
-                   {showPurgeConfirm && (
-                     <div className="mt-4 sm:mt-8 flex gap-2 sm:gap-4 flex-col sm:flex-row animate-in slide-in-from-top-4">
-                        <button 
-                          disabled={isPurging} 
-                          onClick={handlePurge} 
-                          className="flex-1 py-3 sm:py-4 bg-red-600 text-white rounded-lg sm:rounded-xl text-[11px] sm:text-[13px] font-black uppercase tracking-widest shadow-lg shadow-red-600/20 active:scale-95 transition-transform disabled:opacity-50"
-                        >
-                          {isPurging ? 'Deleting...' : 'Yes, Delete Everything'}
-                        </button>
-                        <button 
-                          onClick={() => setShowPurgeConfirm(false)} 
-                          className="px-4 sm:px-8 py-3 sm:py-4 bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-lg sm:rounded-xl text-[11px] sm:text-[13px] font-black uppercase border border-[var(--border)] active:scale-95 transition-transform"
-                        >
-                          Keep Data
-                        </button>
-                     </div>
-                   )}
-                </div>
-              </div>
-            )}
+          {/* Tab content */}
+          <div className="flex-1 overflow-y-auto p-5 sm:p-10 custom-scrollbar">
+            {activeTab === 'general'         && <GeneralTab  />}
+            {activeTab === 'personification' && <CustomAITab />}
+            {activeTab === 'usage'           && <UsageTab    />}
+            {activeTab === 'data'            && <DataTab     />}
           </div>
 
-          <footer className="px-3 sm:px-10 py-3 sm:py-8 bg-[var(--bg-secondary)]/30 border-t border-[var(--border)] flex justify-end gap-2 sm:gap-4 transition-colors backdrop-blur-md flex-shrink-0 flex-wrap">
-                      {/* Download logo button removed as requested */}
-             <button 
-               onClick={onClose} 
-               className="px-4 sm:px-8 py-2 sm:py-3 text-[11px] sm:text-[13px] font-black uppercase tracking-widest text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors rounded-lg sm:rounded-xl hover:bg-[var(--bg-tertiary)]/30"
-             >
-               Cancel
-             </button>
-             <button 
-               onClick={handleSaveAll}
-               disabled={isSaving}
-               className="px-4 sm:px-10 py-2 sm:py-3 bg-[var(--accent)] rounded-lg sm:rounded-2xl text-[11px] sm:text-[13px] font-black uppercase tracking-[0.15em] sm:tracking-[0.2em] text-white shadow-xl shadow-[var(--accent)]/20 active:scale-95 transition-all hover:brightness-110 disabled:opacity-50"
-             >
-               {isSaving ? 'Saving...' : 'Apply'}
-             </button>
+          {/* Footer */}
+          <footer className="px-5 sm:px-10 py-4 sm:py-6 bg-[var(--bg-secondary)]/30 border-t border-[var(--border)] flex justify-end gap-3 backdrop-blur-md flex-shrink-0">
+            <button
+              onClick={onClose}
+              className="px-5 py-2.5 text-[11px] font-black uppercase tracking-widest text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors rounded-xl hover:bg-[var(--bg-tertiary)]/40"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveAll}
+              disabled={isSaving}
+              style={!isSaving ? goldActive : undefined}
+              className={`px-8 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 ${
+                isSaving ? 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]' : ''
+              }`}
+            >
+              {isSaving ? 'Saving...' : 'Apply'}
+            </button>
           </footer>
         </div>
       </div>

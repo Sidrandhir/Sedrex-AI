@@ -2,6 +2,9 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import './ChatSidebar.css';
 import { ChatSession, UserStats, User } from '../types';
 import { Icons } from '../constants';
+import {
+  useArtifacts, setActiveArtifact, openPanel, Artifact,
+} from '../services/artifactStore';
 
 interface SidebarProps {
   sessions: ChatSession[];
@@ -20,14 +23,134 @@ interface SidebarProps {
   onToggle: () => void;
   onOpenCommandPalette: () => void;
   user: User;
+  onRefreshArtifacts?: () => void;
+  id?: string;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ 
-  sessions, 
-  activeSessionId, 
-  onNewChat, 
-  onSelectSession, 
-  view, 
+// ── Language icon map ──────────────────────────────────────────────
+const FILE_ICONS: Record<string, string> = {
+  typescript: '⚡', ts: '⚡', tsx: '⚛', javascript: '⚡', js: '⚡', jsx: '⚛',
+  python: '🐍', rust: '🦀', go: '🔹', java: '☕', kotlin: '🟣',
+  css: '🎨', scss: '🎨', html: '🌐', sql: '🗄️', json: '{ }',
+  yaml: '⚙️', bash: '💻', sh: '💻', markdown: '📝', text: '📄',
+  mermaid: '🔷',
+};
+const langIcon  = (lang: string) => FILE_ICONS[lang.toLowerCase()] ?? '📄';
+
+const LANG_LABELS: Record<string, string> = {
+  typescript: 'TypeScript', ts: 'TypeScript', tsx: 'TSX',
+  javascript: 'JavaScript', js: 'JavaScript', jsx: 'JSX',
+  python: 'Python', rust: 'Rust', go: 'Go', java: 'Java',
+  css: 'CSS', scss: 'SCSS', html: 'HTML', sql: 'SQL',
+  json: 'JSON', yaml: 'YAML', bash: 'Shell', sh: 'Shell',
+  markdown: 'Markdown', mermaid: 'Diagram', text: 'Text',
+};
+const langLabel = (lang: string) => LANG_LABELS[lang.toLowerCase()] ?? lang.toUpperCase();
+
+// ── Artifact row ───────────────────────────────────────────────────
+const ArtifactRow = ({
+  artifact,
+  onOpen,
+}: {
+  artifact: Artifact;
+  onOpen: (id: string) => void;
+}) => (
+  <button
+    className="artifact-sidebar-row"
+    onClick={() => onOpen(artifact.id)}
+    title={`${artifact.title} — ${artifact.lineCount} lines`}
+  >
+    <span className="artifact-sidebar-icon">{langIcon(artifact.language)}</span>
+    <div className="artifact-sidebar-info">
+      <span className="artifact-sidebar-title">{artifact.title}</span>
+      <span className="artifact-sidebar-meta">
+        {langLabel(artifact.language)} · {artifact.lineCount} lines
+      </span>
+    </div>
+    <svg
+      className="artifact-sidebar-arrow"
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      style={{ width: 10, height: 10, flexShrink: 0 }}
+    >
+      <path d="M2 6h8M6 2l4 4-4 4" />
+    </svg>
+  </button>
+);
+
+// ── Section header with optional refresh button ────────────────────
+const SectionHeader = ({
+  label,
+  icon,
+  count,
+  countBadgeStyle,
+  isOpen: expanded,
+  onToggle,
+  onRefresh,
+}: {
+  label:            string;
+  icon:             React.ReactNode;
+  count:            number;
+  countBadgeStyle?: React.CSSProperties;
+  isOpen:           boolean;
+  onToggle:         () => void;
+  onRefresh?:       () => void;
+}) => (
+  <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+    <button
+      onClick={onToggle}
+      className="sidebar-section-header"
+      aria-expanded={expanded}
+      style={{ flex: 1 }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {icon}
+        <span>{label}</span>
+        {count > 0 && (
+          <span style={countBadgeStyle ?? {
+            background: 'var(--accent)', color: '#000',
+            borderRadius: 10, fontSize: 9, fontWeight: 700,
+            padding: '1px 5px', lineHeight: 1.6,
+          }}>
+            {count}
+          </span>
+        )}
+      </div>
+      <span style={{ fontSize: 9 }}>{expanded ? '▼' : '▶'}</span>
+    </button>
+
+    {onRefresh && (
+      <button
+        onClick={e => { e.stopPropagation(); onRefresh(); }}
+        title={`Refresh ${label}`}
+        style={{
+          background: 'none', border: 'none', cursor: 'pointer',
+          padding: '4px 6px', color: 'var(--text-secondary)',
+          borderRadius: 6, fontSize: 13, lineHeight: 1,
+          transition: 'color 0.15s',
+          flexShrink: 0,
+        }}
+        onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')}
+        onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+      >
+        ↻
+      </button>
+    )}
+  </div>
+);
+
+// ═══════════════════════════════════════════════════════════════════
+// SIDEBAR
+// ═══════════════════════════════════════════════════════════════════
+
+const Sidebar: React.FC<SidebarProps> = ({
+  sessions,
+  activeSessionId,
+  onNewChat,
+  onSelectSession,
+  view,
   onSetView,
   stats,
   onDeleteSession,
@@ -38,16 +161,30 @@ const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onToggle,
   onOpenCommandPalette,
-  user
+  user,
+  onRefreshArtifacts,
+  id,
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
+  const [searchTerm,        setSearchTerm]        = useState('');
+  const [debouncedSearch,   setDebouncedSearch]   = useState('');
+  const [editingId,         setEditingId]         = useState<string | null>(null);
+  const [editValue,         setEditValue]         = useState('');
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [showFavorites,     setShowFavorites]     = useState(true);
+  const [showChats,         setShowChats]         = useState(true);
+  const [showArtifacts,     setShowArtifacts]     = useState(true);
+  const [showDiagrams,      setShowDiagrams]      = useState(true);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Debounce search input to avoid filtering on every keystroke
+  // Artifact store
+  const { artifacts, diagrams } = useArtifacts();
+
+  const handleOpenArtifact = useCallback((id: string) => {
+    setActiveArtifact(id);
+    openPanel();
+  }, []);
+
+  // ── Debounced search ──────────────────────────────────────────
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setSearchTerm(val);
@@ -59,159 +196,144 @@ const Sidebar: React.FC<SidebarProps> = ({
     return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
   }, []);
 
-
-  // Escape key closes mobile sidebar overlay
+  // Escape closes sidebar on mobile
   useEffect(() => {
     if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onToggle();
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onToggle(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
   }, [isOpen, onToggle]);
 
-  // Removed sidebar swipe/gesture open logic. Sidebar now only opens via button click.
-
-
-
-  // Restore filteredSessions definition
+  // ── Filtered sessions ─────────────────────────────────────────
   const filteredSessions = useMemo(() => {
     let list = sessions;
     if (debouncedSearch.trim()) {
       const term = debouncedSearch.toLowerCase();
-      list = sessions.filter(s =>
-        s.title.toLowerCase().includes(term)
-      );
+      list = sessions.filter(s => s.title.toLowerCase().includes(term));
     }
     return list.slice(0, 50);
   }, [sessions, debouncedSearch]);
 
-  // Style helpers for ChatGPT-like session titles and menu
-  const sessionTitleClass = "text-xs sm:text-sm font-semibold leading-tight truncate transition-colors group-hover:text-[var(--accent)]";
-  const menuHeadingClass = "text-[0.98rem] font-bold uppercase tracking-wide text-[var(--text-secondary)] mb-2 mt-4";
+  const favorites    = filteredSessions.filter(s =>  s.isFavorite);
+  const regular      = filteredSessions.filter(s => !s.isFavorite);
+  const hasSearch    = debouncedSearch.trim().length > 0;
+  const hasNoResults = hasSearch && filteredSessions.length === 0;
 
-  const favorites = filteredSessions.filter(s => s.isFavorite);
-  const regular = filteredSessions.filter(s => !s.isFavorite);
-  const hasSearch = debouncedSearch.trim().length > 0;
-  const hasNoSearchResults = hasSearch && filteredSessions.length === 0;
+  const isMobile = () => typeof window !== 'undefined' && window.innerWidth < 1024;
 
-  // Dropdown state for sections
-  const [showFavorites, setShowFavorites] = useState(true);
-  const [showChats, setShowChats] = useState(true);
-
+  // ── Session item handlers ─────────────────────────────────────
   const startEditing = (e: React.MouseEvent, s: ChatSession) => {
     e.stopPropagation();
-    setEditingId(s.id);
-    setEditValue(s.title);
-    setConfirmingDeleteId(null);
+    setEditingId(s.id); setEditValue(s.title); setConfirmingDeleteId(null);
   };
 
-  const saveEdit = (id: string) => {
-    if (editValue.trim()) {
-      onRenameSession(id, editValue.trim());
-    }
+  const saveEdit = (sessionId: string) => {
+    if (editValue.trim()) onRenameSession(sessionId, editValue.trim());
     setEditingId(null);
   };
 
-  const handleDeleteClick = (e: React.MouseEvent, id: string) => {
+  const handleDeleteClick = (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
-    if (confirmingDeleteId === id) {
-      onDeleteSession(id);
-      setConfirmingDeleteId(null);
-    } else {
-      setConfirmingDeleteId(id);
-      setEditingId(null);
-    }
+    if (confirmingDeleteId === sessionId) { onDeleteSession(sessionId); setConfirmingDeleteId(null); }
+    else { setConfirmingDeleteId(sessionId); setEditingId(null); }
   };
 
   const cancelDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setConfirmingDeleteId(null);
+    e.stopPropagation(); setConfirmingDeleteId(null);
   };
 
-  const handleSessionClick = (id: string) => {
-    onSelectSession(id);
-    onSetView('chat');
-    if (window.innerWidth < 640 && isOpen) {
-      onToggle();
-    }
+  const handleSessionClick = (sessionId: string) => {
+    onSelectSession(sessionId); onSetView('chat');
+    if (isMobile() && isOpen) onToggle();
   };
 
+  // ── Render session item ───────────────────────────────────────
   const renderSessionItem = (session: ChatSession) => {
-    const isActive = activeSessionId === session.id && view === 'chat';
+    const isActive     = activeSessionId === session.id && view === 'chat';
     const isConfirming = confirmingDeleteId === session.id;
-    
-    if (!isOpen && window.innerWidth >= 640) return null;
-    
+    if (!isOpen && !isMobile()) return null;
+
     return (
-      <div 
+      <div
         key={session.id}
         onClick={() => !isConfirming && handleSessionClick(session.id)}
-        className={`group relative flex items-center w-full p-3 sm:p-2.5 rounded-xl text-[13px] sm:text-[14px] md:text-[14px] lg:text-[15px] transition-all cursor-pointer ${
-          isActive ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-md border border-[var(--border)]' : 'text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/50'
-        } ${isConfirming ? 'border-red-500/50 bg-red-500/5' : ''}`}
+        className={[
+          'group relative flex items-center w-full p-2.5 rounded-xl text-[13px] transition-all cursor-pointer',
+          isActive
+            ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm border border-[var(--accent)]/20'
+            : 'text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/50',
+          isConfirming ? 'border border-red-500/40 bg-red-500/5' : '',
+        ].join(' ')}
+        role="button"
+        tabIndex={0}
+        onKeyDown={e => e.key === 'Enter' && !isConfirming && handleSessionClick(session.id)}
       >
         {editingId === session.id ? (
           <input
             autoFocus
-            aria-label="Edit chat session title"
-            placeholder="Enter session title"
-            className="w-full bg-transparent border-none outline-none focus:ring-0 p-0 text-[var(--text-primary)] text-xs sm:text-sm font-medium"
+            aria-label="Rename chat"
+            className="w-full bg-transparent border-none outline-none p-0 text-[var(--text-primary)] text-[13px] font-medium"
             value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
+            onChange={e => setEditValue(e.target.value)}
             onBlur={() => saveEdit(session.id)}
-            onKeyDown={(e) => e.key === 'Enter' && saveEdit(session.id)}
-            onClick={(e) => e.stopPropagation()}
+            onKeyDown={e => {
+              if (e.key === 'Enter')  saveEdit(session.id);
+              if (e.key === 'Escape') setEditingId(null);
+            }}
+            onClick={e => e.stopPropagation()}
           />
         ) : (
           <>
-            <span className={`flex-1 truncate pr-[120px] font-medium ${isConfirming ? 'text-red-500 font-bold' : ''}`}>
-              <span className="text-xs sm:text-sm">{isConfirming ? 'Delete chat?' : (session.title || 'New Chat')}</span>
+            <span className={`flex-1 truncate pr-24 text-[13px] font-medium ${isConfirming ? 'text-red-400 font-bold' : ''}`}>
+              {isConfirming ? 'Delete this chat?' : (session.title || 'New Chat')}
             </span>
-            <div className={`absolute right-2 flex items-center gap-1 transition-opacity ${isActive || isConfirming ? 'opacity-100' : 'opacity-0 sm:group-hover:opacity-100'}`}>
+
+            <div className={`absolute right-2 flex items-center gap-0.5 transition-opacity ${
+              isActive || isConfirming ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            }`}>
               {isConfirming ? (
                 <>
-                  <button aria-label="Confirm session deletion" onClick={(e) => handleDeleteClick(e, session.id)} data-nexus-tooltip="Yes, delete" className="p-2 text-red-500 rounded-lg"><Icons.Check className="w-4 h-4" /></button>
-                  <button aria-label="Cancel session deletion" onClick={cancelDelete} data-nexus-tooltip="Cancel" className="p-2 text-[var(--text-secondary)] rounded-lg"><Icons.X className="w-4 h-4" /></button>
+                  <button
+                    onClick={e => handleDeleteClick(e, session.id)}
+                    className="p-1.5 text-red-400 hover:text-red-300 rounded-lg"
+                    aria-label="Confirm delete"
+                  >
+                    <Icons.Check className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={cancelDelete}
+                    className="p-1.5 text-[var(--text-secondary)] rounded-lg"
+                    aria-label="Cancel delete"
+                  >
+                    <Icons.X className="w-3.5 h-3.5" />
+                  </button>
                 </>
               ) : (
                 <>
-                  <button aria-label={session.isFavorite ? "Unpin session" : "Pin session"} onClick={(e) => { e.stopPropagation(); onToggleFavorite(session.id); }} data-nexus-tooltip={session.isFavorite ? "Unpin" : "Pin"} className={`p-2 transition-colors ${session.isFavorite ? 'text-[var(--accent)]' : 'hover:text-[var(--accent)]'}`}>
-                    <Icons.Star fill={session.isFavorite ? 'currentColor' : 'none'} className="w-4 h-4" />
-                  </button>
-                  <button aria-label="Rename session" onClick={(e) => startEditing(e, session)} data-nexus-tooltip="Rename" className="p-2 hover:text-[var(--accent)] transition-colors"><Icons.Edit className="w-4 h-4" /></button>
-                  <button aria-label="Delete session" onClick={(e) => handleDeleteClick(e, session.id)} data-nexus-tooltip="Delete" className="p-2 hover:text-red-500 transition-colors"><Icons.Trash className="w-4 h-4" /></button>
-                  {/* Extract button only on mobile view */}
                   <button
-                    aria-label="Extract chat"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (typeof window !== 'undefined' && window.innerWidth < 640) {
-                        // Download chat as markdown
-                        const s = sessions.find(x => x.id === session.id);
-                        if (!s || !s.messages || !s.messages.length) return;
-                        let md = `# ${s.title || 'Chat Export'}\n\n`;
-                        md += `*Exported on ${new Date().toLocaleString()}*\n\n---\n\n`;
-                        s.messages.forEach(msg => {
-                          const role = msg.role === 'user' ? '**You**' : '**Nexus AI**';
-                          md += `### ${role}\n\n${msg.content}\n\n---\n\n`;
-                        });
-                        const blob = new Blob([md], { type: 'text/markdown' });
-                        const filename = `${(s.title || 'chat').replace(/[^a-z0-9]/gi, '_')}_export.md`;
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = filename;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
-                      }
-                    }}
-                    data-nexus-tooltip="Extract"
-                    className="p-2 hover:text-emerald-500 transition-colors block sm:hidden"
+                    onClick={e => { e.stopPropagation(); onToggleFavorite(session.id); }}
+                    className={`p-1.5 rounded-lg transition-colors ${
+                      session.isFavorite
+                        ? 'text-[var(--accent)]'
+                        : 'hover:text-[var(--accent)] text-[var(--text-secondary)]'
+                    }`}
+                    aria-label={session.isFavorite ? 'Unfavourite' : 'Favourite'}
                   >
-                    <Icons.Download className="w-4 h-4" />
+                    <Icons.Star fill={session.isFavorite ? 'currentColor' : 'none'} className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={e => startEditing(e, session)}
+                    className="p-1.5 hover:text-[var(--accent)] text-[var(--text-secondary)] rounded-lg transition-colors"
+                    aria-label="Rename chat"
+                  >
+                    <Icons.Edit className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={e => handleDeleteClick(e, session.id)}
+                    className="p-1.5 hover:text-red-400 text-[var(--text-secondary)] rounded-lg transition-colors"
+                    aria-label="Delete chat"
+                  >
+                    <Icons.Trash className="w-3.5 h-3.5" />
                   </button>
                 </>
               )}
@@ -222,180 +344,429 @@ const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
+  // ── Logo mark ─────────────────────────────────────────────────
+  const SedrexMark = () => (
+    <svg viewBox="0 0 28 28" fill="none" style={{ width: 28, height: 28, flexShrink: 0 }} aria-hidden="true">
+      <rect width="28" height="28" rx="7" fill="rgba(16,185,129,0.1)" stroke="rgba(16,185,129,0.3)" strokeWidth="1" />
+      <path
+        d="M19 8H11C9.3 8 8 9.3 8 11V12.5C8 14.2 9.3 15.5 11 15.5H17C18.7 15.5 20 16.8 20 18.5V20C20 21.7 18.7 23 17 23H8"
+        stroke="#10B981" strokeWidth="1.8" strokeLinecap="round"
+      />
+    </svg>
+  );
+
+  const HamburgerIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="3" y1="6"  x2="21" y2="6"  />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  );
+
+  const CloseIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="18" y1="6"  x2="6"  y2="18" />
+      <line x1="6"  y1="6"  x2="18" y2="18" />
+    </svg>
+  );
+
+  // ═════════════════════════════════════════════════════════════════
+  // RENDER
+  // ═════════════════════════════════════════════════════════════════
+
   return (
     <>
-      <div 
-        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-[40] sm:hidden transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+      {/* ── Mobile toggle button ────────────────────────────── */}
+      <button
+        className="sidebar-mobile-toggle"
         onClick={onToggle}
-      />
-      {/* Mobile sidebar open button (only visible when sidebar is closed) */}
-      {!isOpen && (
-        <button
-          className="fixed top-4 left-4 z-[60] sm:hidden bg-[var(--bg-secondary)] border border-[var(--border)] shadow-lg rounded-xl p-2 flex items-center justify-center"
-          onClick={onToggle}
-          aria-label="Open sidebar"
-        >
-          <Icons.PanelLeftOpen className="w-6 h-6" />
-        </button>
+        aria-label={isOpen ? 'Close sidebar' : 'Open sidebar'}
+        aria-expanded={isOpen}
+        aria-controls={id || 'app-sidebar'}
+        type="button"
+      >
+        {isOpen ? <CloseIcon /> : <HamburgerIcon />}
+      </button>
+
+      {/* ── Mobile overlay ──────────────────────────────────── */}
+      {isOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={() => { if (isMobile()) onToggle(); }}
+          aria-hidden="true"
+        />
       )}
 
-      <aside 
-        className={`fixed sm:relative flex flex-col h-full bg-[var(--bg-secondary)] text-[var(--text-primary)] border-r border-[var(--border)] z-[50] sidebar-transition ${
-          isOpen ? 'translate-x-0 w-[280px] sm:w-64' : '-translate-x-full sm:translate-x-0 sm:w-[68px]'
-        }`}
+      {/* ── Sidebar panel ───────────────────────────────────── */}
+      <aside
+        id={id || 'app-sidebar'}
+        role="navigation"
+        aria-label="Sidebar"
+        className={`flex flex-col bg-[var(--bg-secondary)] text-[var(--text-primary)] border-r border-[var(--border)] ${isOpen ? 'translate-x-0' : ''}`}
       >
-        <div className="p-4 space-y-4 pt-safe">
-          <div className="flex items-center justify-between mb-2">
-            {(isOpen || window.innerWidth < 640) && (
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center shadow-lg">
-                  <img src="/nexus-logo-modern.svg" alt="Nexus AI Logo" className="w-7 h-7" />
+
+        {/* ── Header ────────────────────────────────────────── */}
+        <div className="p-3 space-y-3 pt-4">
+          <div className="flex items-center justify-between">
+            {isOpen && (
+              <div className="flex items-center gap-2.5">
+                <SedrexMark />
+                <div>
+                  <h1 style={{
+                    fontFamily: "'IBM Plex Sans', sans-serif",
+                    fontSize: 13, fontWeight: 900, letterSpacing: 4,
+                    color: 'var(--text-primary)', textTransform: 'uppercase' as const,
+                    lineHeight: 1, margin: 0,
+                  }}>
+                    SEDREX
+                  </h1>
+                  <span style={{
+                    fontFamily: "'IBM Plex Mono', monospace",
+                    fontSize: 9, letterSpacing: 2,
+                    color: 'var(--accent, #10B981)',
+                    textTransform: 'uppercase' as const, display: 'block',
+                  }}>
+                    Beta
+                  </span>
                 </div>
-                <h1 className="text-[14px] font-black tracking-tight text-[var(--text-primary)] uppercase">NEXUS AI</h1>
-                {/* BEGIN: Beta Badge (remove this block to remove Beta label) */}
-                <span className="sidebar-beta-badge">Beta</span>
-                {/* END: Beta Badge */}
               </div>
             )}
-            <button 
+
+            {/* Desktop collapse/expand */}
+            <button
               onClick={onToggle}
-              aria-label={isOpen ? "Collapse sidebar" : "Expand sidebar"}
-              {...(!isOpen ? { 'data-nexus-tooltip': 'Expand sidebar' } : {})}
-              className={`p-2 rounded-xl border border-[var(--border)] hover:border-[var(--text-secondary)] text-[var(--text-secondary)] transition-all flex items-center justify-center ${!isOpen ? 'mx-auto w-10 h-10' : 'w-9 h-9'}`}
+              aria-label={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+              className={`sidebar-desktop-toggle p-2 rounded-xl border border-[var(--border)] hover:border-[var(--accent)]/40 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-all flex items-center justify-center ${!isOpen ? 'mx-auto w-9 h-9' : 'w-8 h-8'}`}
             >
-              <Icons.PanelLeftOpen className={`${isOpen ? 'rotate-180' : ''} w-5 h-5`} />
+              <Icons.PanelLeftOpen className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </button>
           </div>
 
-          <button 
-            onClick={() => { onNewChat(); onSetView('chat'); if (window.innerWidth < 640) onToggle(); }} 
-            {...(!isOpen ? { 'data-nexus-tooltip': 'New chat' } : {})}
-            className={`flex items-center gap-3 p-3.5 rounded-2xl border border-[var(--border)] hover:bg-[var(--bg-tertiary)] transition-all text-[14px] sm:text-[13px] font-semibold ${isOpen ? 'w-full' : 'w-10 h-10 p-0 justify-center mx-auto'}`}
+          {/* New Chat button */}
+          <button
+            onClick={() => { onNewChat(); onSetView('chat'); if (isMobile()) onToggle(); }}
+            className={`flex items-center gap-2.5 rounded-xl border border-[var(--border)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5 transition-all text-[var(--text-primary)] ${isOpen ? 'w-full p-3' : 'w-9 h-9 p-0 justify-center mx-auto'}`}
+            aria-label="New chat"
           >
             <Icons.Plus />
-            {isOpen && <span className="truncate uppercase tracking-widest text-[12px] sm:text-[11px]">New Chat</span>}
+            {isOpen && (
+              <span style={{
+                fontFamily: "'IBM Plex Mono', monospace",
+                fontSize: 10, fontWeight: 700,
+                letterSpacing: 3, textTransform: 'uppercase' as const,
+              }}>
+                New Chat
+              </span>
+            )}
           </button>
 
-          {/* Collapsed-only command palette highlighter */}
-          {!isOpen && window.innerWidth >= 640 && (
+          {/* Collapsed: Ctrl+K hint */}
+          {!isOpen && !isMobile() && (
             <button
               onClick={onOpenCommandPalette}
-              aria-label="Open command palette"
-              data-nexus-tooltip="Open command palette (Ctrl/Cmd + K)"
-              className="mt-3 w-10 rounded-xl border border-emerald-500/45 bg-emerald-500/10 p-1.5 text-center text-[9px] font-black uppercase leading-tight tracking-wide text-emerald-400 shadow-[0_0_0_1px_rgba(16,185,129,0.2)] transition-all hover:bg-emerald-500/15"
+              aria-label="Command palette (Ctrl+K)"
+              className="mt-2 w-9 mx-auto rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/6 p-1.5 text-center font-black uppercase leading-tight tracking-wide text-[var(--accent)] transition-all hover:bg-[var(--accent)]/10 flex flex-col items-center"
+              style={{ fontSize: 9 }}
             >
-              <span className="block">Ctrl</span>
-              <span className="block text-[11px]">K</span>
+              <span>Ctrl</span>
+              <span style={{ fontSize: 10 }}>K</span>
             </button>
           )}
         </div>
 
+        {/* ── Search ────────────────────────────────────────── */}
         {isOpen && (
-          <div className="px-4 mb-6">
-            <div className="relative group">
-              <div className="absolute inset-y-0 left-3 flex items-center text-[var(--text-secondary)]"><Icons.Search /></div>
-              <input 
+          <div className="px-3 mb-2">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-3 flex items-center text-[var(--text-secondary)]">
+                <Icons.Search className="w-3.5 h-3.5" />
+              </div>
+              <input
                 ref={searchInputRef}
                 type="text"
                 placeholder="Search chats..."
                 value={searchTerm}
                 onChange={handleSearchChange}
-                className="w-full bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl py-3 pl-10 pr-4 text-[13px] font-medium outline-none focus:border-emerald-500/50"
+                aria-label="Search chats"
+                className="w-full bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl py-2.5 pl-9 pr-8 text-[12px] font-medium outline-none focus:border-[var(--accent)]/40 text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
               />
               {searchTerm.trim() && (
                 <button
-                  aria-label="Clear chat search"
-                  onClick={() => {
-                    setSearchTerm('');
-                    setDebouncedSearch('');
-                    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-                    searchInputRef.current?.focus();
-                  }}
+                  onClick={() => { setSearchTerm(''); setDebouncedSearch(''); searchInputRef.current?.focus(); }}
+                  aria-label="Clear search"
                   className="absolute inset-y-0 right-3 flex items-center text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 >
-                  <Icons.X className="w-4 h-4" />
+                  <Icons.X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
           </div>
         )}
 
-        <div className={`flex-1 overflow-y-auto px-4 custom-scrollbar ${!isOpen && window.innerWidth >= 640 ? 'hidden' : ''}`}> 
-          {hasNoSearchResults && (
-            <div className="mb-4 rounded-xl border border-[var(--border)] bg-[var(--bg-primary)] p-3">
+        {/* ── Scrollable body ───────────────────────────────── */}
+        <div className={`flex-1 overflow-y-auto px-3 custom-scrollbar ${!isOpen && !isMobile() ? 'hidden' : ''}`}>
+
+          {/* No results banner */}
+          {hasNoResults && (
+            <div className="mb-3 rounded-xl border border-[var(--border)] bg-[var(--bg-primary)] p-3">
               <p className="text-[12px] font-semibold text-[var(--text-primary)]">No chats found</p>
-              <p className="mt-1 text-[11px] text-[var(--text-secondary)]">No match for "{debouncedSearch}".</p>
+              <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
+                No match for "{debouncedSearch}"
+              </p>
               <button
-                onClick={() => {
-                  setSearchTerm('');
-                  setDebouncedSearch('');
-                  searchInputRef.current?.focus();
-                }}
-                className="mt-2 text-[11px] font-semibold text-emerald-500 hover:text-emerald-400"
+                onClick={() => { setSearchTerm(''); setDebouncedSearch(''); }}
+                className="mt-1.5 text-[11px] font-bold text-[var(--accent)] hover:opacity-80"
               >
                 Clear search
               </button>
             </div>
           )}
 
-          {/* Favorites Section */}
-          <div className="sidebar-section">
-            <div className="sidebar-section-header" onClick={() => setShowFavorites(v => !v)}>
-              Favorites
-              <span className="sidebar-arrow">{showFavorites ? 'v' : '>'}</span>
-            </div>
-            {showFavorites && favorites.length > 0 && (
-              <div className="sidebar-session-list sidebar-session-list-simple">{favorites.map(renderSessionItem)}</div>
-            )}
-            {showFavorites && favorites.length === 0 && !hasNoSearchResults && (
-              <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--bg-primary)]/50 px-3 py-2 text-[11px] text-[var(--text-secondary)]">
-                Pin chats to keep your favorites here.
+          {/* ── Artifacts ─────────────────────────────────── */}
+          <div className="mb-1">
+            <SectionHeader
+              label="Artifacts"
+              icon={
+                <svg viewBox="0 0 14 14" style={{ width: 11, height: 11, color: 'var(--accent)' }} fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M4 3L1 7l3 4M10 3l3 4-3 4M8 1L6 13" />
+                </svg>
+              }
+              count={artifacts.length}
+              isOpen={showArtifacts}
+              onToggle={() => setShowArtifacts(v => !v)}
+              onRefresh={onRefreshArtifacts}
+            />
+
+            {showArtifacts && (
+              <div className="sidebar-artifact-list">
+                {artifacts.length === 0 ? (
+                  <div className="sidebar-artifact-empty">
+                    Generated code files appear here.
+                  </div>
+                ) : (
+                  artifacts.slice(0, 20).map(a => (
+                    <ArtifactRow key={a.id} artifact={a} onOpen={handleOpenArtifact} />
+                  ))
+                )}
               </div>
             )}
           </div>
-          {/* Recent Chats Section */}
-          <div className="sidebar-section">
-            <div className="sidebar-section-header" onClick={() => setShowChats(v => !v)}>
-              Recent Chats
-              <span className="sidebar-arrow">{showChats ? 'v' : '>'}</span>
-            </div>
-            {showChats && (
-              <div className="sidebar-session-list sidebar-session-list-simple">{regular.map(renderSessionItem)}</div>
+
+          {/* ── Diagrams ──────────────────────────────────── */}
+          <div className="mb-1">
+            <SectionHeader
+              label="Diagrams"
+              icon={
+                <svg viewBox="0 0 14 14" style={{ width: 11, height: 11, color: 'var(--accent)' }} fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="1" y="1" width="5" height="5" rx="1" />
+                  <rect x="8" y="1" width="5" height="5" rx="1" />
+                  <rect x="4" y="8" width="6" height="5" rx="1" />
+                  <path d="M3.5 6v1.5M10.5 6v1.5M7 6v2" />
+                </svg>
+              }
+              count={diagrams.length}
+              countBadgeStyle={{
+                background: 'rgba(16,185,129,0.2)', color: 'var(--accent)',
+                borderRadius: 10, fontSize: 9, fontWeight: 700,
+                padding: '1px 5px', lineHeight: 1.6,
+                border: '1px solid rgba(16,185,129,0.3)',
+              }}
+              isOpen={showDiagrams}
+              onToggle={() => setShowDiagrams(v => !v)}
+            />
+
+            {showDiagrams && (
+              <div className="sidebar-artifact-list">
+                {diagrams.length === 0 ? (
+                  <div className="sidebar-artifact-empty">
+                    Mermaid diagrams generated in chat appear here.
+                  </div>
+                ) : (
+                  diagrams.slice(0, 20).map(d => (
+                    <ArtifactRow key={d.id} artifact={d} onOpen={handleOpenArtifact} />
+                  ))
+                )}
+              </div>
             )}
-            {showChats && regular.length === 0 && !hasNoSearchResults && (
-              <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--bg-primary)]/50 px-3 py-3">
-                <p className="text-[11px] font-semibold text-[var(--text-primary)]">No recent chats yet.</p>
+          </div>
+
+          {/* ── Favorites ─────────────────────────────────── */}
+          <div className="mb-1">
+            <button
+              onClick={() => setShowFavorites(v => !v)}
+              className="w-full flex items-center justify-between px-1 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              aria-expanded={showFavorites}
+            >
+              <span>Favorites</span>
+              <span style={{ fontSize: 9 }}>{showFavorites ? '▼' : '▶'}</span>
+            </button>
+
+            {showFavorites && favorites.length > 0 && (
+              <div className="space-y-0.5">
+                {favorites.map(renderSessionItem)}
+              </div>
+            )}
+
+            {showFavorites && favorites.length === 0 && !hasNoResults && (
+              <div className="rounded-xl border border-dashed border-[var(--border)] px-3 py-2 text-[11px] text-[var(--text-secondary)]">
+                Pin chats to keep favorites here.
+              </div>
+            )}
+          </div>
+
+          {/* ── Recent Chats ──────────────────────────────── */}
+          <div className="mb-1">
+            <button
+              onClick={() => setShowChats(v => !v)}
+              className="w-full flex items-center justify-between px-1 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              aria-expanded={showChats}
+            >
+              <span>Recent Chats</span>
+              <span style={{ fontSize: 9 }}>{showChats ? '▼' : '▶'}</span>
+            </button>
+
+            {showChats && (
+              <div className="space-y-0.5">
+                {regular.map(renderSessionItem)}
+              </div>
+            )}
+
+            {showChats && regular.length === 0 && !hasNoResults && (
+              <div className="rounded-xl border border-dashed border-[var(--border)] px-3 py-3">
+                <p className="text-[11px] font-semibold text-[var(--text-primary)]">No chats yet.</p>
                 <button
                   onClick={() => { onNewChat(); onSetView('chat'); }}
-                  className="mt-1 text-[11px] font-semibold text-emerald-500 hover:text-emerald-400"
+                  className="mt-1 text-[11px] font-bold text-[var(--accent)] hover:opacity-80"
                 >
-                  Start your first chat
+                  Start your first chat →
                 </button>
               </div>
             )}
           </div>
-        </div>
 
-        <div className="p-4 mt-auto border-t border-[var(--border)] space-y-4 pb-safe">
-          {/* Billing/Upgrade hidden in beta */}
+        </div>{/* end scrollable body */}
 
-          <button 
-            onClick={() => { onOpenSettings(); if (window.innerWidth < 640) onToggle(); }}
-            {...(!isOpen ? { 'data-nexus-tooltip': 'Settings' } : {})}
-            className={`flex items-center gap-3 p-3 rounded-xl hover:bg-[var(--bg-tertiary)] transition-all ${isOpen ? 'w-full' : 'w-10 h-10 p-0 justify-center mx-auto'}`}
+        {/* ── Footer / user ─────────────────────────────────── */}
+        <div className="p-3 mt-auto border-t border-[var(--border)] pb-safe">
+          <button
+            onClick={() => { onOpenSettings(); if (isMobile()) onToggle(); }}
+            aria-label="Open settings"
+            className={`flex items-center gap-2.5 rounded-xl hover:bg-[var(--bg-tertiary)] transition-all ${isOpen ? 'w-full p-2.5' : 'w-9 h-9 p-0 justify-center mx-auto'}`}
           >
-            <div className="w-8 h-8 rounded-xl bg-indigo-500 flex items-center justify-center text-[13px] font-bold text-white flex-shrink-0">
+            <div
+              className="w-8 h-8 rounded-xl flex items-center justify-center text-[13px] font-bold text-white flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, var(--accent, #10B981), #059669)' }}
+              aria-hidden="true"
+            >
               {user.email.charAt(0).toUpperCase()}
             </div>
             {isOpen && (
               <div className="flex-1 text-left min-w-0">
-                <p className="font-semibold truncate text-[13px]">{user.email.split('@')[0]}</p>
-                <p className="text-[11px] font-bold text-emerald-500">{user.tier}</p>
+                <p className="font-semibold truncate text-[12px] text-[var(--text-primary)]">
+                  {user.email.split('@')[0]}
+                </p>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--accent, #10B981)' }}>
+                  {user.tier}
+                </p>
               </div>
             )}
           </button>
         </div>
+
       </aside>
+
+      {/* ── Scoped styles ─────────────────────────────────────── */}
+      <style>{`
+        .sidebar-section-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 6px 4px;
+          font-size: 10px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          color: var(--text-secondary);
+          transition: color 0.15s;
+          background: none;
+          border: none;
+          cursor: pointer;
+        }
+        .sidebar-section-header:hover { color: var(--text-primary); }
+
+        .sidebar-artifact-list {
+          display: flex;
+          flex-direction: column;
+          gap: 1px;
+          margin-bottom: 4px;
+        }
+
+        .sidebar-artifact-empty {
+          padding: 8px 12px;
+          font-size: 11px;
+          color: var(--text-secondary);
+          border: 1px dashed var(--border);
+          border-radius: 10px;
+          line-height: 1.5;
+        }
+
+        .artifact-sidebar-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: 100%;
+          padding: 7px 10px;
+          border-radius: 10px;
+          background: none;
+          border: none;
+          cursor: pointer;
+          text-align: left;
+          transition: background 0.12s;
+          color: var(--text-primary);
+        }
+        .artifact-sidebar-row:hover { background: var(--bg-tertiary); }
+
+        .artifact-sidebar-icon {
+          font-size: 14px;
+          flex-shrink: 0;
+          width: 20px;
+          text-align: center;
+        }
+
+        .artifact-sidebar-info {
+          display: flex;
+          flex-direction: column;
+          gap: 1px;
+          flex: 1;
+          min-width: 0;
+          overflow: hidden;
+        }
+
+        .artifact-sidebar-title {
+          font-size: 12px;
+          font-weight: 600;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          color: var(--text-primary);
+        }
+
+        .artifact-sidebar-meta {
+          font-size: 10px;
+          color: var(--text-secondary);
+          white-space: nowrap;
+        }
+
+        .artifact-sidebar-arrow {
+          color: var(--text-secondary);
+          opacity: 0;
+          transition: opacity 0.12s;
+        }
+        .artifact-sidebar-row:hover .artifact-sidebar-arrow {
+          opacity: 1;
+          color: var(--accent);
+        }
+      `}</style>
     </>
   );
 };

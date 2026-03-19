@@ -1,5 +1,5 @@
 {
-  "name": "Copy of NEXUS AI",
+  "name": "Copy of SEDREX",
   "description": "A high-performance AI chat application with a smart router system that automatically selects the best model for your queries.",
   "requestFramePermissions": [
     "microphone"

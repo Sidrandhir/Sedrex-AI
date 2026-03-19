@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEDREX Admin Intelligence</title>
+<style>
+  :root {
+    --bg:     #020408; --bg2: #060c14; --bg3: #0a1220;
+    --border: rgba(201,169,110,.12); --border2: rgba(201,169,110,.25);
+    --accent: #10B981; --alo: rgba(16, 185, 129,.08);
+    --text:   #e4e8f0; --muted: #5a6478;
+    --green:  #4ade80; --red:   #f87171; --blue: #60a5fa;
+    --mono:   'IBM Plex Mono', 'Courier New', monospace;
+    --sans:   'IBM Plex Sans', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); }
+  a { color: inherit; text-decoration: none; }
+
+  /* ── Auth screen ─────────────────────────────────────────── */
+  #auth-screen {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px;
+    background: var(--bg);
+  }
+  .auth-logo { font-size: 32px; margin-bottom: 8px; }
+  .auth-title { font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+  .auth-sub   { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .auth-field {
+    width: 320px; padding: 10px 14px;
+    background: var(--bg2); border: 1px solid var(--border2);
+    border-radius: 10px; color: var(--text); font-size: 14px;
+    outline: none; font-family: var(--mono);
+  }
+  .auth-field:focus { border-color: var(--accent); }
+  .auth-btn {
+    width: 320px; padding: 11px;
+    background: var(--accent); border: none;
+    border-radius: 10px; color: #020408;
+    font-size: 14px; font-weight: 700; cursor: pointer;
+    font-family: var(--sans); transition: filter 150ms;
+  }
+  .auth-btn:hover { filter: brightness(1.1); }
+  .auth-err { color: var(--red); font-size: 12px; height: 16px; }
+
+  /* ── App shell ───────────────────────────────────────────── */
+  #app { display: none; flex-direction: column; height: 100vh; }
+  #app.visible { display: flex; }
+
+  /* ── Header ──────────────────────────────────────────────── */
+  .hdr {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px; border-bottom: 1px solid var(--border);
+    background: var(--bg2); flex-shrink: 0;
+  }
+  .hdr-left  { display: flex; align-items: center; gap: 10px; }
+  .hdr-title { font-size: 15px; font-weight: 700; }
+  .hdr-sub   { font-size: 11px; color: var(--muted); }
+  .live-dot  { color: var(--green); font-size: 11px; font-weight: 700; }
+  .hdr-btns  { display: flex; gap: 8px; }
+  .btn-sm {
+    padding: 6px 14px; border: 1px solid var(--border2);
+    border-radius: 7px; background: transparent;
+    color: var(--muted); font-size: 12px; font-weight: 600;
+    cursor: pointer; font-family: var(--mono); transition: all 150ms;
+  }
+  .btn-sm:hover { color: var(--accent); border-color: var(--accent); }
+  .btn-sm.danger:hover { color: var(--red); border-color: var(--red); }
+
+  /* ── Nav ─────────────────────────────────────────────────── */
+  .nav {
+    display: flex; padding: 0 20px; border-bottom: 1px solid var(--border);
+    background: var(--bg2); flex-shrink: 0; overflow-x: auto; gap: 2px;
+  }
+  .nav-tab {
+    padding: 10px 16px; border: none; background: transparent;
+    color: var(--muted); font-size: 13px; font-weight: 600;
+    cursor: pointer; border-bottom: 2px solid transparent;
+    white-space: nowrap; font-family: var(--sans);
+    margin-bottom: -1px; transition: all 150ms;
+  }
+  .nav-tab:hover { color: var(--text); }
+  .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .nav-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+    background: var(--alo); color: var(--accent);
+    font-size: 10px; font-weight: 700; margin-left: 6px;
+  }
+
+  /* ── Content ─────────────────────────────────────────────── */
+  .content { flex: 1; overflow-y: auto; padding: 20px; }
+  .content::-webkit-scrollbar { width: 4px; }
+  .content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── Stat grid ───────────────────────────────────────────── */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+    gap: 12px; margin-bottom: 24px;
+  }
+  .stat-card {
+    padding: 14px 16px; background: var(--bg2);
+    border: 1px solid var(--border); border-radius: 10px;
+  }
+  .stat-card:hover { border-color: var(--border2); }
+  .stat-lbl {
+    font-size: 10px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+  }
+  .stat-val {
+    font-size: 22px; font-weight: 700; font-family: var(--mono); line-height: 1;
+  }
+  .stat-sub { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+  /* ── Section header ──────────────────────────────────────── */
+  .sec-hdr {
+    display: flex; align-items: center; gap: 8px;
+    margin: 20px 0 10px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 10px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .sec-count {
+    font-family: var(--mono); font-size: 10px;
+    background: var(--alo); color: var(--accent);
+    padding: 1px 7px; border-radius: 100px;
+  }
+
+  /* ── Table ───────────────────────────────────────────────── */
+  .tbl-wrap {
+    overflow-x: auto; margin-bottom: 24px;
+    border: 1px solid var(--border); border-radius: 10px;
+  }
+  .tbl-wrap::-webkit-scrollbar { height: 4px; }
+  .tbl-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 700px; }
+  thead { position: sticky; top: 0; z-index: 2; background: var(--bg3); }
+  th {
+    padding: 8px 12px; font-family: var(--mono); font-size: 10px;
+    font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--accent); text-align: left;
+    border-bottom: 1px solid var(--border2); white-space: nowrap;
+  }
+  td {
+    padding: 9px 12px; border-bottom: 1px solid var(--border);
+    vertical-align: middle; line-height: 1.4;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--alo); cursor: pointer; }
+  .mono { font-family: var(--mono); }
+  .sm   { font-size: 11px; color: var(--muted); }
+  .good { color: var(--green); }
+  .bad  { color: var(--red);   }
+  .hi   { color: var(--accent); font-weight: 600; }
+
+  /* ── Badges ──────────────────────────────────────────────── */
+  .badge {
+    display: inline-block; padding: 1px 7px; border-radius: 100px;
+    font-size: 9px; font-weight: 700; font-family: var(--mono);
+    text-transform: uppercase; letter-spacing: .05em;
+  }
+  .badge-online  { background: rgba(74,222,128,.1);  color: var(--green); }
+  .badge-offline { background: rgba(90,100,120,.1);  color: var(--muted); }
+  .badge-free    { color: var(--muted); }
+  .badge-pro     { color: var(--accent); }
+  .badge-unl     { color: var(--green); }
+  .badge-admin   { background: var(--alo); color: var(--accent); padding: 1px 6px; border-radius: 4px; margin-left: 6px; }
+
+  /* ── Intent colors ───────────────────────────────────────── */
+  .int-coding    { color: var(--blue); }
+  .int-reasoning { color: #a78bfa; }
+  .int-live      { color: var(--green); }
+  .int-general   { color: var(--muted); }
+
+  /* ── Toolbar ─────────────────────────────────────────────── */
+  .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .search {
+    flex: 1; max-width: 340px; padding: 8px 14px;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-size: 13px;
+    outline: none; font-family: var(--sans); transition: border-color 150ms;
+  }
+  .search::placeholder { color: var(--muted); opacity: .5; }
+  .search:focus { border-color: var(--border2); }
+
+  /* ── Modal ───────────────────────────────────────────────── */
+  .overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(2,4,8,.85); backdrop-filter: blur(8px);
+    align-items: center; justify-content: center;
+    padding: 20px; z-index: 50;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    width: min(860px, 100%); max-height: 85vh;
+    background: var(--bg2); border: 1px solid var(--border2);
+    border-radius: 16px; display: flex; flex-direction: column;
+    overflow: hidden; animation: modal-in 220ms ease;
+  }
+  @keyframes modal-in { from { opacity:0; transform:scale(.96) translateY(10px); } to { opacity:1; transform:none; } }
+  .modal-hdr {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .modal-avatar {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: var(--alo); border: 1px solid var(--border2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 700; color: var(--accent); flex-shrink: 0;
+  }
+  .modal-close {
+    width: 28px; height: 28px; border-radius: 7px; border: none;
+    background: transparent; color: var(--muted); cursor: pointer;
+    font-size: 16px; display: flex; align-items: center; justify-content: center;
+    transition: all 150ms;
+  }
+  .modal-close:hover { background: rgba(248,113,113,.1); color: var(--red); }
+  .modal-tabs { display: flex; gap: 2px; padding: 8px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .modal-tab {
+    padding: 6px 16px; border-radius: 7px; border: none;
+    background: transparent; color: var(--muted);
+    font-size: 12px; font-weight: 600; cursor: pointer; font-family: var(--sans);
+    text-transform: capitalize; transition: all 150ms;
+  }
+  .modal-tab:hover { color: var(--text); }
+  .modal-tab.active { background: var(--alo); color: var(--accent); }
+  .modal-body { flex: 1; overflow-y: auto; padding: 20px; }
+  .modal-body::-webkit-scrollbar { width: 4px; }
+  .modal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── Detail grid ─────────────────────────────────────────── */
+  .det-section { margin-bottom: 20px; }
+  .det-title {
+    font-size: 10px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted);
+    margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border);
+  }
+  .det-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; }
+  .det-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 10px; background: var(--bg3); border-radius: 7px; font-size: 12px;
+  }
+  .det-item > span:first-child { color: var(--muted); }
+  .det-item > span:last-child  { font-family: var(--mono); font-size: 11px; }
+
+  /* ── Query list in modal ─────────────────────────────────── */
+  .q-item { padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .q-item:last-child { border-bottom: none; }
+  .q-top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 6px; font-size: 11px; }
+  .q-prompt { font-size: 12px; color: rgba(228,232,240,.7); margin-bottom: 5px; line-height: 1.5; }
+  .q-bottom { display: flex; gap: 10px; flex-wrap: wrap; font-family: var(--mono); font-size: 10px; color: var(--muted); }
+
+  /* ── Loading/empty ───────────────────────────────────────── */
+  .loading, .empty { padding: 3rem; text-align: center; color: var(--muted); font-size: 13px; }
+  .spinner {
+    width: 20px; height: 20px; margin: 0 auto 12px;
+    border: 2px solid rgba(201,169,110,.2); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 700ms linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Responsive ──────────────────────────────────────────── */
+  @media (max-width: 640px) {
+    .stat-grid { grid-template-columns: 1fr 1fr; }
+    .content   { padding: 12px; }
+    .modal     { border-radius: 16px 16px 0 0; max-height: 92vh; }
+    .overlay   { align-items: flex-end; padding: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Auth screen -->
+<div id="auth-screen">
+  <div class="auth-logo">⚡</div>
+  <div class="auth-title">SEDREX Admin</div>
+  <div class="auth-sub">Intelligence Dashboard — Admin access only</div>
+  <input id="sb-url"   class="auth-field" type="url"      placeholder="https://xxxx.supabase.co" />
+  <input id="sb-key"   class="auth-field" type="password" placeholder="Supabase service_role key" />
+  <div id="auth-err"   class="auth-err"></div>
+  <button class="auth-btn" onclick="login()">Connect</button>
+  <div style="font-size:11px;color:var(--muted);margin-top:8px;max-width:300px;text-align:center;line-height:1.5">
+    Credentials stored in sessionStorage only. Never transmitted to third parties.
+  </div>
+</div>
+
+<!-- App -->
+<div id="app">
+  <div class="hdr">
+    <div class="hdr-left">
+      <span style="font-size:18px">⚡</span>
+      <div>
+        <div class="hdr-title">SEDREX Admin Intelligence</div>
+        <div class="hdr-sub">
+          <span id="live-indicator" class="live-dot" style="display:none">● live users: <span id="live-count">0</span> &nbsp;·&nbsp; </span>
+          Updated <span id="refresh-time">—</span>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-btns">
+      <button class="btn-sm" onclick="loadAll()">↻ Refresh</button>
+      <button class="btn-sm danger" onclick="logout()">Disconnect</button>
+    </div>
+  </div>
+
+  <div class="nav">
+    <button class="nav-tab active" data-tab="overview"  onclick="switchTab('overview')">📊 Overview</button>
+    <button class="nav-tab"        data-tab="users"     onclick="switchTab('users')">👤 Users <span class="nav-badge" id="cnt-users">0</span></button>
+    <button class="nav-tab"        data-tab="queries"   onclick="switchTab('queries')">💬 Queries <span class="nav-badge" id="cnt-queries">0</span></button>
+    <button class="nav-tab"        data-tab="sessions"  onclick="switchTab('sessions')">🔗 Sessions <span class="nav-badge" id="cnt-sessions">0</span></button>
+  </div>
+
+  <div class="content" id="content">
+    <div class="loading"><div class="spinner"></div>Loading data…</div>
+  </div>
+</div>
+
+<!-- User detail modal -->
+<div class="overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="modal-avatar" id="m-avatar">?</div>
+        <div>
+          <div style="font-size:14px;font-weight:600" id="m-email">—</div>
+          <div style="display:flex;gap:8px;margin-top:4px;font-size:10px" id="m-badges"></div>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" data-mtab="overview" onclick="switchModalTab('overview')">Overview</button>
+      <button class="modal-tab"        data-mtab="queries"  onclick="switchModalTab('queries')">Queries</button>
+      <button class="modal-tab"        data-mtab="sessions" onclick="switchModalTab('sessions')">Sessions</button>
+    </div>
+    <div class="modal-body" id="modal-body">
+      <div class="loading"><div class="spinner"></div>Loading…</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Supabase REST client (no npm, just fetch) ──────────────────────
+let SB_URL = '', SB_KEY = '', SB_PROJECT = '';
+
+async function sbSelect(table, query = '', limit = 200, order = '') {
+  const qs = [`select=*${query}`, limit ? `limit=${limit}` : '', order ? `order=${order}` : ''].filter(Boolean).join('&');
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?${qs}`, {
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', Prefer: 'count=exact' }
+  });
+  if (!r.ok) throw new Error(`${table}: ${r.status} ${await r.text()}`);
+  return r.json();
+}
+
+// ── Auth ──────────────────────────────────────────────────────────
+async function login() {
+  const url = document.getElementById('sb-url').value.trim().replace(/\/$/, '');
+  const key = document.getElementById('sb-key').value.trim();
+  const err = document.getElementById('auth-err');
+  if (!url || !key) { err.textContent = 'Both fields required.'; return; }
+  SB_URL = url; SB_KEY = key;
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/profiles?select=id&limit=1`, {
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
+    });
+    if (!r.ok) throw new Error(`Connection failed (${r.status})`);
+    sessionStorage.setItem('sedrex_admin_url', SB_URL);
+    sessionStorage.setItem('sedrex_admin_key', SB_KEY);
+    err.textContent = '';
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('app').classList.add('visible');
+    loadAll();
+    setInterval(loadAll, 30000);
+  } catch (e) { err.textContent = e.message; }
+}
+
+function logout() {
+  sessionStorage.removeItem('sedrex_admin_url');
+  sessionStorage.removeItem('sedrex_admin_key');
+  location.reload();
+}
+
+// Auto-login from session
+window.addEventListener('DOMContentLoaded', () => {
+  const u = sessionStorage.getItem('sedrex_admin_url');
+  const k = sessionStorage.getItem('sedrex_admin_key');
+  if (u && k) {
+    document.getElementById('sb-url').value = u;
+    document.getElementById('sb-key').value = k;
+    login();
+  }
+});
+
+// ── State ─────────────────────────────────────────────────────────
+let _users = [], _platform = [], _queries = [], _sessions = [];
+let _currentTab = 'overview', _currentModalTab = 'overview', _selectedUser = null;
+let _userQueries = [], _userSessions = [];
+
+const fmt = {
+  num:  n => (n ?? 0).toLocaleString(),
+  k:    n => n >= 1000 ? `${(n/1000).toFixed(1)}k` : String(n ?? 0),
+  date: s => s ? new Date(s).toLocaleString() : '—',
+  ago:  s => {
+    if (!s) return '—';
+    const d = Date.now() - new Date(s).getTime();
+    if (d < 60000)   return 'just now';
+    if (d < 3600000) return `${Math.floor(d/60000)}m ago`;
+    if (d < 86400000)return `${Math.floor(d/3600000)}h ago`;
+    return `${Math.floor(d/86400000)}d ago`;
+  },
+  mins: n => n >= 60 ? `${Math.floor(n/60)}h ${Math.floor(n%60)}m` : `${Math.round(n ?? 0)}m`,
+};
+
+const TIER_CLR = { free:'var(--muted)', pro:'var(--accent)', unlimited:'var(--green)' };
+const INT_CLR  = { coding:'var(--blue)', reasoning:'#a78bfa', live:'var(--green)', general:'var(--muted)' };
+
+// ── Load all data ─────────────────────────────────────────────────
+async function loadAll() {
+  const c = document.getElementById('content');
+  if (!_users.length) c.innerHTML = '<div class="loading"><div class="spinner"></div>Loading data…</div>';
+  try {
+    const [users, platform, queries, sessions] = await Promise.all([
+      sbSelect('admin_user_summary', '', 300, 'last_seen_at.desc.nullslast'),
+      sbSelect('admin_platform_daily', '', 30,  'date.desc'),
+      sbSelect('admin_user_queries',   '', 100, 'created_at.desc'),
+      sbSelect('admin_user_sessions',  '', 100, 'started_at.desc'),
+    ]);
+    _users    = users    ?? [];
+    _platform = platform ?? [];
+    _queries  = queries  ?? [];
+    _sessions = sessions ?? [];
+
+    document.getElementById('cnt-users').textContent    = _users.length;
+    document.getElementById('cnt-queries').textContent  = _queries.length;
+    document.getElementById('cnt-sessions').textContent = _sessions.length;
+
+    const liveCount = _users.filter(u => u.active_sessions > 0).length;
+    const liveEl    = document.getElementById('live-indicator');
+    document.getElementById('live-count').textContent = liveCount;
+    liveEl.style.display = liveCount > 0 ? 'inline' : 'none';
+    document.getElementById('refresh-time').textContent = fmt.ago(new Date().toISOString());
+
+    renderTab(_currentTab);
+  } catch (e) {
+    c.innerHTML = `<div class="loading" style="color:var(--red)">⚠ ${e.message}<br><br><button class="btn-sm" onclick="loadAll()">Retry</button></div>`;
+  }
+}
+
+// ── Tab switching ─────────────────────────────────────────────────
+function switchTab(tab) {
+  _currentTab = tab;
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  renderTab(tab);
+}
+
+function renderTab(tab) {
+  const c = document.getElementById('content');
+  if (tab === 'overview')  c.innerHTML = renderOverview();
+  if (tab === 'users')     c.innerHTML = renderUsers();
+  if (tab === 'queries')   c.innerHTML = renderQueries();
+  if (tab === 'sessions')  c.innerHTML = renderSessions();
+}
+
+// ── Overview ──────────────────────────────────────────────────────
+function renderOverview() {
+  const t = _platform[0] ?? {};
+  const totalTokens = _users.reduce((s, u) => s + (u.lifetime_tokens ?? 0), 0);
+  const totalMsgs   = _users.reduce((s, u) => s + (u.total_messages ?? 0), 0);
+  const pro         = _users.filter(u => u.tier === 'pro' || u.tier === 'unlimited').length;
+  const liveNow     = _users.filter(u => u.active_sessions > 0).length;
+
+  return `
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-lbl">Total Users</div><div class="stat-val">${fmt.num(_users.length)}</div><div class="stat-sub">${pro} paid</div></div>
+    <div class="stat-card"><div class="stat-lbl">Online Now</div><div class="stat-val" style="color:var(--green)">${liveNow}</div></div>
+    <div class="stat-card"><div class="stat-lbl">Queries Today</div><div class="stat-val">${fmt.k(t.total_queries ?? 0)}</div><div class="stat-sub">${t.active_users ?? 0} users</div></div>
+    <div class="stat-card"><div class="stat-lbl">Tokens Today</div><div class="stat-val" style="color:var(--accent)">${fmt.k(t.total_tokens ?? 0)}</div></div>
+    <div class="stat-card"><div class="stat-lbl">Total Messages</div><div class="stat-val">${fmt.k(totalMsgs)}</div></div>
+    <div class="stat-card"><div class="stat-lbl">Lifetime Tokens</div><div class="stat-val">${fmt.k(totalTokens)}</div></div>
+  </div>
+  <div class="sec-hdr">Today's Breakdown</div>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-lbl">💻 Coding</div><div class="stat-val">${fmt.num(t.coding_queries ?? 0)}</div></div>
+    <div class="stat-card"><div class="stat-lbl">🧠 Reasoning</div><div class="stat-val">${fmt.num(t.reasoning_queries ?? 0)}</div></div>
+    <div class="stat-card"><div class="stat-lbl">🔍 Live</div><div class="stat-val">${fmt.num(t.live_queries ?? 0)}</div></div>
+    <div class="stat-card"><div class="stat-lbl">💬 General</div><div class="stat-val">${fmt.num(t.general_queries ?? 0)}</div></div>
+    <div class="stat-card"><div class="stat-lbl">📄 Artifacts</div><div class="stat-val">${fmt.num(t.artifacts_created ?? 0)}</div></div>
+    <div class="stat-card"><div class="stat-lbl">👍 Good</div><div class="stat-val good">${fmt.num(t.good_feedback ?? 0)}</div></div>
+    <div class="stat-card"><div class="stat-lbl">👎 Bad</div><div class="stat-val bad">${fmt.num(t.bad_feedback ?? 0)}</div></div>
+    <div class="stat-card"><div class="stat-lbl">↻ Regen</div><div class="stat-val">${fmt.num(t.regenerations ?? 0)}</div></div>
+  </div>
+  <div class="sec-hdr">Models Today</div>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-lbl">Gemini</div><div class="stat-val" style="color:var(--accent)">${fmt.num(t.gemini_queries ?? 0)}</div></div>
+    <div class="stat-card"><div class="stat-lbl">Claude</div><div class="stat-val">${fmt.num(t.claude_queries ?? 0)}</div></div>
+    <div class="stat-card"><div class="stat-lbl">OpenAI</div><div class="stat-val">${fmt.num(t.openai_queries ?? 0)}</div></div>
+  </div>
+  <div class="sec-hdr">Last 30 Days <span class="sec-count">${_platform.length}</span></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Date</th><th>Users</th><th>Queries</th><th>Tokens</th><th>Gemini</th><th>Claude</th><th>Coding</th><th>Live</th><th>Artifacts</th><th>👍</th><th>👎</th></tr></thead>
+    <tbody>${_platform.map(d => `<tr>
+      <td class="mono">${d.date}</td><td>${d.active_users}</td><td>${fmt.k(d.total_queries)}</td>
+      <td>${fmt.k(d.total_tokens)}</td><td>${d.gemini_queries}</td><td>${d.claude_queries}</td>
+      <td>${d.coding_queries}</td><td>${d.live_queries}</td><td>${d.artifacts_created}</td>
+      <td class="good">${d.good_feedback}</td><td class="bad">${d.bad_feedback}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+// ── Users ─────────────────────────────────────────────────────────
+let _userSearch = '';
+function renderUsers() {
+  const filtered = _users.filter(u =>
+    !_userSearch || u.email?.toLowerCase().includes(_userSearch) ||
+    (u.country ?? '').toLowerCase().includes(_userSearch) ||
+    (u.tier ?? '').toLowerCase().includes(_userSearch)
+  );
+  return `
+  <div class="toolbar">
+    <input class="search" placeholder="Search email, country, tier…" value="${_userSearch}"
+      oninput="_userSearch=this.value;document.getElementById('u-tbody').innerHTML=renderUserRows()" />
+    <span class="mono sm">${filtered.length} users</span>
+  </div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Email</th><th>Tier</th><th>Status</th><th>Last Seen</th><th>Messages</th><th>Tokens</th><th>Sessions</th><th>Avg Session</th><th>Coding</th><th>Live</th><th>Artifacts</th><th>Today</th><th>Timezone</th><th>Country</th><th>Device</th></tr></thead>
+    <tbody id="u-tbody">${renderUserRows()}</tbody>
+  </table></div>`;
+}
+
+function renderUserRows() {
+  const filtered = _users.filter(u =>
+    !_userSearch || u.email?.toLowerCase().includes(_userSearch) ||
+    (u.country ?? '').toLowerCase().includes(_userSearch) ||
+    (u.tier ?? '').toLowerCase().includes(_userSearch)
+  );
+  return filtered.map(u => `<tr onclick='openUserModal("${u.user_id}")'>
+    <td>
+      ${u.active_sessions > 0 ? '<span style="color:var(--green);font-size:8px;margin-right:4px">●</span>' : ''}
+      ${u.email ?? '—'}
+      ${u.is_admin ? '<span class="badge" style="background:var(--alo);color:var(--accent);margin-left:5px">admin</span>' : ''}
+    </td>
+    <td><span style="color:${TIER_CLR[u.tier]??'var(--muted)'};font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase">${u.tier}</span></td>
+    <td>${u.active_sessions > 0 ? '<span class="badge badge-online">● live</span>' : u.is_banned ? '<span class="badge" style="background:rgba(248,113,113,.1);color:var(--red)">banned</span>' : '<span class="badge badge-offline">offline</span>'}</td>
+    <td class="sm mono">${fmt.ago(u.last_seen_at)}</td>
+    <td>${fmt.k(u.total_messages)}</td>
+    <td>${fmt.k(u.lifetime_tokens)}</td>
+    <td>${u.total_sessions}</td>
+    <td>${fmt.mins(u.avg_session_minutes)}</td>
+    <td>${u.total_code_requests}</td>
+    <td>${u.total_live_requests}</td>
+    <td>${u.total_artifacts}</td>
+    <td class="${u.queries_today > 0 ? 'hi' : ''}">${u.queries_today > 0 ? u.queries_today : '—'}</td>
+    <td class="sm">${u.timezone ?? '—'}</td>
+    <td class="sm">${u.country ?? '—'}</td>
+    <td class="sm">${u.device_type ?? '—'}</td>
+  </tr>`).join('');
+}
+
+// ── Queries ───────────────────────────────────────────────────────
+function renderQueries() {
+  return `
+  <div class="sec-hdr">Recent Queries <span class="sec-count">${_queries.length}</span></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Time</th><th>User</th><th>Prompt</th><th>Intent</th><th>Model</th><th>Tokens</th><th>Speed</th><th>Feedback</th><th>Flags</th></tr></thead>
+    <tbody>${_queries.map(q => `<tr>
+      <td class="sm mono">${fmt.ago(q.created_at)}</td>
+      <td class="sm" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${q.email}</td>
+      <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(228,232,240,.7)">${(q.prompt_text ?? '').slice(0,80)}${(q.prompt_text ?? '').length > 80 ? '…' : ''}</td>
+      <td><span style="color:${INT_CLR[q.intent]??'var(--muted)'};font-size:10px;font-weight:700;font-family:var(--mono);text-transform:uppercase">${q.intent ?? '—'}</span></td>
+      <td class="sm">${(q.model_used ?? '—').replace('Google Gemini','Gemini').replace('Anthropic Claude','Claude').replace('OpenAI GPT-4','GPT-4')}</td>
+      <td>${fmt.k(q.total_tokens)}</td>
+      <td class="sm">${q.response_time_ms}ms</td>
+      <td>${q.feedback === 'good' ? '👍' : q.feedback === 'bad' ? '👎' : '—'}</td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap">
+        ${q.had_error      ? '<span style="font-size:9px;background:rgba(248,113,113,.12);color:var(--red);padding:1px 6px;border-radius:4px;font-family:var(--mono)">err</span>' : ''}
+        ${q.artifact_created ? '<span style="font-size:9px;background:rgba(74,222,128,.08);color:var(--green);padding:1px 6px;border-radius:4px;font-family:var(--mono)">art</span>' : ''}
+        ${q.was_regenerated ? '<span style="font-size:9px;background:var(--alo);color:var(--accent);padding:1px 6px;border-radius:4px;font-family:var(--mono)">regen</span>' : ''}
+        ${q.slash_command ? `<span style="font-size:9px;background:rgba(96,165,250,.08);color:var(--blue);padding:1px 6px;border-radius:4px;font-family:var(--mono)">/${q.slash_command}</span>` : ''}
+      </td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+// ── Sessions ──────────────────────────────────────────────────────
+function renderSessions() {
+  return `
+  <div class="sec-hdr">Recent Sessions <span class="sec-count">${_sessions.length}</span></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>User</th><th>Status</th><th>Started</th><th>Duration</th><th>Messages</th><th>Tokens</th><th>Device</th><th>Browser</th><th>OS</th><th>Country</th><th>City</th><th>Timezone</th><th>Ended</th></tr></thead>
+    <tbody>${_sessions.map(s => `<tr>
+      <td class="sm" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.email}</td>
+      <td>${s.is_active ? '<span class="badge badge-online">● live</span>' : '<span class="badge badge-offline">ended</span>'}</td>
+      <td class="sm mono">${fmt.date(s.started_at)}</td>
+      <td class="mono">${fmt.mins(s.duration_minutes)}</td>
+      <td>${s.messages_sent}</td>
+      <td>${fmt.k(s.tokens_used)}</td>
+      <td class="sm">${s.device_type ?? '—'}</td>
+      <td class="sm">${s.browser ?? '—'}</td>
+      <td class="sm">${s.os ?? '—'}</td>
+      <td class="sm">${s.country ?? '—'}</td>
+      <td class="sm">${s.city ?? '—'}</td>
+      <td class="sm">${s.timezone ?? '—'}</td>
+      <td class="sm">${s.ended_reason ?? '—'}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+// ── User modal ────────────────────────────────────────────────────
+async function openUserModal(userId) {
+  _selectedUser = _users.find(u => u.user_id === userId);
+  if (!_selectedUser) return;
+  const u = _selectedUser;
+  document.getElementById('m-avatar').textContent = (u.email?.[0] ?? '?').toUpperCase();
+  document.getElementById('m-email').textContent  = u.email ?? '—';
+  document.getElementById('m-badges').innerHTML   =
+    `<span style="color:${TIER_CLR[u.tier]??'var(--muted)'};font-family:var(--mono);font-size:10px;font-weight:700;text-transform:uppercase">${u.tier}</span>` +
+    (u.is_admin ? '<span class="badge" style="background:var(--alo);color:var(--accent)">admin</span>' : '') +
+    (u.is_banned ? '<span class="badge" style="background:rgba(248,113,113,.1);color:var(--red)">banned</span>' : '') +
+    (u.active_sessions > 0 ? '<span class="badge badge-online">● online</span>' : '');
+  document.getElementById('modal-overlay').classList.add('open');
+  document.querySelectorAll('.modal-tab').forEach(t => t.classList.toggle('active', t.dataset.mtab === 'overview'));
+  _currentModalTab = 'overview';
+  renderModalTab('overview');
+
+  // Prefetch queries & sessions
+  try {
+    [_userQueries, _userSessions] = await Promise.all([
+      sbSelect(`admin_user_queries?user_id=eq.${userId}`, '', 50, 'created_at.desc'),
+      sbSelect(`admin_user_sessions?user_id=eq.${userId}`, '', 30, 'started_at.desc'),
+    ]);
+  } catch { _userQueries = []; _userSessions = []; }
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+function switchModalTab(tab) {
+  _currentModalTab = tab;
+  document.querySelectorAll('.modal-tab').forEach(t => t.classList.toggle('active', t.dataset.mtab === tab));
+  renderModalTab(tab);
+}
+
+function renderModalTab(tab) {
+  const body = document.getElementById('modal-body');
+  const u    = _selectedUser;
+  if (!u) return;
+
+  if (tab === 'overview') {
+    body.innerHTML = `
+    <div class="det-section">
+      <div class="det-title">Identity & Device</div>
+      <div class="det-grid">
+        ${[
+          ['Signup',        fmt.date(u.signup_at)],
+          ['Last seen',     fmt.ago(u.last_seen_at)],
+          ['First message', fmt.ago(u.first_message_at)],
+          ['Last message',  fmt.ago(u.last_message_at)],
+          ['Timezone',      u.timezone ?? '—'],
+          ['Country',       u.country  ?? '—'],
+          ['City',          u.city     ?? '—'],
+          ['Device',        u.device_type ?? '—'],
+          ['Browser',       u.browser  ?? '—'],
+          ['Signup via',    u.signup_source ?? 'email'],
+        ].map(([l,v]) => `<div class="det-item"><span>${l}</span><span>${v}</span></div>`).join('')}
+      </div>
+    </div>
+    <div class="det-section">
+      <div class="det-title">Usage</div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-lbl">Total Messages</div><div class="stat-val">${fmt.num(u.total_messages)}</div></div>
+        <div class="stat-card"><div class="stat-lbl">This Month</div><div class="stat-val">${fmt.num(u.monthly_messages)}</div></div>
+        <div class="stat-card"><div class="stat-lbl">Sessions</div><div class="stat-val">${fmt.num(u.total_sessions)}</div></div>
+        <div class="stat-card"><div class="stat-lbl">Avg Session</div><div class="stat-val">${fmt.mins(u.avg_session_minutes)}</div></div>
+        <div class="stat-card"><div class="stat-lbl">Input Tokens</div><div class="stat-val">${fmt.k(u.total_input_tokens)}</div></div>
+        <div class="stat-card"><div class="stat-lbl">Output Tokens</div><div class="stat-val">${fmt.k(u.total_output_tokens)}</div></div>
+        <div class="stat-card"><div class="stat-lbl">Lifetime Tokens</div><div class="stat-val" style="color:var(--accent)">${fmt.k(u.lifetime_tokens)}</div></div>
+        <div class="stat-card"><div class="stat-lbl">Streak</div><div class="stat-val">${u.streak_days ?? 0}d</div></div>
+      </div>
+    </div>
+    <div class="det-section">
+      <div class="det-title">Query Types</div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-lbl">💻 Coding</div><div class="stat-val">${fmt.num(u.total_code_requests)}</div></div>
+        <div class="stat-card"><div class="stat-lbl">🧠 Reasoning</div><div class="stat-val">${fmt.num(u.total_reasoning_requests)}</div></div>
+        <div class="stat-card"><div class="stat-lbl">🔍 Live</div><div class="stat-val">${fmt.num(u.total_live_requests)}</div></div>
+        <div class="stat-card"><div class="stat-lbl">📄 Artifacts</div><div class="stat-val">${fmt.num(u.total_artifacts)}</div></div>
+      </div>
+    </div>`;
+    return;
+  }
+
+  if (tab === 'queries') {
+    if (!_userQueries.length) { body.innerHTML = '<div class="empty">No queries yet</div>'; return; }
+    body.innerHTML = _userQueries.map(q => `
+    <div class="q-item">
+      <div class="q-top">
+        <span style="color:${INT_CLR[q.intent]??'var(--muted)'};font-size:10px;font-weight:700;font-family:var(--mono);text-transform:uppercase">${q.intent ?? '—'}</span>
+        <span class="sm mono">${(q.model_used ?? '—').replace('Google Gemini','Gemini').replace('Anthropic Claude','Claude').replace('OpenAI GPT-4','GPT-4')}</span>
+        <span style="color:var(--accent);font-family:var(--mono);font-size:10px">${fmt.k(q.total_tokens)} tokens</span>
+        <span class="sm" style="margin-left:auto">${fmt.ago(q.created_at)}</span>
+        ${q.feedback === 'good' ? '👍' : q.feedback === 'bad' ? '👎' : ''}
+        ${q.had_error ? '<span style="font-size:9px;background:rgba(248,113,113,.12);color:var(--red);padding:1px 5px;border-radius:4px">err</span>' : ''}
+        ${q.artifact_created ? '<span style="font-size:9px;background:rgba(74,222,128,.08);color:var(--green);padding:1px 5px;border-radius:4px">artifact</span>' : ''}
+      </div>
+      <div class="q-prompt">${(q.prompt_text ?? '').slice(0,200)}${(q.prompt_text ?? '').length > 200 ? '…' : ''}</div>
+      <div class="q-bottom">
+        <span>${q.response_time_ms}ms</span>
+        <span>in: ${fmt.k(q.input_tokens)} · out: ${fmt.k(q.output_tokens)}</span>
+        ${q.slash_command ? `<span style="color:var(--blue)">/${q.slash_command}</span>` : ''}
+        ${q.was_regenerated ? '<span style="color:var(--accent)">regenerated</span>' : ''}
+        ${q.conversation_title ? `<span style="opacity:.5">${q.conversation_title}</span>` : ''}
+      </div>
+    </div>`).join('');
+    return;
+  }
+
+  if (tab === 'sessions') {
+    if (!_userSessions.length) { body.innerHTML = '<div class="empty">No sessions yet</div>'; return; }
+    body.innerHTML = _userSessions.map(s => `
+    <div class="q-item">
+      <div class="q-top">
+        ${s.is_active ? '<span class="badge badge-online">● active now</span>' : `<span class="sm">${fmt.ago(s.ended_at)}</span>`}
+        <span style="font-family:var(--mono);font-weight:600">${fmt.mins(s.duration_minutes)}</span>
+        <span class="sm">${s.device_type ?? '—'} · ${s.browser ?? '—'}</span>
+        ${s.country ? `<span style="color:var(--accent);font-size:11px">${s.city ? s.city+', ' : ''}${s.country}</span>` : ''}
+      </div>
+      <div class="q-bottom">
+        <span>${fmt.date(s.started_at)}</span>
+        <span>${s.messages_sent} msgs</span>
+        <span>${fmt.k(s.tokens_used)} tokens</span>
+        ${s.ended_reason ? `<span style="color:var(--red)">${s.ended_reason}</span>` : ''}
+        ${s.timezone ? `<span>${s.timezone}</span>` : ''}
+      </div>
+    </div>`).join('');
+  }
+}
+</script>
+</body>
+</html>

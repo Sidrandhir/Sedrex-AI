@@ -63,7 +63,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
           full_name: fullName,
           tier: 'free',
           updated_at: new Date().toISOString()
-        }, { onConflict: 'id' }).catch(() => {});
+        }, { onConflict: 'id' }).then(null, () => {});
       }
     } catch (e) {
       console.warn("Profile fetch failed, using defaults");

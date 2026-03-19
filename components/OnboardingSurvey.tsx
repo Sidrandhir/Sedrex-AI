@@ -206,7 +206,7 @@ const OnboardingSurvey: React.FC<Props> = ({ onComplete, userName }) => {
         <div className="survey-header">
           <div className="survey-logo">
             <div className="survey-logo-icon"><Icons.Robot className="w-5 h-5 text-white" /></div>
-            <span className="survey-logo-text">Nexus AI</span>
+            <span className="survey-logo-text">SEDREX</span>
           </div>
           <button className="survey-skip" onClick={handleSkip}>
             Skip for now

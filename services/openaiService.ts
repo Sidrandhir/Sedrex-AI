@@ -1,36 +1,51 @@
-
-import { Message, MessageRole } from "../types";
+// services/openaiService.ts
+import { Message } from "../types";
+import { buildSedrexSystemPrompt, sanitizeConversationHistory } from "./SedrexsystemPrompt";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-// Fixed: Added systemInstructions parameter to match the 3-argument call in aiService.ts (Line 183)
-export const callOpenAI = async (prompt: string, history: Message[], systemInstructions?: string): Promise<string> => {
+export const callOpenAI = async (
+  prompt: string,
+  history: Message[],
+  systemInstructions?: string,
+): Promise<string> => {
   if (!OPENAI_API_KEY) {
     return "Error: OpenAI API Key is missing. Please set process.env.OPENAI_API_KEY.";
   }
 
   try {
+    // ── FIXED: sanitize history before sending ──────────────────────
+    // Strips any leaked "I am built by Google / I am GPT" text from
+    // previous assistant messages so they don't re-anchor wrong identity
+    const cleanHistory = sanitizeConversationHistory(history);
+
+    // ── FIXED: always lead with Sedrex identity as system message ───
+    // Merge with any caller-supplied systemInstructions
+    const sedrexPrompt = buildSedrexSystemPrompt();
+    const finalSystem  = systemInstructions
+      ? `${sedrexPrompt}\n\n${systemInstructions}`
+      : sedrexPrompt;
+
     const messages = [
-      // Prepend system instructions if provided to maintain consistency across models
-      ...(systemInstructions ? [{ role: 'system' as const, content: systemInstructions }] : []),
-      ...history.map(m => ({
+      { role: 'system' as const, content: finalSystem },   // ← identity lock first
+      ...cleanHistory.map(m => ({
         role: (m.role === 'assistant' ? 'assistant' : 'user') as 'assistant' | 'user',
-        content: m.content
+        content: m.content,
       })),
-      { role: 'user' as const, content: prompt }
+      { role: 'user' as const, content: prompt },
     ];
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${OPENAI_API_KEY}`
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
         model: "gpt-4-turbo-preview",
-        messages: messages,
+        messages,
         temperature: 0.7,
-      })
+      }),
     });
 
     if (!response.ok) {

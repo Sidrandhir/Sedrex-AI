@@ -1,139 +1,134 @@
 import React, { useEffect, useState } from 'react';
 import { Icons } from '../constants';
-import NexusLogo from '../public/nexus-logo-modern.svg';
 import { Link } from 'react-router-dom';
 import './LandingPage.css';
 
-type Props = {
-  onOpenAuth: () => void;
-};
+type Props = { onOpenAuth: () => void };
 
 const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  const [theme, setTheme]                     = useState<'light' | 'dark'>('dark');
   const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
-  const [activeWord, setActiveWord] = useState(0);
-  const [typedText, setTypedText] = useState('');
-  const [isTyping, setIsTyping] = useState(true);
-  const [currentPrompt, setCurrentPrompt] = useState(0);
+  const [activeWord, setActiveWord]           = useState(0);
+  const [typedText, setTypedText]             = useState('');
+  const [isTyping, setIsTyping]               = useState(true);
+  const [currentPrompt, setCurrentPrompt]     = useState(0);
 
-  const rotatingWords = ['faster.', 'smarter.', 'clearer.', 'easier.'];
+  const rotatingWords    = ['verify.', 'trust.', 'confirm.', 'know.'];
   const typewriterPrompts = [
-    'Help me plan a product launch strategy',
-    'Debug this React component',
-    'What happened in tech today?',
-    'Analyze this quarterly report',
+    'Is this news article actually accurate?',
+    'Verify this scientific claim for me',
+    'Cross-check these market numbers',
+    'What are reliable sources on this?',
   ];
-  const routeLabels = ['Reasoning & Planning', 'Coding & Writing', 'Search & Speed', 'Reasoning & Planning'];
-  const routeIcons = ['🧠', '⚡', '🔍', '🧠'];
+  const routeLabels = ['Verification', 'Research', 'Analysis', 'Fact-check'];
+  const routeIcons  = ['✓', '🔍', '📊', '⚡'];
 
+  // ── Theme init ─────────────────────────────────────────────────
   useEffect(() => {
-    const savedTheme = localStorage.getItem('nexus_theme') as 'light' | 'dark' | null;
-    if (savedTheme) {
-      setTheme(savedTheme);
-    } else {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      setTheme(prefersDark ? 'dark' : 'light');
-    }
+    const saved = localStorage.getItem('sedrex_theme') as 'light' | 'dark' | null;
+    setTheme(saved ?? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
   }, []);
 
   const toggleTheme = () => {
-    const newTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(newTheme);
-    localStorage.setItem('nexus_theme', newTheme);
-    document.documentElement.setAttribute('data-theme', newTheme);
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    localStorage.setItem('sedrex_theme', next);
+    document.documentElement.setAttribute('data-theme', next);
   };
 
-  // Rotating hero word
+  // ── Rotating word ──────────────────────────────────────────────
   useEffect(() => {
-    const interval = setInterval(() => setActiveWord(prev => (prev + 1) % rotatingWords.length), 2600);
-    return () => clearInterval(interval);
+    const t = setInterval(() => setActiveWord(p => (p + 1) % rotatingWords.length), 2600);
+    return () => clearInterval(t);
   }, []);
 
-  // Typewriter effect
+  // ── Typewriter ─────────────────────────────────────────────────
   useEffect(() => {
     const prompt = typewriterPrompts[currentPrompt];
-    let charIndex = 0;
+    let i = 0;
     setTypedText('');
     setIsTyping(true);
-
-    const typeInterval = setInterval(() => {
-      if (charIndex <= prompt.length) {
-        setTypedText(prompt.slice(0, charIndex));
-        charIndex++;
-      } else {
-        clearInterval(typeInterval);
+    const timer = setInterval(() => {
+      if (i <= prompt.length) { setTypedText(prompt.slice(0, i)); i++; }
+      else {
+        clearInterval(timer);
         setIsTyping(false);
-        setTimeout(() => setCurrentPrompt(prev => (prev + 1) % typewriterPrompts.length), 2400);
+        setTimeout(() => setCurrentPrompt(p => (p + 1) % typewriterPrompts.length), 2400);
       }
     }, 45);
-    return () => clearInterval(typeInterval);
+    return () => clearInterval(timer);
   }, [currentPrompt]);
 
-  // Cursor glow — skip on touch devices (no mouse)
+  // ── Cursor glow ────────────────────────────────────────────────
   useEffect(() => {
-    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    if (isTouchDevice) return;
-    const handleMouseMove = (e: MouseEvent) => {
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) return;
+    const handler = (e: MouseEvent) => {
       const el = document.querySelector('.cursor-glow') as HTMLElement;
       if (el) { el.style.left = `${e.clientX}px`; el.style.top = `${e.clientY}px`; }
     };
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousemove', handler);
+    return () => window.removeEventListener('mousemove', handler);
   }, []);
 
-  // Intersection Observer for scroll reveals
+  // ── Scroll reveal ──────────────────────────────────────────────
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => entries.forEach(entry => {
-        if (entry.isIntersecting) setVisibleSections(prev => new Set([...prev, entry.target.id]));
-      }),
+    const obs = new IntersectionObserver(
+      entries => entries.forEach(e => { if (e.isIntersecting) setVisibleSections(p => new Set([...p, e.target.id])); }),
       { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
     );
-    document.querySelectorAll('[data-animate]').forEach(el => observer.observe(el));
-    return () => observer.disconnect();
+    document.querySelectorAll('[data-animate]').forEach(el => obs.observe(el));
+    return () => obs.disconnect();
   }, []);
 
-  const isVisible = (id: string) => visibleSections.has(id);
+  const vis = (id: string) => visibleSections.has(id);
+
+  // ── SEDREX logo SVG ─────────────────────────────────────────────
+  const SedrexLogoSVG = () => (
+    <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: 36, height: 36 }}>
+      <rect width="36" height="36" rx="9" fill="rgba(201,168,76,0.1)" stroke="rgba(201,168,76,0.3)" strokeWidth="1"/>
+      <path d="M24 10H14C11.8 10 10 11.8 10 14V16C10 18.2 11.8 20 14 20H22C24.2 20 26 21.8 26 24V26C26 28.2 24.2 30 22 30H10" stroke="#c9a84c" strokeWidth="2.2" strokeLinecap="round"/>
+      <circle cx="29" cy="7" r="3" fill="#c9a84c" opacity="0.5"/>
+    </svg>
+  );
 
   return (
     <div className={`landing-page ${theme}`}>
-      {/* Background */}
-      <div className="background-container">
-        <div className="gradient-orb orb-1"></div>
-        <div className="gradient-orb orb-2"></div>
-        <div className="gradient-orb orb-3"></div>
-        <div className="mesh-gradient"></div>
-        <div className="grid-pattern"></div>
-      </div>
-      <div className="cursor-glow"></div>
 
-      {/* Particles */}
+      {/* ── Background ─────────────────────────────────────────── */}
+      <div className="background-container">
+        <div className="gradient-orb orb-1" />
+        <div className="gradient-orb orb-2" />
+        <div className="gradient-orb orb-3" />
+        <div className="mesh-gradient" />
+        <div className="grid-pattern" />
+      </div>
+      <div className="cursor-glow" />
+
+      {/* ── Particles ──────────────────────────────────────────── */}
       <div className="particles-container">
-        {[...Array(16)].map((_, i) => (
-          <div
-            key={i}
-            className="particle particle-style"
-            style={{
-              left: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 14}s`,
-              animationDuration: `${14 + Math.random() * 16}s`,
-            }}
-          />
+        {[...Array(14)].map((_, i) => (
+          <div key={i} className="particle" style={{
+            left: `${Math.random() * 100}%`,
+            animationDelay: `${Math.random() * 14}s`,
+            animationDuration: `${14 + Math.random() * 16}s`,
+          }} />
         ))}
       </div>
 
-      {/* Nav */}
+      {/* ══════════════════════════════════════════════════════════
+          NAVBAR
+          ══════════════════════════════════════════════════════════ */}
       <nav className="navbar">
         <div className="nav-container">
           <div className="logo-section">
-            <img src={NexusLogo} alt="Nexus Logo" className="logo-icon" style={{width:32, height:32, marginRight:8, filter:'drop-shadow(0 2px 8px #16A34A33)'}} />
-            <div className="logo-text">
-              <h1 className="logo-title">Nexus AI</h1>
-              <p className="logo-subtitle">One input. Best output.</p>
+            <SedrexLogoSVG />
+            <div className="logo-text" style={{ marginLeft: 10 }}>
+              <h1 className="logo-title">SEDREX</h1>
+              <p className="logo-subtitle">Verify before you act.</p>
             </div>
           </div>
           <div className="nav-buttons">
-            <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme" data-nexus-tooltip={theme === 'dark' ? 'Light mode' : 'Dark mode'}>
+            <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
               <Icons.Sun className="sun-icon" />
               <Icons.Moon className="moon-icon" />
             </button>
@@ -143,28 +138,35 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
         </div>
       </nav>
 
-      {/* ═══════════════ HERO ═══════════════ */}
+      {/* ══════════════════════════════════════════════════════════
+          HERO
+          ══════════════════════════════════════════════════════════ */}
       <section className="hero-section">
         <div className="hero-content">
           <div className="hero-text">
+
             <div className="hero-eyebrow">
-              <span className="eyebrow-dot"></span>
-              The AI that thinks before it answers
+              <span className="eyebrow-dot" />
+              Verification-First Intelligence
             </div>
+
             <h2 className="hero-title">
-              Stop switching AIs.<br />
+              The AI that checks<br />
               <span className="hero-title-line2">
-                Start getting answers{' '}
+                before it answers.{' '}
                 <span className="rotating-word-wrapper">
-                  {rotatingWords.map((word, i) => (
-                    <span key={word} className={`rotating-word ${i === activeWord ? 'active' : ''}`}>{word}</span>
+                  {rotatingWords.map((w, i) => (
+                    <span key={w} className={`rotating-word ${i === activeWord ? 'active' : ''}`}>{w}</span>
                   ))}
                 </span>
               </span>
             </h2>
+
             <p className="hero-subtitle">
-              Nexus understands what you need and routes every question to the right intelligence — reasoning, coding, or live search. You just type.
+              SEDREX connects information sources, cross-references evidence, and delivers
+              verified, source-backed answers — so you act on truth, not assumption.
             </p>
+
             <div className="hero-cta">
               <button className="btn btn-primary-large btn-glow" onClick={onOpenAuth}>
                 Start Free — No Card Needed
@@ -172,40 +174,53 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
               </button>
               <a href="#how-it-works" className="btn btn-ghost">
                 See how it works
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="btn-chevron"><path d="M7 13l5 5 5-5M7 6l5 5 5-5"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="btn-chevron">
+                  <path d="M7 13l5 5 5-5M7 6l5 5 5-5"/>
+                </svg>
               </a>
             </div>
           </div>
 
-          {/* 3D Demo Card */}
+          {/* Demo card */}
           <div className="hero-card">
             <div className="card-3d">
               <div className="card-front">
                 <div className="card-browser-bar">
                   <div className="browser-dots">
-                    <span className="dot dot-red"></span>
-                    <span className="dot dot-yellow"></span>
-                    <span className="dot dot-green"></span>
+                    <span className="dot dot-red" /><span className="dot dot-yellow" /><span className="dot dot-green" />
                   </div>
-                  <span className="browser-title">Nexus AI</span>
+                  <span className="browser-title">SEDREX</span>
                 </div>
                 <div className="card-body">
                   <div className="card-input-area">
-                    <span className="card-typing">{typedText}<span className={`type-cursor ${isTyping ? 'blink' : ''}`}>|</span></span>
+                    <span className="card-typing">
+                      {typedText}
+                      <span className={`type-cursor ${isTyping ? 'blink' : ''}`}>|</span>
+                    </span>
                   </div>
                   <div className="card-routing">
                     <div className="routing-label">
-                      <span className="routing-dot"></span>
-                      <span className="routing-text">Routed to</span>
+                      <span className="routing-dot" />
+                      <span className="routing-text">Verified by</span>
                       <span className="routing-active-badge">
                         {routeIcons[currentPrompt]} {routeLabels[currentPrompt]}
                       </span>
                     </div>
                   </div>
+                  {/* Confidence indicator */}
+                  <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ fontSize: 10, fontFamily: 'IBM Plex Mono', letterSpacing: 2, color: 'rgba(201,168,76,0.6)', textTransform: 'uppercase' }}>
+                      Confidence
+                    </div>
+                    <div style={{ flex: 1, height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{ width: '87%', height: '100%', background: 'linear-gradient(90deg, #c9a84c, #e8c96a)', borderRadius: 2, animation: 'confBarLoad 1.2s ease both' }} />
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'IBM Plex Mono', color: '#c9a84c', fontWeight: 700 }}>87%</div>
+                  </div>
                   <div className="card-response">
-                    <div className="response-line rl-1"></div>
-                    <div className="response-line rl-2"></div>
-                    <div className="response-line rl-3"></div>
+                    <div className="response-line rl-1" />
+                    <div className="response-line rl-2" />
+                    <div className="response-line rl-3" />
                   </div>
                 </div>
               </div>
@@ -214,26 +229,30 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
         </div>
 
         <div className="trust-strip">
-          <p className="trust-text">Built for professionals, developers, and teams who want answers — not options.</p>
+          <p className="trust-text">
+            Built for analysts, researchers, journalists, and professionals who cannot afford wrong answers.
+          </p>
         </div>
       </section>
 
-      {/* ═══════════════ HOW IT WORKS ═══════════════ */}
+      {/* ══════════════════════════════════════════════════════════
+          HOW IT WORKS
+          ══════════════════════════════════════════════════════════ */}
       <section id="how-it-works" className="how-section" data-animate>
-        <div className={`section-inner ${isVisible('how-it-works') ? 'visible' : ''}`}>
+        <div className={`section-inner ${vis('how-it-works') ? 'visible' : ''}`}>
           <div className="section-header">
             <span className="section-tag">How it works</span>
-            <h2 className="section-title">You ask. Nexus thinks. You win.</h2>
-            <p className="section-description">Three steps. Zero decision fatigue.</p>
+            <h2 className="section-title">You ask. SEDREX verifies. You act.</h2>
+            <p className="section-description">Three steps. Zero doubt.</p>
           </div>
           <div className="steps-container">
-            <div className="step-line"></div>
             {[
-              { num: '01', icon: '💬', title: 'You type naturally', desc: 'Ask anything — strategy, code, current events. No model picking. No guesswork.' },
-              { num: '02', icon: '🧠', title: 'Nexus reads your intent', desc: 'Our engine classifies what you need — reasoning, precision, or speed — in milliseconds.' },
-              { num: '03', icon: '✨', title: 'Best answer. First try.', desc: 'The right intelligence activates. Accurate, contextual response. No tool-switching.' },
+              { num: '01', icon: '💬', title: 'You ask anything', desc: 'Type a question, paste a claim, or share a document. SEDREX understands context instantly.' },
+              { num: '02', icon: '🔗', title: 'SEDREX connects sources', desc: 'Cross-references multiple information sources in parallel, building an evidence chain in real time.' },
+              { num: '03', icon: '✓',  title: 'Verified answer delivered', desc: 'You get a structured, confidence-scored, source-backed answer. No guessing, no hallucination.' },
             ].map((step, i) => (
-              <div key={step.num} className={`step-card ${isVisible('how-it-works') ? 'visible' : ''} step-delay-${i}`}>
+              <div key={step.num} className={`step-card ${vis('how-it-works') ? 'visible' : ''}`}
+                style={{ transitionDelay: `${i * 100}ms` }}>
                 <div className="step-number">{step.num}</div>
                 <div className="step-icon">{step.icon}</div>
                 <h3 className="step-title">{step.title}</h3>
@@ -244,21 +263,24 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
         </div>
       </section>
 
-      {/* ═══════════════ CAPABILITIES ═══════════════ */}
+      {/* ══════════════════════════════════════════════════════════
+          CAPABILITIES
+          ══════════════════════════════════════════════════════════ */}
       <section id="capabilities" className="capabilities-section" data-animate>
-        <div className={`section-inner ${isVisible('capabilities') ? 'visible' : ''}`}>
+        <div className={`section-inner ${vis('capabilities') ? 'visible' : ''}`}>
           <div className="section-header">
             <span className="section-tag">Capabilities</span>
-            <h2 className="section-title">One platform. Every kind of thinking.</h2>
-            <p className="section-description">Nexus covers every intent — so you never switch tools again.</p>
+            <h2 className="section-title">One platform. Every kind of intelligence.</h2>
+            <p className="section-description">SEDREX covers every intent — with verification at the core of every answer.</p>
           </div>
           <div className="cap-grid">
             {[
-              { icon: '🧠', title: 'Reasoning & Planning', desc: 'Strategy, trade-offs, decisions, frameworks. When you need to think deeply — Nexus thinks with you.', tags: ['Compare options', 'Build plans', 'Analyze data'], gradient: 'cap-gradient-1' },
-              { icon: '⚡', title: 'Coding & Writing', desc: 'Implementation, debugging, documentation, structured writing. Technical precision on demand.', tags: ['Write code', 'Fix bugs', 'Draft docs'], gradient: 'cap-gradient-2' },
-              { icon: '🔍', title: 'Search & Speed', desc: 'Real-time answers, live web search, image understanding, quick summaries. Instant intelligence.', tags: ['Live search', 'Quick facts', 'Summarize'], gradient: 'cap-gradient-3' },
+              { icon: '✓', title: 'Fact Verification', desc: 'Cross-references claims against multiple authoritative sources. Confidence score on every answer. No hallucination.', tags: ['Claim checking', 'Source citation', 'Confidence score'], gradient: 'cap-gradient-1' },
+              { icon: '⚡', title: 'Deep Research', desc: 'Multi-source synthesis for complex questions. Connects dots across documents, web, and databases simultaneously.', tags: ['Multi-source', 'Document analysis', 'Web grounding'], gradient: 'cap-gradient-2' },
+              { icon: '🔍', title: 'Live Intelligence', desc: 'Real-time web search with instant verification. Current events, prices, and breaking news — always sourced.', tags: ['Live search', 'Breaking news', 'Real-time data'], gradient: 'cap-gradient-3' },
             ].map((cap, i) => (
-              <div key={cap.title} className={`cap-card ${cap.gradient} ${isVisible('capabilities') ? 'visible' : ''} cap-delay-${i}`}>
+              <div key={cap.title} className={`cap-card ${cap.gradient} ${vis('capabilities') ? 'visible' : ''}`}
+                style={{ transitionDelay: `${i * 100}ms` }}>
                 <div className="cap-icon-large">{cap.icon}</div>
                 <h3 className="cap-title">{cap.title}</h3>
                 <p className="cap-desc">{cap.desc}</p>
@@ -269,54 +291,59 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
         </div>
       </section>
 
-      {/* ═══════════════ PAIN vs GAIN ═══════════════ */}
-      <section id="why-nexus" className="pain-section" data-animate>
-        <div className={`section-inner ${isVisible('why-nexus') ? 'visible' : ''}`}>
+      {/* ══════════════════════════════════════════════════════════
+          PAIN vs GAIN
+          ══════════════════════════════════════════════════════════ */}
+      <section id="why-sedrex" className="pain-section" data-animate>
+        <div className={`section-inner ${vis('why-sedrex') ? 'visible' : ''}`}>
           <div className="section-header">
             <span className="section-tag">The problem</span>
-            <h2 className="section-title">You're wasting time choosing AIs.<br/>Nexus ends that.</h2>
+            <h2 className="section-title">AI that guesses is dangerous.<br/>SEDREX verifies.</h2>
           </div>
           <div className="pain-grid">
-            <div className={`pain-card pain-old ${isVisible('why-nexus') ? 'visible' : ''}`}>
-              <div className="pain-header-bar pain-red"><span className="pain-x">✕</span> Without Nexus</div>
+            <div className={`pain-card ${vis('why-sedrex') ? 'visible' : ''}`}>
+              <div className="pain-header-bar pain-red"><span className="pain-x">✕</span> Without SEDREX</div>
               <ul className="pain-list">
-                <li><span className="pain-icon-bad">⏳</span>Open ChatGPT. Not great. Try Claude. Hmm. Try Gemini.</li>
-                <li><span className="pain-icon-bad">🤷</span>"Which model is better for this?" — every single time</li>
-                <li><span className="pain-icon-bad">💸</span>Pay for 3 subscriptions. Use each one 30% of the time.</li>
-                <li><span className="pain-icon-bad">😤</span>Copy-paste context between tools. Lose your flow.</li>
+                <li><span className="pain-icon-bad">⚠️</span> AI confidently gives wrong answers — you don't know until it's too late.</li>
+                <li><span className="pain-icon-bad">🔁</span> You manually verify every important claim across multiple tabs.</li>
+                <li><span className="pain-icon-bad">😤</span> No sources cited — can't tell fact from hallucination.</li>
+                <li><span className="pain-icon-bad">⏳</span> Hours wasted validating AI output before you can use it.</li>
               </ul>
             </div>
-            <div className={`pain-card pain-new ${isVisible('why-nexus') ? 'visible' : ''} pain-delay`}>
-              <div className="pain-header-bar pain-green"><span className="pain-check">✓</span> With Nexus</div>
+            <div className={`pain-card ${vis('why-sedrex') ? 'visible' : ''}`} style={{ transitionDelay: '100ms' }}>
+              <div className="pain-header-bar pain-green"><span className="pain-check">✓</span> With SEDREX</div>
               <ul className="pain-list">
-                <li><span className="pain-icon-good">⚡</span>One input. Best answer. First try. Every time.</li>
-                <li><span className="pain-icon-good">🧠</span>Nexus reads your intent — you never pick a model.</li>
-                <li><span className="pain-icon-good">💰</span>One subscription. Full coverage.</li>
-                <li><span className="pain-icon-good">🎯</span>Stay in one place. Stay in flow. Stay productive.</li>
+                <li><span className="pain-icon-good">✓</span> Every answer verified against real sources before delivery.</li>
+                <li><span className="pain-icon-good">📎</span> Sources cited automatically — click through to verify yourself.</li>
+                <li><span className="pain-icon-good">📊</span> Confidence score on every response — you know exactly how sure to be.</li>
+                <li><span className="pain-icon-good">⚡</span> Act on information immediately. No re-verification needed.</li>
               </ul>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ═══════════════ FEATURES ═══════════════ */}
+      {/* ══════════════════════════════════════════════════════════
+          FEATURES
+          ══════════════════════════════════════════════════════════ */}
       <section id="features" className="features-section" data-animate>
-        <div className={`section-inner ${isVisible('features') ? 'visible' : ''}`}>
+        <div className={`section-inner ${vis('features') ? 'visible' : ''}`}>
           <div className="section-header">
             <span className="section-tag">Built for real work</span>
             <h2 className="section-title">Everything a power user needs.</h2>
-            <p className="section-description">Tools that actually save you time.</p>
+            <p className="section-description">Tools that actually save you time — and protect your reputation.</p>
           </div>
           <div className="features-grid">
             {[
-              { icon: '📄', title: 'Drop any file', desc: 'PDFs, Word docs, Excel, CSV, ZIP — drop it in and ask questions about your data.' },
-              { icon: '🌐', title: 'Live web search', desc: 'Real-time grounding with current events, prices, and news. Always up-to-date.' },
-              { icon: '🎙️', title: 'Voice to text', desc: 'Speak your question. Nexus transcribes and responds. Hands-free intelligence.' },
-              { icon: '📊', title: 'Charts & visuals', desc: 'Generate interactive charts from your data — no export needed.' },
-              { icon: '🔄', title: 'Smart follow-ups', desc: 'AI suggests the next best question. Keeps your momentum going.' },
-              { icon: '🌗', title: 'Light & dark', desc: 'Professional interface in both themes. Built for all-day use.' },
+              { icon: '📎', title: 'Drop any file', desc: 'PDFs, Word docs, Excel, CSV — SEDREX reads and verifies claims in your documents instantly.' },
+              { icon: '🌐', title: 'Live web grounding', desc: 'Real-time source verification. Every answer grounded in current, citable information.' },
+              { icon: '📊', title: 'Confidence scoring', desc: 'Every answer carries a confidence level. High, moderate, or low — you always know.' },
+              { icon: '🔗', title: 'Source citations', desc: 'Clickable sources on every response. Full transparency, full traceability.' },
+              { icon: '🔄', title: 'Smart follow-ups', desc: 'SEDREX suggests the deepest next question. Keeps your research momentum going.' },
+              { icon: '🌗', title: 'Light & dark mode', desc: 'Professional interface for all-day use. Easy on the eyes, hard on misinformation.' },
             ].map((feat, i) => (
-              <div key={feat.title} className={`feature-card ${isVisible('features') ? 'visible' : ''} feature-delay-${i}`}>
+              <div key={feat.title} className={`feature-card ${vis('features') ? 'visible' : ''}`}
+                style={{ transitionDelay: `${i * 70}ms` }}>
                 <div className="feature-icon">{feat.icon}</div>
                 <h3 className="feature-title">{feat.title}</h3>
                 <p className="feature-desc">{feat.desc}</p>
@@ -326,59 +353,65 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
         </div>
       </section>
 
-      {/* ═══════════════ FOMO / MOMENTUM ═══════════════ */}
+      {/* ══════════════════════════════════════════════════════════
+          MOMENTUM
+          ══════════════════════════════════════════════════════════ */}
       <section id="momentum" className="momentum-section" data-animate>
-        <div className={`section-inner ${isVisible('momentum') ? 'visible' : ''}`}>
+        <div className={`section-inner ${vis('momentum') ? 'visible' : ''}`}>
           <div className="momentum-content">
             <h2 className="momentum-title">
-              The AI landscape moves fast.<br />
-              <span className="momentum-highlight">People who consolidate now, win.</span>
+              In a world full of AI noise,<br />
+              <span className="momentum-highlight">verified intelligence wins.</span>
             </h2>
             <p className="momentum-subtitle">
-              Every day you spend switching between AI tools is a day someone else spent getting answers in one place.
+              Every decision made on unverified AI output is a liability. SEDREX eliminates that risk.
             </p>
             <div className="momentum-stats">
               <div className="m-stat">
-                <span className="m-stat-num">3×</span>
-                <span className="m-stat-label">faster than tab-switching between AI tools</span>
-              </div>
-              <div className="m-stat-divider"></div>
-              <div className="m-stat">
-                <span className="m-stat-num">1</span>
-                <span className="m-stat-label">subscription instead of multiple</span>
-              </div>
-              <div className="m-stat-divider"></div>
-              <div className="m-stat">
                 <span className="m-stat-num">0</span>
-                <span className="m-stat-label">model decisions you need to make</span>
+                <span className="m-stat-label">hallucinations in verified responses</span>
+              </div>
+              <div className="m-stat-divider" />
+              <div className="m-stat">
+                <span className="m-stat-num">3×</span>
+                <span className="m-stat-label">faster research with built-in verification</span>
+              </div>
+              <div className="m-stat-divider" />
+              <div className="m-stat">
+                <span className="m-stat-num">∞</span>
+                <span className="m-stat-label">sources checked before every answer</span>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ═══════════════ CTA ═══════════════ */}
+      {/* ══════════════════════════════════════════════════════════
+          CTA
+          ══════════════════════════════════════════════════════════ */}
       <section className="cta-section" data-animate id="cta">
-        <div className={`cta-inner ${isVisible('cta') ? 'visible' : ''}`}>
-          <div className="cta-glow"></div>
-          <span className="cta-eyebrow">Ready?</span>
-          <h2 className="cta-title">Your next best answer is one message away.</h2>
-          <p className="cta-subtitle">Free to start. No credit card. No model picking. Just results.</p>
+        <div className={`cta-inner ${vis('cta') ? 'visible' : ''}`}>
+          <div className="cta-glow" />
+          <span className="cta-eyebrow">Ready to stop guessing?</span>
+          <h2 className="cta-title">Your next verified answer is one message away.</h2>
+          <p className="cta-subtitle">Free to start. No credit card. Verification-first from message one.</p>
           <button className="btn btn-primary-large btn-glow btn-cta" onClick={onOpenAuth}>
-            Get Started Free<span className="btn-arrow">→</span>
+            Get Started Free <span className="btn-arrow">→</span>
           </button>
           <p className="cta-microcopy">Takes 10 seconds. Cancel anytime.</p>
         </div>
       </section>
 
-      {/* Footer */}
+      {/* ══════════════════════════════════════════════════════════
+          FOOTER
+          ══════════════════════════════════════════════════════════ */}
       <footer className="footer">
         <div className="footer-content">
           <div className="footer-brand">
-            <img src={NexusLogo} alt="Nexus Logo" className="footer-logo-icon" style={{width:28, height:28, marginRight:8, filter:'drop-shadow(0 2px 8px #16A34A33)'}} />
-            <span className="footer-logo-text">Nexus AI</span>
+            <SedrexLogoSVG />
+            <span className="footer-logo-text" style={{ marginLeft: 8 }}>SEDREX</span>
           </div>
-          <p className="footer-copy">&copy; {new Date().getFullYear()} Nexus AI. All rights reserved.</p>
+          <p className="footer-copy">&copy; {new Date().getFullYear()} SEDREX Technologies Pvt Ltd · India</p>
           <div className="footer-links">
             <Link to="/privacy">Privacy</Link>
             <Link to="/terms">Terms</Link>
@@ -386,6 +419,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
           </div>
         </div>
       </footer>
+
     </div>
   );
 };

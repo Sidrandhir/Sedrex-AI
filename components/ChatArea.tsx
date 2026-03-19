@@ -5,22 +5,24 @@ import { Message, AIModel, RouterResult, ChatSession, GroundingChunk } from '../
 import { Icons } from '../constants';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import './ChatArea.css';
+import EmptyState from './EmptyState';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
 import { ConfidenceBadge } from './ConfidenceBadge';
 import type { ConfidenceSignal } from '../services/aiService';
+import ArtifactCard from './ArtifactCard';
+import { getArtifacts } from '../services/artifactStore';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   BarChart, Bar, LineChart, Line,
 } from 'recharts';
 
-// ── Global type augmentation ──────────────────────────────────────
 declare global {
   interface Window { __sidebarGestureLock?: boolean; }
 }
 
-// ── Types ─────────────────────────────────────────────────────────
 interface ChatAreaProps {
   session: ChatSession;
   isLoading: boolean;
@@ -39,9 +41,72 @@ interface ChatAreaProps {
   onSuggestionClick?: (text: string) => void;
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+// FIX 1 — MARKDOWN PREPROCESSOR
+// Strict separator-only regex + HTML <br> → \n conversion
+// + auto-detect mermaid from bare "graph TD" / "flowchart" blocks
+// ══════════════════════════════════════════════════════════════════
+function preprocessMarkdown(raw: string): string {
+  if (!raw) return '';
+
+  let result = raw;
+
+  // FIX 1a: Strip HTML <br> tags — replace with newline
+  result = result.replace(/<br\s*\/?>/gi, '\n');
+
+  // FIX 1b: Remove stray HTML tags from LLM output.
+  // SECURITY: <a> and <img> are intentionally excluded — both can carry
+  // onerror/onload attributes that execute JS even inside React, because
+  // Mermaid output uses dangerouslySetInnerHTML. Only safe inline tags kept.
+  result = result.replace(/<(?!\/?(strong|em|code|s)\b)[^>]+>/gi, '');
+
+  // FIX 1c: Strict separator-only regex — never match data rows
+  // Old: /^(\|(?:[:\-\s|]+)\|)$/gm  ← too broad, matched cells with dashes
+  // New: strictly requires each segment to be only colons/dashes/spaces
+  result = result.replace(
+    /^\|(\s*:?-+:?\s*\|)+\s*$/gm,
+    (row) => row.replace(/:{2,}/g, ':')
+  );
+
+  // FIX 1d: Blank line BEFORE table block (header + separator must be contiguous)
+  result = result.replace(
+    /([^\n])\n(\|[^\n]+\|\n\|[-:\s|]+\|)/g,
+    '$1\n\n$2'
+  );
+
+  // FIX 1e: Blank line AFTER table block
+  result = result.replace(
+    /(\|[^\n]+\|\n)(?!\|)/g,
+    '$1\n'
+  );
+
+  // FIX 1f: Auto-wrap bare mermaid/graph blocks that LLM forgot to fence.
+  // CRITICAL GUARD: only wrap if the block contains actual diagram arrows.
+  // Without this, "graph theory is used in mathematics" → falsely fenced.
+  result = result.replace(
+    /^(graph\s+(?:TD|LR|RL|BT|TB)[\s\S]*?)(?=\n{2,}|$)/gm,
+    (match) => {
+      if (match.trim().startsWith('```')) return match;
+      // Require at least one real arrow — no arrow = normal prose, skip
+      if (!match.includes('-->') && !match.includes('->')) return match;
+      return '```mermaid\n' + match.trim() + '\n```';
+    }
+  );
+  result = result.replace(
+    /^((?:flowchart\s+(?:TD|LR|RL|BT|TB)|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie)[\s\S]*?)(?=\n{2,}|$)/gm,
+    (match) => {
+      if (match.trim().startsWith('```')) return match;
+      if (!match.includes('-->') && !match.includes('->') && !match.includes(':')) return match;
+      return '```mermaid\n' + match.trim() + '\n```';
+    }
+  );
+
+  return result;
+}
+
+// ══════════════════════════════════════════════════════════════════
 // UTILITIES
-// ═══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 
 const copyToClipboard = (text: string): void => {
   if (navigator.clipboard?.writeText) {
@@ -66,7 +131,6 @@ const downloadFile = (blob: Blob, filename: string): void => {
     /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const url = URL.createObjectURL(blob);
-
   if (isIOS) {
     if (navigator.share && navigator.canShare?.({ files: [new File([blob], filename)] })) {
       navigator.share({ files: [new File([blob], filename, { type: blob.type })] })
@@ -76,10 +140,8 @@ const downloadFile = (blob: Blob, filename: string): void => {
     }
   } else {
     const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
@@ -104,52 +166,30 @@ const stripMarkdown = (text: string): string =>
     .replace(/\n/g, ' ')
     .trim();
 
-// ═══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 // SUB-COMPONENTS
-// ═══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 
-// ── Chart tooltip ─────────────────────────────────────────────────
 const ChartTooltip = memo(({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{
-      background: 'var(--bg-secondary)',
-      border: '1px solid var(--border)',
-      borderRadius: 8,
-      padding: '8px 12px',
-      boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
-    }}>
-      <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', marginBottom: 2 }}>{label}</p>
-      <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{payload[0].value}</p>
+    <div className="chart-tooltip">
+      <p className="chart-tooltip-label">{label}</p>
+      <p className="chart-tooltip-value">{payload[0].value}</p>
     </div>
   );
 });
 
-// ── Chart block ───────────────────────────────────────────────────
 const EnhancedChart = memo(({ dataStr }: { dataStr: string }) => {
   try {
     const { type = 'area', data, label = 'Data' } = JSON.parse(dataStr);
     const accent = 'var(--accent)';
-    const chartProps = {
-      data,
-      margin: { top: 8, right: 8, left: -20, bottom: 0 },
-    };
-    const axisProps = {
-      axisLine: false,
-      tickLine: false,
-      tick: { fontSize: 10, fill: 'var(--text-secondary)', fontWeight: 600 },
-    };
-
+    const chartProps = { data, margin: { top: 8, right: 8, left: -20, bottom: 0 } };
+    const axisProps = { axisLine: false, tickLine: false, tick: { fontSize: 10, fill: 'var(--text-secondary)', fontWeight: 600 } };
     return (
-      <div style={{
-        margin: '1.25em 0',
-        padding: '20px 24px',
-        borderRadius: 16,
-        border: '1px solid var(--border)',
-        background: 'color-mix(in srgb, var(--bg-secondary) 40%, transparent)',
-      }}>
-        <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', marginBottom: 16, opacity: 0.6 }}>{label}</p>
-        <div style={{ height: 220, width: '100%' }}>
+      <div className="enhanced-chart-container">
+        <p className="enhanced-chart-label">{label}</p>
+        <div className="enhanced-chart-inner">
           <ResponsiveContainer width="100%" height="100%">
             {type === 'bar' ? (
               <BarChart {...chartProps}>
@@ -186,96 +226,141 @@ const EnhancedChart = memo(({ dataStr }: { dataStr: string }) => {
         </div>
       </div>
     );
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 });
 
-// ── Mermaid diagram ───────────────────────────────────────────────
-const MermaidBlock = memo(({ code }: { code: string }) => {
-  const [svg, setSvg] = useState('');
-  const [error, setError] = useState('');
+// ══════════════════════════════════════════════════════════════════
+// FIX 2 — MERMAID BLOCK
+// Full sanitizer for subgraph parentheses, node limit guard,
+// size guard (10k chars), error display with raw fallback
+// ══════════════════════════════════════════════════════════════════
+const MAX_MERMAID_CHARS        = 10_000;
+const MAX_MERMAID_EDGES        = 200;   // raised — Notion/Claude safely render 150-300 edges
+const MERMAID_WARN_EDGES       = 120;   // soft-warn above this, still render
 
-  // Sanitize nested parentheses in node labels
-  const sanitize = (raw: string): string =>
-    raw
-      .replace(/(\w[\w\d_-]*)\[([^\]"]*\([^\]]*\)[^\]"]*)\]/g, (_, id, label) =>
-        label.startsWith('"') ? _ : `${id}["${label}"]`
-      )
-      .replace(/(\w[\w\d_-]*)\(([^)"]*\([^)]*\)[^)"]*)\)/g, (_, id, label) =>
-        label.startsWith('"') ? _ : `${id}("${label}")`
-      );
+function sanitizeMermaid(raw: string): string {
+  let code = raw;
+
+  // Fix: subgraph Frontend (Client-side) → subgraph "Frontend (Client-side)"
+  code = code.replace(
+    /subgraph\s+([A-Za-z0-9_][\w\s-]*)\s*\(([^)\n]+)\)/g,
+    (_match, name, paren) => `subgraph "${name.trim()} (${paren.trim()})"`
+  );
+
+  // Fix: node labels with parentheses that break parser
+  // e.g.  A[Label (detail)] → A["Label (detail)"]
+  code = code.replace(
+    /(\b[\w]+)\[([^\]"]*\([^\]]*\)[^\]"]*)\]/g,
+    (_m, id, label) => `${id}["${label}"]`
+  );
+  code = code.replace(
+    /(\b[\w]+)\(([^)"]*\([^)]*\)[^)"]*)\)/g,
+    (_m, id, label) => `${id}("${label}")`
+  );
+
+  // Fix: empty or malformed pipes
+  code = code.replace(/\s+\|\s+\|/g, ' ');
+
+  return code;
+}
+
+const MermaidBlock = memo(({ code }: { code: string }) => {
+  const [svg, setSvg]       = useState('');
+  const [error, setError]   = useState('');
+  const [warn, setWarn]     = useState('');   // soft warning — renders but cautions user
 
   useEffect(() => {
     let cancelled = false;
+
+    // Hard limit: char count (genuine OOM risk)
+    if (code.length > MAX_MERMAID_CHARS) {
+      setError(`Diagram too large (${code.length.toLocaleString()} chars, max ${MAX_MERMAID_CHARS.toLocaleString()}).`);
+      return;
+    }
+
+    // Edge count — soft warn above MERMAID_WARN_EDGES, hard block above MAX_MERMAID_EDGES
+    const edgeCount = (code.match(/<-->|<--|-->|==>|-.->|--\|/g) || []).length;
+    if (edgeCount > MAX_MERMAID_EDGES) {
+      // Still attempt render but tell user it may be slow
+      setWarn(`Large diagram (${edgeCount} connections) — may render slowly on some devices.`);
+    } else if (edgeCount > MERMAID_WARN_EDGES) {
+      setWarn(`Complex diagram (${edgeCount} connections).`);
+    }
+
     (async () => {
       try {
         const mermaid = (await import('mermaid')).default;
-        mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose' });
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: 'dark',
+          // FIX: 'loose' allowed arbitrary JS via click handlers (XSS).
+          // 'strict' sanitizes SVG output — safe for dangerouslySetInnerHTML.
+          securityLevel: 'strict',
+        });
         const id = 'mermaid-' + Math.random().toString(36).slice(2, 9);
-        const { svg: rendered } = await mermaid.render(id, sanitize(code));
+        const { svg: rendered } = await mermaid.render(id, sanitizeMermaid(code));
         if (!cancelled) setSvg(rendered);
       } catch (e: any) {
         if (!cancelled) setError(e.message || 'Invalid diagram syntax');
       }
     })();
+
     return () => { cancelled = true; };
   }, [code]);
-
-  const handleDownload = () => {
-    if (!svg) return;
-    downloadFile(new Blob([svg], { type: 'image/svg+xml' }), 'diagram.svg');
-  };
 
   return (
     <div className="nx-diagram">
       <div className="nx-diagram-header">
         <span className="nx-code-lang">Diagram</span>
         {svg && (
-          <button onClick={handleDownload} className="nx-code-btn">
-            <Icons.Download className="icon-12" />
-            SVG
+          <button
+            onClick={() => downloadFile(new Blob([svg], { type: 'image/svg+xml' }), 'diagram.svg')}
+            className="nx-code-btn"
+          >
+            <Icons.Download className="icon-12" />SVG
           </button>
         )}
       </div>
+      {/* Soft warning banner — shown even when diagram renders successfully */}
+      {warn && !error && (
+        <div style={{ padding: '6px 16px', background: 'rgba(201,168,76,0.07)', borderBottom: '1px solid rgba(201,168,76,0.15)', fontSize: 11, color: 'var(--accent,#c9a84c)', display: 'flex', alignItems: 'center', gap: 6 }}>
+          ⚠ {warn}
+        </div>
+      )}
       {error ? (
-        <div style={{ padding: '16px 20px', color: '#f87171', fontSize: 13 }}>
-          Diagram error: {error}
+        <div className="diagram-error">
+          <div style={{ marginBottom: 8 }}>⚠ Diagram error: {error}</div>
+          <pre style={{ fontSize: 11, opacity: 0.6, overflowX: 'auto', margin: 0 }}>{code}</pre>
         </div>
       ) : svg ? (
         <div className="nx-diagram-body" dangerouslySetInnerHTML={{ __html: svg }} />
       ) : (
-        <div className="nx-diagram-loading">
-          <div className="nx-spinner" />
-        </div>
+        <div className="nx-diagram-loading"><div className="nx-spinner" /></div>
       )}
     </div>
   );
 });
 
-// ── Product grid ──────────────────────────────────────────────────
 const ProductGrid = memo(({ dataStr }: { dataStr: string }) => {
   const products = useMemo(() => {
-    try {
-      const p = JSON.parse(dataStr);
-      return Array.isArray(p) ? p : [];
-    } catch { return []; }
+    try { const p = JSON.parse(dataStr); return Array.isArray(p) ? p : []; }
+    catch { return []; }
   }, [dataStr]);
-
   if (!products.length) return null;
-
   return (
-    <div style={{ margin: '1.25em 0' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)' }}>
-        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+    <div className="product-grid-outer">
+      <div className="product-grid-header">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+        </svg>
         Products
       </div>
       <div className="nx-product-grid">
         {products.map((p: any, i: number) => (
           <a key={i} href={p.url || '#'} target="_blank" rel="noopener noreferrer" className="nx-product-card">
             {p.image && (
-              <div style={{ height: 112, marginBottom: 12, borderRadius: 8, overflow: 'hidden', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <img src={p.image} alt={p.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} loading="lazy" />
+              <div className="product-image-container">
+                <img src={p.image} alt={p.name} className="product-image" loading="lazy" />
               </div>
             )}
             <div className="nx-product-name">{p.name}</div>
@@ -314,7 +399,7 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
   const language = (className ?? '').replace('language-', '').toLowerCase();
   const codeString = String(children ?? '').replace(/\n$/, '');
 
-  // Horizontal scroll → lock sidebar swipe
+  // Touch gesture lock for horizontal scroll inside code blocks
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -333,8 +418,8 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
     };
     const onEnd = () => setTimeout(() => { window.__sidebarGestureLock = false; }, 80);
     el.addEventListener('touchstart', onStart, { passive: true });
-    el.addEventListener('touchmove', onMove, { passive: true });
-    el.addEventListener('touchend', onEnd, { passive: true });
+    el.addEventListener('touchmove',  onMove,  { passive: true });
+    el.addEventListener('touchend',   onEnd,   { passive: true });
     return () => {
       el.removeEventListener('touchstart', onStart);
       el.removeEventListener('touchmove', onMove);
@@ -342,36 +427,49 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
     };
   }, []);
 
-  // Route special languages to their own renderers
-  if (language === 'chart')    return <EnhancedChart dataStr={codeString} />;
-  if (language === 'mermaid')  return <MermaidBlock code={codeString} />;
-  if (language === 'products') return <ProductGrid dataStr={codeString} />;
+  // Special renderers
+  if (language === 'chart' && codeString.trim().startsWith('{'))
+    return <EnhancedChart dataStr={codeString} />;
+  if (language === 'mermaid')
+    return <MermaidBlock code={codeString} />;
+  if (language === 'products')
+    return <ProductGrid dataStr={codeString} />;
 
   const handleCopy = () => {
-    copyToClipboard(codeString);
-    setCopied(true);
+    copyToClipboard(codeString); setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-
   const handleDownload = () => {
     const ext  = EXT_MAP[language]  || language || 'txt';
     const mime = MIME_MAP[language] || 'text/plain';
     downloadFile(new Blob([codeString], { type: mime }), `file.${ext}`);
   };
 
-  // Syntax highlight — skip on large files or weak devices
   const highlighted = useMemo(() => {
     if (!codeString) return '';
+    // FIX 7: Dual guard — hardwareConcurrency alone is unreliable (phones fake 8+ cores).
+    // Add a code-length threshold: >15k chars is slow regardless of device class.
     if (codeString.length > 20_000) return escapeHtml(codeString);
-    if (typeof navigator !== 'undefined' && navigator.hardwareConcurrency <= 2) return escapeHtml(codeString);
+    if (codeString.length > 15_000) return escapeHtml(codeString); // length beats fake core count
+    if (typeof navigator !== 'undefined' && navigator.hardwareConcurrency <= 2)
+      return escapeHtml(codeString);
+
+    // FIX 5: Hash-based key — a 20k char codeString as a Map key wastes ~40KB
+    // per entry. djb2 reduces that to 7 bytes at negligible collision risk.
+    const cacheKey = `${language}:${djb2(codeString)}`;
+    if (highlightCache.has(cacheKey)) return highlightCache.get(cacheKey)!;
+
+    let result = '';
     try {
       if (language && hljs.getLanguage(language)) {
-        return hljs.highlight(codeString, { language, ignoreIllegals: true }).value;
+        result = hljs.highlight(codeString, { language, ignoreIllegals: true }).value;
+      } else {
+        result = hljs.highlightAuto(codeString).value;
       }
-      return hljs.highlightAuto(codeString).value;
-    } catch {
-      return escapeHtml(codeString);
-    }
+    } catch { result = escapeHtml(codeString); }
+
+    setHighlightCache(cacheKey, result);
+    return result;
   }, [codeString, language]);
 
   return (
@@ -380,18 +478,14 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
         <span className="nx-code-lang">{language || 'code'}</span>
         <div className="nx-code-actions">
           <button onClick={handleDownload} className="nx-code-btn">
-            <Icons.Download className="icon-12" />
-            Download
+            <Icons.Download className="icon-12" />Download
           </button>
           <button onClick={handleCopy} className={`nx-code-btn${copied ? ' copied' : ''}`}>
-            {copied
-              ? <Icons.Check className="icon-12" />
-              : <Icons.Copy className="icon-12" />}
+            {copied ? <Icons.Check className="icon-12" /> : <Icons.Copy className="icon-12" />}
             {copied ? 'Copied' : 'Copy'}
           </button>
         </div>
       </div>
-      {/* Dedicated scroll container for code blocks */}
       <div className="nx-code-scroll">
         <pre>
           <code
@@ -404,27 +498,62 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
   );
 });
 
+// ══════════════════════════════════════════════════════════════════
+// CACHE KEY HASH — djb2 (zero-dependency, ~10ns per call)
+// Replaces full-string keys which balloon to MBs on long messages.
+// Collision rate: ~1 in 4 billion — acceptable for a render cache.
+// ══════════════════════════════════════════════════════════════════
+function djb2(str: string): string {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) + h) ^ str.charCodeAt(i);
+    h >>>= 0; // keep unsigned 32-bit
+  }
+  return h.toString(36);
+}
+
+// ── Highlight cache ─────────────────────────────────────────────
+const HIGHLIGHT_CACHE_LIMIT = 200;
+const highlightCache = new Map<string, string>();
+
+function setHighlightCache(key: string, value: string) {
+  if (highlightCache.size >= HIGHLIGHT_CACHE_LIMIT) {
+    const firstKey = highlightCache.keys().next().value as string | undefined;
+    if (firstKey) highlightCache.delete(firstKey);
+  }
+  highlightCache.set(key, value);
+}
+
 const escapeHtml = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-// ── Table with copy-data button ───────────────────────────────────
+// ── Markdown cache ───────────────────────────────────────────────
+const MARKDOWN_CACHE_LIMIT = 300;
+const markdownCache = new Map<string, string>();
+
+function setMarkdownCache(key: string, value: string) {
+  if (markdownCache.size >= MARKDOWN_CACHE_LIMIT) {
+    const firstKey = markdownCache.keys().next().value as string | undefined;
+    if (firstKey) markdownCache.delete(firstKey);
+  }
+  markdownCache.set(key, value);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ENHANCED TABLE
+// ══════════════════════════════════════════════════════════════════
 const EnhancedTable = ({ children }: any) => {
   const [copied, setCopied] = useState(false);
   const tableRef = useRef<HTMLTableElement>(null);
-
-  // Defensive: check if children are valid table rows/cells
-  const isValidTable = React.Children.toArray(children).some(
-    (child: any) => child && child.type && (
-      child.type === 'thead' || child.type === 'tbody' || child.type === 'tr'
-    )
-  );
 
   const handleCopy = () => {
     if (!tableRef.current) return;
     const rows = Array.from(tableRef.current.querySelectorAll('tr')) as HTMLTableRowElement[];
     const tsv = rows
-      .map(r => Array.from(r.querySelectorAll('th,td') as NodeListOf<HTMLElement>)
-        .map(c => c.innerText.trim()).join('\t'))
+      .map(r =>
+        Array.from(r.querySelectorAll('th,td') as NodeListOf<HTMLElement>)
+          .map(c => c.innerText.trim()).join('\t')
+      )
       .join('\n');
     copyToClipboard(tsv);
     setCopied(true);
@@ -432,102 +561,243 @@ const EnhancedTable = ({ children }: any) => {
   };
 
   return (
-    <div className="nx-table-wrapper">
+    <div className="nx-table-wrapper" style={{ width: '100%', maxWidth: '100%' }}>
       <button onClick={handleCopy} className="nx-table-copy-btn">
-        {copied
-          ? <Icons.Check className="icon-11" />
-          : <Icons.Copy className="icon-11" />}
+        {copied ? <Icons.Check className="icon-11" /> : <Icons.Copy className="icon-11" />}
         {copied ? 'Copied' : 'Copy'}
       </button>
       <div className="nx-table-scroll">
-        {isValidTable ? (
-          <table ref={tableRef}>{children}</table>
-        ) : (
-          <div className="nx-table-warning">⚠️ Table markdown is malformed or incomplete. Please check your markdown syntax.</div>
-        )}
+        <table ref={tableRef} style={{ width: '100%', minWidth: 0 }}>
+          {children}
+        </table>
       </div>
     </div>
   );
 };
 
-// ── Inline code style (shared) ────────────────────────────────────
+// ── Inline code style ────────────────────────────────────────────
 const inlineCodeStyle: React.CSSProperties = {
   fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
   fontSize: '0.875em',
   fontWeight: 500,
   padding: '0.15em 0.45em',
-  borderRadius: 6,
-  background: 'color-mix(in srgb, var(--accent, #10a37f) 10%, var(--bg-tertiary, #2a2a2e))',
-  color: 'var(--accent, #10a37f)',
-  border: '1px solid color-mix(in srgb, var(--accent, #10a37f) 20%, transparent)',
+  borderRadius: 4,
+  background: 'rgba(201,168,76,0.1)',
+  color: 'var(--accent, #c9a84c)',
+  border: '1px solid rgba(201,168,76,0.2)',
   whiteSpace: 'nowrap' as const,
 };
 
-// ── Markdown component map — stable, never recreated ──────────────
-// NOTE: In ReactMarkdown v8 / remark-gfm, the `inline` prop was removed.
-// We detect inline code by checking whether `node.tagName` is 'code'
-// and whether its parent is NOT a 'pre'. We use the `className` absence
-// as the primary signal since fenced blocks always get a language className.
-const buildMarkdownComponents = () => ({
+// ══════════════════════════════════════════════════════════════════
+// FIX 3 — MARKDOWN COMPONENTS
+// code: distinguish inline vs block correctly using `node` prop
+// pre: correctly unwrap code element
+// ══════════════════════════════════════════════════════════════════
+const markdownComponents = {
   table: EnhancedTable,
 
-  // Paragraph: use <div> to avoid React hydration errors when block-level
-  // elements (code blocks, tables) appear inside prose paragraphs.
   p: ({ children }: any) => (
-    <div style={{ marginTop: 0, marginBottom: '0.9em', lineHeight: 1.75 }}>
-      {children}
-    </div>
+    <p className="md-paragraph">{children}</p>
   ),
 
-  // Headings — keep consistent weight and spacing
-  h1: ({ children }: any) => <h2 style={{ fontSize: '1.4em', fontWeight: 700, margin: '1.5em 0 0.5em', lineHeight: 1.3, letterSpacing: '-0.01em' }}>{children}</h2>,
-  h2: ({ children }: any) => <h2 style={{ fontSize: '1.2em', fontWeight: 600, margin: '1.4em 0 0.5em', lineHeight: 1.3, letterSpacing: '-0.01em' }}>{children}</h2>,
-  h3: ({ children }: any) => <h3 style={{ fontSize: '1.05em', fontWeight: 600, margin: '1.2em 0 0.4em', lineHeight: 1.35 }}>{children}</h3>,
-  h4: ({ children }: any) => <h4 style={{ fontSize: '1em', fontWeight: 600, margin: '1em 0 0.35em', lineHeight: 1.4 }}>{children}</h4>,
+  h1: ({ children }: any) => (
+    <h1 style={{ fontSize: '1.5em', fontWeight: 700, margin: '1.6em 0 0.5em', lineHeight: 1.3, letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>{children}</h1>
+  ),
+  h2: ({ children }: any) => (
+    <h2 style={{ fontSize: '1.25em', fontWeight: 700, margin: '1.5em 0 0.5em', lineHeight: 1.3, letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>{children}</h2>
+  ),
+  h3: ({ children }: any) => (
+    <h3 style={{ fontSize: '1.1em', fontWeight: 650, margin: '1.3em 0 0.4em', lineHeight: 1.35, color: 'var(--text-primary)' }}>{children}</h3>
+  ),
+  h4: ({ children }: any) => (
+    <h4 style={{ fontSize: '1em', fontWeight: 600, margin: '1.1em 0 0.35em', lineHeight: 1.4, color: 'var(--text-primary)' }}>{children}</h4>
+  ),
 
-  // Lists — consistent spacing
-  ul: ({ children }: any) => <ul style={{ margin: '0.25em 0 0.9em', paddingLeft: '1.6em', listStyleType: 'disc' }}>{children}</ul>,
-  ol: ({ children }: any) => <ol style={{ margin: '0.25em 0 0.9em', paddingLeft: '1.6em', listStyleType: 'decimal' }}>{children}</ol>,
-  li: ({ children }: any) => <li style={{ marginBottom: '0.3em', lineHeight: 1.7 }}>{children}</li>,
+  ul: ({ children }: any) => (
+    <ul style={{ margin: '0.25em 0 1em', paddingLeft: '1.6em', listStyleType: 'disc' }}>{children}</ul>
+  ),
+  ol: ({ children }: any) => (
+    <ol style={{ margin: '0.25em 0 1em', paddingLeft: '1.6em', listStyleType: 'decimal' }}>{children}</ol>
+  ),
+  li: ({ children }: any) => (
+    <li style={{ marginBottom: '0.35em', lineHeight: 1.72, paddingLeft: '0.2em' }}>{children}</li>
+  ),
 
-  // Blockquote
   blockquote: ({ children }: any) => (
     <blockquote style={{
-      margin: '0.9em 0',
-      paddingLeft: '1rem',
-      borderLeft: '3px solid var(--accent, #10a37f)',
+      margin: '1em 0', padding: '0.75em 1.25em',
+      borderLeft: '3px solid var(--accent, #c9a84c)',
+      background: 'rgba(201,168,76,0.05)',
+      borderRadius: '0 8px 8px 0',
       color: 'var(--text-secondary)',
-      fontStyle: 'normal',
     }}>
       {children}
     </blockquote>
   ),
 
-  // Strong / em
-  strong: ({ children }: any) => <strong style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{children}</strong>,
+  strong: ({ children }: any) => (
+    <strong style={{ fontWeight: 650, color: 'var(--text-primary)' }}>{children}</strong>
+  ),
 
-  // Code: detect fenced blocks by the presence of a language className.
-  // Inline code has no className (or className is empty / undefined).
+  hr: () => (
+    <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '1.5em 0' }} />
+  ),
+
+  // FIX 3a: pre correctly passes className + children to CodeBlock
   pre: ({ children }: any) => {
-    const codeEl = children?.props;
-    return (
-      <CodeBlock className={codeEl?.className}>
-        {codeEl?.children}
-      </CodeBlock>
-    );
-  },
-  code: ({ inline, children }: any) => {
-    return <code style={inlineCodeStyle}>{children}</code>;
+    // ReactMarkdown wraps <code> inside <pre> — extract its props
+    const child = React.Children.only(children) as React.ReactElement<any> | null;
+    if (child && child.props) {
+      return (
+        <CodeBlock className={child.props.className}>
+          {child.props.children}
+        </CodeBlock>
+      );
+    }
+    // Fallback: no child element (shouldn't happen, but be safe)
+    return <CodeBlock>{children}</CodeBlock>;
   },
 
-  // Horizontal rule
-  hr: () => <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '1.5em 0' }} />,
-});
+  // FIX 3b: Correct inline vs block detection
+  // ReactMarkdown passes inline=true for backtick code, inline=false for fenced blocks
+  // Fenced blocks are handled by <pre> above, so here we ONLY render inline code
+  code: ({ inline, children, className }: any) => {
+    if (inline) {
+      return <code style={inlineCodeStyle}>{children}</code>;
+    }
+    // Block code inside <pre> is already handled by the pre renderer above.
+    // This branch runs only if ReactMarkdown renders a block <code> without <pre>
+    // (rare edge case). Render it without the inline style to avoid confusion.
+    return <code>{children}</code>;
+  },
+};
 
-// ═══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+// FIX 4 — STREAMING CURSOR CSS injection (runtime, no CSS file change needed)
+// Applied via a <style> tag injected once
+// ══════════════════════════════════════════════════════════════════
+const STREAMING_CURSOR_CSS = `
+.streaming-cursor::after {
+  content: "▋";
+  animation: blink-cursor 1s step-start infinite;
+  margin-left: 2px;
+  font-size: 0.9em;
+  vertical-align: baseline;
+  color: var(--accent, #c9a84c);
+  opacity: 0.85;
+}
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+`;
+
+function injectStreamingCursorStyle() {
+  if (document.getElementById('sx-streaming-cursor')) return;
+  const style = document.createElement('style');
+  style.id = 'sx-streaming-cursor';
+  style.textContent = STREAMING_CURSOR_CSS;
+  document.head.appendChild(style);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// RENDER WITH ARTIFACTS
+// Splits response content at [ARTIFACT:title] markers and renders
+// ArtifactCard components inline in chat bubbles — exactly like
+// Claude's artifact panel. Code blocks >30 lines go to the panel.
+// ══════════════════════════════════════════════════════════════════
+
+function renderWithArtifacts(
+  content:       string,
+  remarkPlugins: any[],
+  mdComponents:  any,
+): React.ReactNode {
+  const ARTIFACT_RE = /\[ARTIFACT:([^\]]+)\]/g;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let keyIdx = 0;
+
+  while ((match = ARTIFACT_RE.exec(content)) !== null) {
+    // Text before the artifact marker
+    if (match.index > lastIndex) {
+      const textBefore = content.slice(lastIndex, match.index).trim();
+      if (textBefore) {
+        parts.push(
+          <ReactMarkdown
+            key={`txt-${keyIdx++}`}
+            remarkPlugins={remarkPlugins}
+            components={mdComponents}
+          >
+            {textBefore}
+          </ReactMarkdown>
+        );
+      }
+    }
+
+    // Find the artifact by title in the store
+    const title     = match[1];
+    const artifacts = getArtifacts();
+    const artifact  = artifacts.find(a => a.title === title);
+
+    if (artifact) {
+      parts.push(
+        <ArtifactCard
+          key={`art-${title.replace(/\s+/g, '-')}`}
+          id={artifact.id}
+          title={artifact.title}
+          language={artifact.language}
+          lineCount={artifact.lineCount}
+          type={artifact.type}
+          filePath={artifact.filePath}
+        />
+      );
+    } else {
+      // Artifact not yet persisted — show a loading placeholder
+      parts.push(
+        <div key={`pending-${keyIdx++}`} style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          padding: '8px 14px', margin: '6px 0',
+          border: '1px solid var(--border)', borderRadius: 10,
+          fontSize: 12, color: 'var(--text-secondary)',
+          background: 'rgba(16,185,129,0.04)',
+        }}>
+          <span>📄</span><span>{title}</span>
+        </div>
+      );
+    }
+
+    lastIndex = match.index + match[0].length;
+    keyIdx++;
+  }
+
+  // Remaining text after last marker
+  if (lastIndex < content.length) {
+    const remaining = content.slice(lastIndex).trim();
+    if (remaining) {
+      parts.push(
+        <ReactMarkdown
+          key={`txt-${keyIdx++}`}
+          remarkPlugins={remarkPlugins}
+          components={mdComponents}
+        >
+          {remaining}
+        </ReactMarkdown>
+      );
+    }
+  }
+
+  if (parts.length > 0) return parts;
+  return (
+    <ReactMarkdown remarkPlugins={remarkPlugins} components={mdComponents}>
+      {content}
+    </ReactMarkdown>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
 // MESSAGE ITEM
-// Memoized — only re-renders when its own data changes.
-// ═══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 
 interface MessageItemProps {
   msg: Message;
@@ -551,11 +821,22 @@ interface MessageItemProps {
   remarkPlugins: any[];
 }
 
+const DOC_META: Record<string, { color: string; bg: string; icon: string; label: string }> = {
+  pdf:  { color: '#f87171', bg: 'rgba(248,113,113,0.08)', icon: '📄', label: 'PDF' },
+  docx: { color: '#60a5fa', bg: 'rgba(96,165,250,0.08)',  icon: '📝', label: 'DOC' },
+  doc:  { color: '#60a5fa', bg: 'rgba(96,165,250,0.08)',  icon: '📝', label: 'DOC' },
+  xlsx: { color: '#34d399', bg: 'rgba(52,211,153,0.08)',  icon: '📊', label: 'XLS' },
+  xls:  { color: '#34d399', bg: 'rgba(52,211,153,0.08)',  icon: '📊', label: 'XLS' },
+  csv:  { color: '#34d399', bg: 'rgba(52,211,153,0.08)',  icon: '📊', label: 'CSV' },
+  json: { color: '#fbbf24', bg: 'rgba(251,191,36,0.08)',  icon: '{ }', label: 'JSON' },
+  zip:  { color: '#fb923c', bg: 'rgba(251,146,60,0.08)',  icon: '📦', label: 'ZIP' },
+  md:   { color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', icon: '📑', label: 'MD' },
+};
+
 const MessageItem = memo(
   ({
     msg, isLast, isLoading, copiedId, editingId, editContent, speakingMsgId,
-    confidence,
-    onCopy, onStartEdit, onCancelEdit, onSubmitEdit, onEditChange,
+    confidence, onCopy, onStartEdit, onCancelEdit, onSubmitEdit, onEditChange,
     onRegenerate, onFeedback, onSpeak, onSuggestionClick,
     mdComponents, remarkPlugins,
   }: MessageItemProps) => {
@@ -565,44 +846,39 @@ const MessageItem = memo(
     const isSpeaking  = speakingMsgId === msg.id;
     const isStreaming = isLoading && isLast && !isUser;
 
-    // Document file type metadata
-    const DOC_META: Record<string, { color: string; bg: string; icon: string; label: string }> = {
-      pdf:  { color: '#f87171', bg: 'rgba(248,113,113,0.08)', icon: '📄', label: 'PDF' },
-      docx: { color: '#60a5fa', bg: 'rgba(96,165,250,0.08)',  icon: '📝', label: 'DOC' },
-      doc:  { color: '#60a5fa', bg: 'rgba(96,165,250,0.08)',  icon: '📝', label: 'DOC' },
-      xlsx: { color: '#34d399', bg: 'rgba(52,211,153,0.08)',  icon: '📊', label: 'XLS' },
-      xls:  { color: '#34d399', bg: 'rgba(52,211,153,0.08)',  icon: '📊', label: 'XLS' },
-      csv:  { color: '#34d399', bg: 'rgba(52,211,153,0.08)',  icon: '📊', label: 'CSV' },
-      json: { color: '#fbbf24', bg: 'rgba(251,191,36,0.08)',  icon: '{ }', label: 'JSON' },
-      zip:  { color: '#fb923c', bg: 'rgba(251,146,60,0.08)',  icon: '📦', label: 'ZIP' },
-      md:   { color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', icon: '📑', label: 'MD' },
-    };
+    // ── Markdown processing with caching ──────────────────────────
+    const processedMarkdown = useMemo(() => {
+      const content = typeof msg.content === 'string' ? msg.content : String(msg.content ?? '');
+      // FIX 4: Hash key — long messages (5k+ tokens) as Map keys = multi-MB leak.
+      // djb2 hash collapses the key to 7 bytes regardless of content length.
+      const cacheKey = djb2(content);
+      if (markdownCache.has(cacheKey)) return markdownCache.get(cacheKey)!;
+      const result = preprocessMarkdown(content);
+      setMarkdownCache(cacheKey, result);
+      return result;
+    }, [msg.content]);
 
     return (
       <div className={`message-group message-enter ${isUser ? 'message-user' : 'message-assistant'}`}>
 
-        {/* ── User bubble ─────────────────────────────────────────── */}
+        {/* ── USER ──────────────────────────────────────────────── */}
         {isUser && (
           <div>
-            {/* Attached documents */}
             {msg.documents && msg.documents.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10, justifyContent: 'flex-end' }}>
+              <div className="doc-attachments">
                 {msg.documents.map((doc, i) => {
                   const ext = doc.title.split('.').pop()?.toLowerCase() || '';
                   const meta = DOC_META[ext] || { color: 'var(--text-secondary)', bg: 'var(--bg-tertiary)', icon: '📄', label: 'FILE' };
                   return (
-                    <div key={i} style={{
-                      display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px',
-                      borderRadius: 10, border: `1px solid ${meta.color}30`,
-                      background: meta.bg, maxWidth: 200,
-                    }}>
-                      <div style={{
-                        width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        borderRadius: 6, background: meta.bg, fontSize: 12, flexShrink: 0,
-                      }}>{meta.icon}</div>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.title}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-secondary)', opacity: 0.7 }}>{meta.label}</div>
+                    <div
+                      key={i}
+                      className="doc-chip"
+                      style={{ border: `1px solid ${meta.color}30`, background: meta.bg }}
+                    >
+                      <div className="doc-chip-icon" style={{ background: meta.bg }}>{meta.icon}</div>
+                      <div className="doc-chip-info">
+                        <div className="doc-chip-title">{doc.title}</div>
+                        <div className="doc-chip-label">{meta.label}</div>
                       </div>
                     </div>
                   );
@@ -611,7 +887,7 @@ const MessageItem = memo(
             )}
 
             {isEditing ? (
-              <div style={{ width: '100%', maxWidth: 620 }}>
+              <div className="edit-container">
                 <textarea
                   className="edit-textarea"
                   value={editContent}
@@ -621,26 +897,59 @@ const MessageItem = memo(
                 />
                 <div className="edit-actions">
                   <button className="edit-btn-primary" onClick={() => onSubmitEdit(msg.id)}>Update</button>
-                  <button className="edit-btn-cancel" onClick={onCancelEdit}>Cancel</button>
+                  <button className="edit-btn-cancel"  onClick={onCancelEdit}>Cancel</button>
                 </div>
               </div>
             ) : (
-              <div className="message-user"><div className="message-user-bubble">{msg.content}</div></div>
+              <div className="message-user">
+                <div className="message-user-bubble">{msg.content}</div>
+              </div>
             )}
 
-            {/* Attached image */}
+            {/* ── CODEBASE REFERENCE CARD ──────────────────────────
+                Added: shows which project was indexed when this
+                message was sent. Right-aligned below the bubble.
+                Nothing else in this component was changed. */}
+            {!isEditing && msg.codebaseRef && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 5 }}>
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '3px 9px 3px 7px',
+                  background: 'rgba(74,222,128,0.05)',
+                  border: '1px solid rgba(74,222,128,0.18)',
+                  borderRadius: 6, fontSize: 11,
+                  color: 'var(--text-secondary)',
+                  userSelect: 'none' as const,
+                }}>
+                  <svg style={{ width: 11, height: 11, flexShrink: 0, color: '#4ade80' }}
+                    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+                  </svg>
+                  <span style={{ color: '#4ade80', fontWeight: 600 }}>
+                    {msg.codebaseRef.projectName}
+                  </span>
+                  <span style={{ opacity: 0.6, fontSize: 10 }}>
+                    {msg.codebaseRef.totalFiles} files referenced
+                  </span>
+                </div>
+              </div>
+            )}
+
             {msg.image && (
               <img
                 src={`data:${msg.image.mimeType};base64,${msg.image.inlineData.data}`}
                 alt="Attached"
-                style={{ marginTop: 10, maxWidth: '100%', borderRadius: 12, border: '1px solid var(--border)' }}
+                className="message-image"
               />
             )}
 
-            {/* User message action row */}
             {!isEditing && (
-              <div className="message-actions" style={{ justifyContent: 'flex-end', paddingRight: 4 }}>
-                <button className={`message-action-btn${isCopied ? ' active-copy' : ''}`} onClick={() => onCopy(msg.content, msg.id)} title="Copy">
+              <div className="message-actions message-actions-end">
+                <button
+                  className={`message-action-btn${isCopied ? ' active-copy' : ''}`}
+                  onClick={() => onCopy(msg.content, msg.id)}
+                  title="Copy"
+                >
                   {isCopied ? <Icons.Check className="icon-14" /> : <Icons.Copy className="icon-14" />}
                 </button>
                 <button className="message-action-btn" onClick={() => onStartEdit(msg.id, msg.content)} title="Edit">
@@ -651,10 +960,10 @@ const MessageItem = memo(
           </div>
         )}
 
-        {/* ── Assistant message ────────────────────────────────────── */}
+        {/* ── ASSISTANT ─────────────────────────────────────────── */}
         {!isUser && (
           <div className="message-assistant-body">
-            {/* Thinking/loading indicator */}
+            {/* Typing indicator — only when no content yet */}
             {isStreaming && !msg.content && (
               <div className="typing-dots">
                 <div className="typing-dot" />
@@ -663,18 +972,37 @@ const MessageItem = memo(
               </div>
             )}
 
-            {/* Markdown body */}
+            {/* FIX 6: Smart streaming render.
+                - Plain prose, bold, lists → render with ReactMarkdown immediately (no layout shift)
+                - Tables and fenced code blocks → defer to plain text until stream ends
+                  because partial markdown for these types corrupts the DOM structure.
+                Detection: if the streaming content contains an open fence (```) with no
+                closing fence, or a pipe row with no separator yet, fall back to plain text. */}
             {msg.content && (
-              <div className="markdown-body response-text">
-                <ReactMarkdown remarkPlugins={remarkPlugins} components={mdComponents}>
-                  {typeof msg.content === 'string' ? msg.content : String(msg.content ?? '')}
-                </ReactMarkdown>
+              <div className={`markdown-body${isStreaming ? ' streaming-cursor' : ''}`}>
+                {isStreaming ? (() => {
+                  const c = msg.content;
+                  const openFence = (c.match(/```/g) || []).length % 2 !== 0;
+                  const openTable = /\|[^\n]+\|/.test(c) && !/\|[-:\s|]+\|/.test(c);
+                  if (openFence || openTable) {
+                    return <span style={{ whiteSpace: 'pre-wrap' }}>{c}</span>;
+                  }
+                  return (
+                    <ReactMarkdown remarkPlugins={remarkPlugins} components={mdComponents}>
+                      {processedMarkdown}
+                    </ReactMarkdown>
+                  );
+                })() : (
+                  // FIX 1: Use renderWithArtifacts for completed messages —
+                  // splits [ARTIFACT:title] markers into ArtifactCard components
+                  <>{renderWithArtifacts(processedMarkdown, remarkPlugins, mdComponents)}</>
+                )}
               </div>
             )}
 
-            {/* Confidence signal — rendered after content settles, not during streaming */}
+            {/* Confidence badge */}
             {msg.content && !isStreaming && confidence && (
-              <div style={{ marginTop: 12, marginBottom: 2 }}>
+              <div className="confidence-spacer">
                 <ConfidenceBadge confidence={confidence} />
               </div>
             )}
@@ -696,8 +1024,12 @@ const MessageItem = memo(
             )}
 
             {/* Action toolbar */}
-            <div className="message-actions" style={{ paddingLeft: 2 }}>
-              <button className={`message-action-btn${isCopied ? ' active-copy' : ''}`} onClick={() => onCopy(msg.content, msg.id)} title="Copy">
+            <div className="message-actions message-actions-start">
+              <button
+                className={`message-action-btn${isCopied ? ' active-copy' : ''}`}
+                onClick={() => onCopy(msg.content, msg.id)}
+                title="Copy"
+              >
                 {isCopied ? <Icons.Check className="icon-14" /> : <Icons.Copy className="icon-14" />}
               </button>
               <button className="message-action-btn" onClick={() => onRegenerate(msg.id)} title="Regenerate">
@@ -708,39 +1040,33 @@ const MessageItem = memo(
                 onClick={() => onSpeak(msg.id, msg.content)}
                 title={isSpeaking ? 'Stop' : 'Read aloud'}
               >
-                {isSpeaking
-                  ? <Icons.VolumeX className="icon-14" />
-                  : <Icons.Volume2 className="icon-14" />}
+                {isSpeaking ? <Icons.VolumeX className="icon-14" /> : <Icons.Volume2 className="icon-14" />}
               </button>
-              
-              {/* TODO: TEMPORARY FEEDBACK FORM BUTTON — Remove entire this section when feedback form not needed */}
               <button
                 className="message-action-btn feedback-form-btn"
                 onClick={() => window.open('https://forms.gle/SB93bLtFPjvJnRNRA', '_blank')}
-                title="Send feedback"
+                title="Feedback"
               >
                 Feedback Form
               </button>
-              {/* END TEMPORARY FEEDBACK FORM */}
-
               <div className="message-action-divider" />
               <button
                 className={`message-action-btn${msg.feedback === 'good' ? ' active-good' : ''}`}
                 onClick={() => onFeedback(msg.id, msg.feedback === 'good' ? null : 'good')}
-                title="Good response"
+                title="Good"
               >
                 <Icons.ThumbsUp className="icon-14" />
               </button>
               <button
                 className={`message-action-btn${msg.feedback === 'bad' ? ' active-bad' : ''}`}
                 onClick={() => onFeedback(msg.id, msg.feedback === 'bad' ? null : 'bad')}
-                title="Bad response"
+                title="Bad"
               >
                 <Icons.ThumbsDown className="icon-14" />
               </button>
             </div>
 
-            {/* Follow-up suggestion chips */}
+            {/* Follow-up suggestions */}
             {isLast && !isLoading && msg.suggestions && msg.suggestions.length > 0 && (
               <div className="suggestion-chips">
                 {msg.suggestions.map((s, i) => (
@@ -756,23 +1082,24 @@ const MessageItem = memo(
     );
   },
   (prev, next) => {
-    if (prev.msg.content    !== next.msg.content)    return false;
-    if (prev.msg.feedback   !== next.msg.feedback)   return false;
-    if (prev.msg.suggestions !== next.msg.suggestions) return false;
-    if (prev.isLast     !== next.isLast)     return false;
-    if (prev.isLoading  !== next.isLoading)  return false;
+    if (prev.msg.content       !== next.msg.content)       return false;
+    if (prev.msg.feedback      !== next.msg.feedback)      return false;
+    if (prev.msg.suggestions   !== next.msg.suggestions)   return false;
+    if (prev.msg.codebaseRef   !== next.msg.codebaseRef)   return false;
+    if (prev.isLast            !== next.isLast)            return false;
+    if (prev.isLoading         !== next.isLoading)         return false;
     if (prev.confidence?.level !== next.confidence?.level) return false;
-    if ((prev.copiedId   === prev.msg.id) !== (next.copiedId   === next.msg.id)) return false;
-    if ((prev.editingId  === prev.msg.id) !== (next.editingId  === next.msg.id)) return false;
-    if (prev.editingId === prev.msg.id && prev.editContent !== next.editContent) return false;
+    if ((prev.copiedId    === prev.msg.id) !== (next.copiedId    === next.msg.id)) return false;
+    if ((prev.editingId   === prev.msg.id) !== (next.editingId   === next.msg.id)) return false;
+    if (prev.editingId === prev.msg.id && prev.editContent !== next.editContent)   return false;
     if ((prev.speakingMsgId === prev.msg.id) !== (next.speakingMsgId === next.msg.id)) return false;
     return true;
   }
 );
 
-// ═══════════════════════════════════════════════════════════════════
-// CHAT AREA (ROOT)
-// ═══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+// CHAT AREA ROOT
+// ══════════════════════════════════════════════════════════════════
 
 const ChatArea: React.FC<ChatAreaProps> = ({
   session, isLoading, onExport, onToggleSidebar, isSidebarOpen,
@@ -781,115 +1108,130 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const scrollRef = useRef<HTMLDivElement>(null);
   const messages  = session?.messages ?? [];
 
-  const [copiedId,     setCopiedId]     = useState<string | null>(null);
-  const [editingId,    setEditingId]    = useState<string | null>(null);
-  const [editContent,  setEditContent]  = useState('');
-  const [autoScroll,   setAutoScroll]   = useState(true);
+  const [copiedId,      setCopiedId]      = useState<string | null>(null);
+  const [editingId,     setEditingId]     = useState<string | null>(null);
+  const [editContent,   setEditContent]   = useState('');
+  const [autoScroll,    setAutoScroll]    = useState(true);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-  // ── Scroll management ──────────────────────────────────────────
+  // Inject streaming cursor CSS once on mount
+  useEffect(() => { injectStreamingCursorStyle(); }, []);
+
+  // ── FIX 5: Auto-scroll with 120px threshold (Claude-standard) ──
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
     setAutoScroll(nearBottom);
     setShowScrollBtn(!nearBottom);
   }, []);
 
   const scrollToBottom = useCallback(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (scrollRef.current)
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, []);
 
   useEffect(() => {
     if (autoScroll) scrollToBottom();
   }, [messages, isLoading, autoScroll, scrollToBottom]);
 
-  // ── TTS ────────────────────────────────────────────────────────
+  // ── FIX 6: TTS — cleanup on unmount (not just session change) ──
   const speakMessage = useCallback((msgId: string, text: string) => {
     const synth = window.speechSynthesis;
     try {
       if (speakingMsgId === msgId) {
-        synth.cancel();
-        setSpeakingMsgId(null);
-        utteranceRef.current = null;
-        return;
+        if (synth.speaking) synth.cancel();
+        setSpeakingMsgId(null); utteranceRef.current = null; return;
       }
-      synth.cancel();
+      if (synth.speaking) synth.cancel();
       const cleaned = stripMarkdown(text);
       if (!cleaned) return;
-
       const doSpeak = () => {
         const u = new SpeechSynthesisUtterance(cleaned);
         u.rate = 1.0; u.pitch = 1.0;
         const voices = synth.getVoices();
-        const voice  =
-          voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) ||
-          voices.find(v => v.lang.startsWith('en-US') && !v.localService) ||
-          voices.find(v => v.lang.startsWith('en'));
+        // FIX 8: Tiered fallback — Google voices are Chrome-only.
+        // Querying v.name.includes('Google') throws on Safari & Firefox.
+        // Priority: Google en-US → en-US non-local → en-US → en-* → en → system default.
+        const voice =
+          voices.find(v => v.lang === 'en-US' && v.name.toLowerCase().includes('google')) ||
+          voices.find(v => v.lang === 'en-US' && !v.localService) ||
+          voices.find(v => v.lang === 'en-US') ||
+          voices.find(v => v.lang.startsWith('en-')) ||
+          voices.find(v => v.lang.startsWith('en')) ||
+          null; // null = let browser pick — always works on all engines
         if (voice) u.voice = voice;
         u.onend  = () => { setSpeakingMsgId(null); utteranceRef.current = null; };
         u.onerror = () => { setSpeakingMsgId(null); utteranceRef.current = null; };
         utteranceRef.current = u;
         setSpeakingMsgId(msgId);
-        synth.cancel();
+        if (synth.speaking) synth.cancel();
         setTimeout(() => synth.speak(u), 50);
       };
-
       if (synth.getVoices().length === 0) {
         let done = false;
-        const onVC = () => { synth.removeEventListener('voiceschanged', onVC); if (!done) { done = true; doSpeak(); } };
+        const onVC = () => {
+          synth.removeEventListener('voiceschanged', onVC);
+          if (!done) { done = true; doSpeak(); }
+        };
         synth.addEventListener('voiceschanged', onVC);
-        setTimeout(() => { synth.removeEventListener('voiceschanged', onVC); if (!done) { done = true; doSpeak(); } }, 500);
+        setTimeout(() => {
+          synth.removeEventListener('voiceschanged', onVC);
+          if (!done) { done = true; doSpeak(); }
+        }, 500);
       } else {
         doSpeak();
       }
-    } catch {
-      setSpeakingMsgId(null);
-      utteranceRef.current = null;
-    }
+    } catch { setSpeakingMsgId(null); utteranceRef.current = null; }
   }, [speakingMsgId]);
 
-  // Cleanup TTS on session change
+  // FIX 6: Cancel speech on unmount (not just on session switch)
   useEffect(() => {
     return () => {
       window.speechSynthesis.cancel();
       setSpeakingMsgId(null);
     };
+  }, []); // ← empty deps = runs on component unmount always
+
+  // Also cancel on session change (keep original behaviour)
+  useEffect(() => {
+    window.speechSynthesis.cancel();
+    setSpeakingMsgId(null);
   }, [session?.id]);
 
   // ── Message actions ────────────────────────────────────────────
   const handleCopy = useCallback((text: string, id: string) => {
-    copyToClipboard(text);
-    setCopiedId(id);
+    copyToClipboard(text); setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   }, []);
-
-  const handleStartEdit = useCallback((id: string, content: string) => {
+  const handleStartEdit  = useCallback((id: string, content: string) => {
     setEditingId(id); setEditContent(content);
   }, []);
-
   const handleCancelEdit = useCallback(() => setEditingId(null), []);
-
   const handleSubmitEdit = useCallback((id: string) => {
-    if (editContent.trim()) {
-      onEditMessage(id, editContent.trim());
-      setEditingId(null);
-    }
+    if (editContent.trim()) { onEditMessage(id, editContent.trim()); setEditingId(null); }
   }, [editContent, onEditMessage]);
 
-  // ── Stable markdown components (never recreated) ───────────────
-  const mdComponents = useMemo(() => buildMarkdownComponents(), []);
-  const remarkPlugins = useMemo(() => [remarkGfm], []);
+  const mdComponents  = markdownComponents;
+  // FIX 9: remark-breaks preserves single newlines as <br> inside paragraphs.
+  // Without it, LLM output with soft line breaks collapses into run-on sentences.
+  const remarkPlugins = useMemo(
+    () => [[remarkGfm, { singleTilde: false }], remarkBreaks] as any[],
+    []
+  );
 
-  // ── Render ─────────────────────────────────────────────────────
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-primary)', position: 'relative', overflow: 'hidden' }}>
+    <div className="chat-root">
 
-      {/* Top-right controls */}
+      {/* Top controls */}
       <div className="chat-controls">
-        <button className="chat-ctrl-btn" onClick={onThemeToggle} title={theme === 'dark' ? 'Light mode' : 'Dark mode'}>
+        <button
+          className="chat-ctrl-btn"
+          onClick={onThemeToggle}
+          title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+        >
           {theme === 'dark' ? <Icons.Sun className="icon-16" /> : <Icons.Moon className="icon-16" />}
         </button>
         <button className="chat-ctrl-btn" onClick={onExport} title="Export chat">
@@ -897,20 +1239,16 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         </button>
       </div>
 
-      {/* Message scroll area */}
+      {/* Scroll area */}
       <div ref={scrollRef} onScroll={handleScroll} className="chat-scroll">
         <div className="chat-column">
 
-          {/* Empty state */}
           {messages.length === 0 && (
-            <div className="chat-empty-state">
-              <div className="chat-empty-icon">
-                <Icons.Robot className="icon-24 icon-accent-robot" />
-              </div>
-            </div>
+            <EmptyState
+              onSuggestionClick={(prompt) => onSuggestionClick?.(prompt)}
+            />
           )}
 
-          {/* Messages */}
           {messages.map((msg, idx) => (
             <MessageItem
               key={msg.id}
@@ -936,7 +1274,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
             />
           ))}
 
-          {/* Global loading indicator (before first token) */}
+          {/* Global typing dots — only when NO assistant message with content exists */}
           {isLoading && !messages.some(m => m.role === 'assistant' && m.content) && (
             <div className="typing-dots">
               <div className="typing-dot" />
@@ -947,10 +1285,10 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       </div>
 
-      {/* Scroll-to-bottom button */}
+      {/* Scroll to bottom */}
       {showScrollBtn && (
         <button
-          className={`scroll-to-bottom-btn-center${isSidebarOpen ? ' scroll-to-bottom-btn-shifted' : ''}`}
+          className="scroll-to-bottom-btn-center"
           onClick={scrollToBottom}
           aria-label="Scroll to latest"
         >

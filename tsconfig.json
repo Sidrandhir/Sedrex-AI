@@ -28,5 +28,9 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
+  "exclude": [
+    "node_modules",
+    "services/sentry-setup-example.ts"
+  ],
   "include": ["**/*.ts", "**/*.tsx", "vite-env.d.ts"]
 }

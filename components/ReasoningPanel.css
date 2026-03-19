@@ -1,0 +1,175 @@
+/* ================================================================
+   SEDREX — ReasoningPanel.css
+   Collapsible reasoning / routing transparency panel
+   ================================================================ */
+
+.rp-root {
+  margin-top: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(16, 185, 129, 0.02);
+  overflow: hidden;
+  transition: border-color 150ms ease;
+}
+
+.rp-root:hover {
+  border-color: rgba(16, 185, 129, 0.18);
+}
+
+[data-theme='light'] .rp-root {
+  background: rgba(138,104,32,0.02);
+}
+
+/* ── Toggle button ───────────────────────────────────── */
+.rp-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.rp-toggle-icon {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.rp-toggle-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  opacity: 0.65;
+  flex: 1;
+}
+
+.rp-toggle-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 100px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid;
+  flex-shrink: 0;
+}
+
+.rp-badge--high     { color: #3de87a; border-color: rgba(61,232,122,0.25); background: rgba(61,232,122,0.06); }
+.rp-badge--moderate { color: var(--accent, #10B981); border-color: rgba(16, 185, 129, 0.25); background: rgba(16, 185, 129, 0.06); }
+.rp-badge--low      { color: #f87171; border-color: rgba(248,113,113,0.25); background: rgba(248,113,113,0.06); }
+.rp-badge--live     { color: #60a5fa; border-color: rgba(96,165,250,0.25); background: rgba(96,165,250,0.06); }
+
+.rp-chevron {
+  color: var(--text-secondary);
+  opacity: 0.4;
+  transition: transform 200ms ease;
+  flex-shrink: 0;
+}
+
+.rp-chevron--open {
+  transform: rotate(180deg);
+}
+
+/* ── Body ────────────────────────────────────────────── */
+.rp-body {
+  overflow: hidden;
+  transition: max-height 280ms cubic-bezier(0.4,0,0.2,1),
+              opacity 200ms ease;
+  max-height: 0;
+  opacity: 0;
+}
+
+.rp-body--open {
+  max-height: 400px;
+  opacity: 1;
+}
+
+.rp-inner {
+  padding: 4px 12px 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Steps grid ──────────────────────────────────────── */
+.rp-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.rp-step {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.rp-step-num {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--accent, #10B981);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.rp-step-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  opacity: 0.8;
+}
+
+/* ── Meta row ────────────────────────────────────────── */
+.rp-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.rp-meta-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.12);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  opacity: 0.75;
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.03em;
+}
+
+.rp-meta-chip-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent, #10B981);
+  opacity: 0.6;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .rp-body { transition: none; }
+  .rp-chevron { transition: none; }
+}

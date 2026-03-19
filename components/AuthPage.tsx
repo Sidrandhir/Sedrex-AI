@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Icons } from '../constants';
-import NexusLogo from '../public/nexus-logo-modern.svg';
+import SedrexLogo from '../public/sedrex-logo.svg';
 import { login, signup, loginWithGoogle, forgotPassword } from '../services/authService';
 import { User } from '../types';
 
@@ -104,7 +104,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
         {/* Logo */}
         <div className="mb-8 flex flex-col items-center">
           <div className="mb-5 flex items-center justify-center">
-            <img src={NexusLogo} alt="Nexus Logo" className="nexus-logo" />
+            <img src={SedrexLogo} alt="SEDREX" className="nexus-logo" />
           </div>
           <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
             {isForgotPassword ? 'Reset your password' : isLogin ? 'Welcome back' : 'Create your account'}
@@ -113,8 +113,8 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
             {isForgotPassword 
               ? 'Enter your email to receive a reset link' 
               : isLogin 
-                ? 'Log in to continue to Nexus AI' 
-                : 'Sign up to get started with Nexus AI'}
+                ? 'Log in to continue to SEDREX' 
+                : 'Sign up to get started with SEDREX'}
           </p>
         </div>
 

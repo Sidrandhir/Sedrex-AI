@@ -1,5 +1,10 @@
+// ══════════════════════════════════════════════════════════════════
+// SEDREX — Type Definitions
+// Verification-First Intelligence Platform
+// ══════════════════════════════════════════════════════════════════
+
 export enum AIModel {
-  GPT4 = 'OpenAI GPT-4',
+  GPT4   = 'OpenAI GPT-4',
   CLAUDE = 'Anthropic Claude',
   GEMINI = 'Google Gemini',
 }
@@ -12,16 +17,14 @@ export interface User {
   createdAt: number;
   isAdmin?: boolean;
   tier: UserTier;
-  personification?: string; 
+  personification?: string;
   responseStyle?: string;
   language?: string;
   theme?: 'light' | 'dark';
 }
 
 export interface MessageImage {
-  inlineData: {
-    data: string;
-  };
+  inlineData: { data: string };
   mimeType: string;
 }
 
@@ -32,7 +35,7 @@ export interface AttachedDocument {
 }
 
 export interface GroundingChunk {
-  web?: { uri: string; title: string };
+  web?:  { uri: string; title: string };
   maps?: { uri: string; title: string };
 }
 
@@ -46,6 +49,11 @@ export interface RoutingContext {
   explanation: string;
   intent?: QueryIntent;
   isLiveEnabled?: boolean;
+  // ── Agent fields (added for multi-agent pipeline) ─────────────
+  // Populated by agentOrchestrator.dispatch() — optional so existing
+  // messages without these fields never break.
+  agentType?:     'reasoning' | 'coding' | 'rag' | 'general';
+  agentProvider?: 'claude' | 'openai' | 'gemini-search' | 'gemini-fallback' | 'perplexity';
 }
 
 export interface Message {
@@ -64,6 +72,18 @@ export interface Message {
   routingContext?: RoutingContext;
   suggestions?: string[];
   feedback?: 'good' | 'bad' | null;
+  // Codebase reference — set on user messages when a project is indexed.
+  // Displayed as a small reference card below the user bubble.
+  codebaseRef?: {
+    projectName: string;
+    totalFiles:  number;
+  };
+  // SEDREX: Confidence signal attached to assistant messages
+  confidence?: {
+    level: 'high' | 'moderate' | 'low' | 'live';
+    label: string;
+    reason: string;
+  };
 }
 
 export interface ChatSession {
@@ -75,7 +95,7 @@ export interface ChatSession {
   lastModified: number;
   isFavorite?: boolean;
   isArchived?: boolean;
-  preferredModel?: AIModel | 'auto'; 
+  preferredModel?: AIModel | 'auto';
 }
 
 export type UserTier = 'free' | 'pro';
@@ -141,10 +161,6 @@ export interface AdminStats {
   avgResponseTime: number;
   errorRate: number;
   modelDistribution: Record<AIModel, number>;
-  growthHistory: {
-    date: string;
-    users: number;
-    revenue: number;
-  }[];
+  growthHistory: { date: string; users: number; revenue: number }[];
   errorLogs: ErrorLog[];
 }

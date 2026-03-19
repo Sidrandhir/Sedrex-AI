@@ -11,72 +11,101 @@ import { getCurrentUser, logout } from './services/authService';
 import { getAdminStats } from './services/analyticsService';
 import { api } from './services/apiService';
 import { Icons } from './constants';
-import NexusLogo from './public/nexus-logo-modern.svg';
-import { Routes, Route, Link } from 'react-router-dom';
+import SedrexLogo from './public/sedrex-logo.svg';
+import { Routes, Route } from 'react-router-dom';
 import Privacy from './components/Privacy';
 import Terms from './components/Terms';
 import Contact from './components/Contact';
 import CommandPalette from './components/CommandPalette';
 import { isSupabaseConfigured as initialConfigured, supabase } from './services/supabaseClient';
+import { getProjectIndex } from './services/codebaseContext';
+import { analytics } from './services/analyticsService';
+import { storageService } from './services/storageService';
+import {
+  loadArtifactsForSession,
+  loadAllUserArtifacts,   // ← FIX 1: load ALL user artifacts on login
+  clearArtifacts,
+  extractArtifactFromResponse,
+  createArtifact,
+  isPanelOpen,
+  subscribeToArtifacts,
+} from './services/artifactStore';
 
-// Lazy-load heavy components that aren't needed on initial render
-const Dashboard = lazy(() => import('./components/Dashboard'));
-const Pricing = lazy(() => import('./components/Pricing'));
-const Billing = lazy(() => import('./components/Billing'));
-const AuthPage = lazy(() => import('./components/AuthPage'));
-const LandingPage = lazy(() => import('./components/LandingPage'));
+const Dashboard      = lazy(() => import('./components/Dashboard'));
+const Pricing        = lazy(() => import('./components/Pricing'));
+const Billing        = lazy(() => import('./components/Billing'));
+const AuthPage       = lazy(() => import('./components/AuthPage'));
+const LandingPage    = lazy(() => import('./components/LandingPage'));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
-const SettingsModal = lazy(() => import('./components/SettingsModal'));
-const MobileOnboarding = lazy(() => import('./components/MobileOnboarding'));
-const OnboardingSurvey = lazy(() => import('./components/OnboardingSurvey'));
+const SettingsModal  = lazy(() => import('./components/SettingsModal'));
+const ArtifactPanel  = lazy(() => import('./components/ArtifactPanel'));
+const MobileOnboarding  = lazy(() => import('./components/MobileOnboarding'));
+const OnboardingSurvey  = lazy(() => import('./components/OnboardingSurvey'));
 const ResetPasswordPage = lazy(() => import('./components/ResetPasswordPage'));
 
-// Minimal fallback for lazy components
-const LazyFallback = () => <div className="flex items-center justify-center p-8"><div className="w-6 h-6 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" /></div>;
+const LazyFallback = () => (
+  <div className="flex items-center justify-center p-8">
+    <div className="w-6 h-6 border-2 border-sedrex/20 border-t-sedrex rounded-full animate-spin" />
+  </div>
+);
 
 const App: React.FC = () => {
-  const [configured] = useState(initialConfigured);
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
-  const [showAuth, setShowAuth] = useState(false);
-  const [showResetPassword, setShowResetPassword] = useState(false);
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<string>('');
-  const [userStats, setUserStats] = useState<UserStats | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
-  const [isLoading, setIsLoading] = useState(false);
-  const [routingInfo, setRoutingInfo] = useState<RouterResult | null>(null);
-  const [view, setView] = useState<'chat' | 'dashboard' | 'pricing' | 'billing' | 'admin'>('chat');
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [showSurvey, setShowSurvey] = useState(false);
+  const [configured]            = useState(initialConfigured);
+  const [user, setUser]         = useState<User | null>(null);
+  const [isAuthChecking, setIsAuthChecking]           = useState(true);
+  const [showAuth, setShowAuth]                       = useState(false);
+  const [showResetPassword, setShowResetPassword]     = useState(false);
+  const [sessions, setSessions]                       = useState<ChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId]         = useState<string>('');
+  const [userStats, setUserStats]                     = useState<UserStats | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen]             = useState(window.innerWidth >= 1024);
+  const [isLoading, setIsLoading]                     = useState(false);
+  const [routingInfo, setRoutingInfo]                 = useState<RouterResult | null>(null);
+  const [view, setView]                               = useState<'chat' | 'dashboard' | 'pricing' | 'billing' | 'admin'>('chat');
+  const [isSettingsOpen, setIsSettingsOpen]           = useState(false);
+  const [toasts, setToasts]                           = useState<ToastMessage[]>([]);
+  const [showOnboarding, setShowOnboarding]           = useState(false);
+  const [showSurvey, setShowSurvey]                   = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('nexus_theme') as 'light' | 'dark') || 'dark');
+  const [artifactPanelOpen, setArtifactPanelOpen]     = useState(false);
+  const [artifactPanelWidth, setArtifactPanelWidth]   = useState(480);
+
+  const [theme, setTheme] = useState<'light' | 'dark'>(
+    () => (localStorage.getItem('sedrex_theme') as 'light' | 'dark') || 'dark'
+  );
+
   const [userSettings, setUserSettings] = useState(() => {
-    const saved = localStorage.getItem('nexus_user_settings');
-    return saved ? JSON.parse(saved) : { personification: 'Concise and professional', language: 'en' };
+    const saved = localStorage.getItem('sedrex_user_settings');
+    return saved ? JSON.parse(saved) : {
+      personification: 'Precise and verification-first',
+      language: 'en',
+    };
   });
 
   const abortControllerRef = useRef<AbortController | null>(null);
-  const touchStartRef = useRef<{ x: number, y: number } | null>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef     = useRef<HTMLInputElement>(null);
 
-  const addToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    const id = Math.random().toString(36).substr(2, 9);
-    setToasts(prev => [...prev.filter(t => t.message !== message), { id, message, type }]);
-  }, []);
-
+  const addToast = useCallback(
+    (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+      const id = Math.random().toString(36).substr(2, 9);
+      setToasts(prev => [...prev.filter(t => t.message !== message), { id, message, type }]);
+    }, []
+  );
   const removeToast = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));
 
-  // Global handler for iOS WebKit "TypeError: Load failed" and unhandled rejections
+  // Subscribe to artifact store to sync panel open state
+  useEffect(() => {
+    const unsub = subscribeToArtifacts(() => {
+      setArtifactPanelOpen(isPanelOpen());
+    });
+    return unsub;
+  }, []);
+
   useEffect(() => {
     const handler = (e: PromiseRejectionEvent) => {
       const msg = (e?.reason?.message || '').toLowerCase();
-      if (msg.includes('load failed') || msg.includes('failed to fetch') || msg.includes('network')) {
-        e.preventDefault(); // Suppress console error for transient network issues
-        console.warn('Transient network error caught globally — retrying silently');
-      }
+      if (msg.includes('load failed') || msg.includes('failed to fetch') || msg.includes('network'))
+        e.preventDefault();
     };
     window.addEventListener('unhandledrejection', handler);
     return () => window.removeEventListener('unhandledrejection', handler);
@@ -84,145 +113,156 @@ const App: React.FC = () => {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('nexus_theme', theme);
+    localStorage.setItem('sedrex_theme', theme);
   }, [theme]);
 
-  // Opens command palette globally with Ctrl/Cmd + K
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handler = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'k') return;
       e.preventDefault();
       setIsCommandPaletteOpen(true);
     };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const handleThemeToggle = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  useEffect(() => {
+    const onResize = () => { if (window.innerWidth >= 1024) setIsSidebarOpen(true); };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const handleThemeToggle = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    analytics.themeToggle(next);
+    setTheme(next);
+  };
+
+  const handleToggleSidebar = () => {
+    analytics.sidebarToggle(isSidebarOpen ? 'close' : 'open');
+    setIsSidebarOpen(prev => !prev);
+  };
+
+  const handleSetView = useCallback((v: 'chat' | 'dashboard' | 'pricing' | 'billing' | 'admin') => {
+    analytics.viewChange(v);
+    setView(v);
+  }, []);
 
   useEffect(() => {
-    if (!configured) {
-      console.warn("Nexus AI: Supabase keys not detected in environment. Ensure .env is configured.");
-      setIsAuthChecking(false);
-      return;
-    }
-
-    // Detect password recovery from URL hash (Supabase redirects with #type=recovery&access_token=...)
+    if (!configured) { setIsAuthChecking(false); return; }
     const hash = window.location.hash;
-    const searchParams = new URLSearchParams(window.location.search);
-    if (hash.includes('type=recovery') || searchParams.get('type') === 'recovery') {
-      setShowResetPassword(true);
-      setIsAuthChecking(false);
-      return;
+    const sp   = new URLSearchParams(window.location.search);
+    if (hash.includes('type=recovery') || sp.get('type') === 'recovery') {
+      setShowResetPassword(true); setIsAuthChecking(false); return;
     }
-
-    // Listen for Supabase PASSWORD_RECOVERY auth event
-    const { data: { subscription } } = supabase!.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setShowResetPassword(true);
-      }
+    const { data: { subscription } } = supabase!.auth.onAuthStateChange(event => {
+      if (event === 'PASSWORD_RECOVERY') setShowResetPassword(true);
     });
-
     getCurrentUser().then(u => {
       setUser(u);
       if (u) {
-        // Show survey for first-time users
-        if (!localStorage.getItem('nexus_survey_done')) {
-          setShowSurvey(true);
-        }
-        if (window.innerWidth < 1024 && !localStorage.getItem('nexus_onboarding_done')) {
+        analytics.startSession(u.id);
+        // ── FIX 1: Load ALL user artifacts from all sessions on login ──
+        // This is the key change — artifacts from every chat session are
+        // loaded once at login so the sidebar shows everything, and
+        // [ARTIFACT:title] markers in old chats can find their artifacts.
+        loadAllUserArtifacts(u.id).catch(() => {});
+        if (!localStorage.getItem('sedrex_survey_done')) setShowSurvey(true);
+        if (window.innerWidth < 1024 && !localStorage.getItem('sedrex_onboarding_done'))
           setShowOnboarding(true);
-        }
       }
     }).finally(() => setIsAuthChecking(false));
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, [configured]);
 
   useEffect(() => {
-    if (user) {
-      // Load stats in background — don't block UI
-      getStats(user.id).then(s => startTransition(() => setUserStats(s)));
-      // Load conversations with limit, then select first one
-      api.getConversations(50).then(async (convs) => {
-        startTransition(() => setSessions(convs));
-        if (convs.length > 0) {
-          setActiveSessionId(convs[0].id);
-          // Load messages for first conversation separately
-          api.getMessages(convs[0].id, 100).then(m => {
-            startTransition(() => setSessions(p => p.map(s => s.id === convs[0].id ? { ...s, messages: m } : s)));
-          });
-        }
-      });
-    }
+    if (!user) return;
+    getStats(user.id).then(s => startTransition(() => setUserStats(s)));
+    api.getConversations(50).then(async convs => {
+      startTransition(() => setSessions(convs));
+      if (convs.length > 0) {
+        setActiveSessionId(convs[0].id);
+        api.getMessages(convs[0].id, 100).then(m =>
+          startTransition(() =>
+            setSessions(p => p.map(s => s.id === convs[0].id ? { ...s, messages: m } : s))
+          )
+        );
+        // Load session-specific artifacts to merge with the global set
+        loadArtifactsForSession(convs[0].id).catch(() => {});
+      }
+    });
   }, [user]);
 
-  // Removed sidebar swipe gesture logic. Sidebar can now only be toggled by button.
+  // ── FIX 1: On session switch, load that session's artifacts and MERGE
+  // (do NOT clearArtifacts — that was wiping all cross-session artifacts)
+  useEffect(() => {
+    if (activeSessionId) {
+      // Merge session artifacts into the global store (no clear)
+      loadArtifactsForSession(activeSessionId).catch(() => {});
+    }
+  }, [activeSessionId]);
 
   const activeSession = sessions.find(s => s.id === activeSessionId);
 
   const handleExportChat = useCallback(() => {
     if (!activeSession || activeSession.messages.length === 0) return;
+
     let md = `# ${activeSession.title || 'Chat Export'}\n\n`;
     md += `*Exported on ${new Date().toLocaleString()}*\n\n---\n\n`;
     activeSession.messages.forEach(msg => {
-      const role = msg.role === 'user' ? '**You**' : '**Nexus AI**';
+      const role = msg.role === 'user' ? '**You**' : '**SEDREX**';
       md += `### ${role}\n\n${msg.content}\n\n---\n\n`;
     });
-    const blob = new Blob([md], { type: 'text/markdown' });
-    const filename = `${(activeSession.title || 'chat').replace(/[^a-z0-9]/gi, '_')}_export.md`;
-    // iOS-safe download: use navigator.share on iOS where <a download> is ignored
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    if (isIOS && navigator.share && navigator.canShare?.({ files: [new File([blob], filename)] })) {
-      navigator.share({ files: [new File([blob], filename, { type: blob.type })] }).catch(() => {
-        window.open(URL.createObjectURL(blob), '_blank');
-      });
+    const filename = `${(activeSession.title || 'chat').replace(/[^a-z0-9]/gi, '_')}_sedrex_export.md`;
+
+    analytics.exportChat(activeSessionId);
+    if (user) {
+      storageService.uploadExport(md, filename, user.id, activeSessionId).catch(() => {});
+    }
+
+    const blob  = new Blob([md], { type: 'text/markdown' });
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (isIOS && navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename)] })) {
+      navigator.share({ files: [new File([blob], filename, { type: blob.type })] })
+        .catch(() => window.open(URL.createObjectURL(blob), '_blank'));
     } else {
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const a   = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
     }
-  }, [activeSession]);
+  }, [activeSession, activeSessionId, user]);
 
   const requestAIResponse = async (sessionId: string, currentHistory: Message[]) => {
     if (!user || isLoading) return;
     setIsLoading(true);
     abortControllerRef.current = new AbortController();
-    
-    const userMsg = currentHistory[currentHistory.length - 1];
-    const previewRouting = routePrompt(userMsg.content, !!userMsg.image, (userMsg.documents?.length || 0) > 0);
-    const assistantId = "assistant-" + Math.random().toString(36).substr(2, 9);
-    
+    const userMsg      = currentHistory[currentHistory.length - 1];
+    const previewRoute = routePrompt(userMsg.content, !!userMsg.image, (userMsg.documents?.length || 0) > 0);
+    const assistantId  = 'assistant-' + Math.random().toString(36).substr(2, 9);
+    const startTime    = Date.now();
+
     setSessions(prev => prev.map(s => s.id === sessionId ? {
       ...s,
-      messages: [...currentHistory, { 
-        id: assistantId, role: 'assistant', content: "", timestamp: Date.now(), model: previewRouting.model 
-      }]
+      messages: [...currentHistory, {
+        id: assistantId, role: 'assistant', content: '', timestamp: Date.now(), model: previewRoute.model,
+      }],
     } : s));
 
-    let accumulatedText = "";
+    let accumulatedText   = '';
     let flushTimer: ReturnType<typeof setTimeout> | null = null;
     let lastFlushedLength = 0;
 
     const flushToUI = () => {
-      // Skip flush if text hasn't grown since last flush (avoids redundant renders)
       if (accumulatedText.length === lastFlushedLength) { flushTimer = null; return; }
       lastFlushedLength = accumulatedText.length;
       const snapshot = accumulatedText;
-      // Use startTransition to mark streaming updates as non-urgent
-      // This keeps the UI responsive to user input during streaming
       startTransition(() => {
         setSessions(prev => prev.map(s => s.id === sessionId ? {
           ...s,
-          messages: s.messages.map(m => m.id === assistantId ? { ...m, content: snapshot } : m)
+          messages: s.messages.map(m => m.id === assistantId ? { ...m, content: snapshot } : m),
         } : s));
       });
       flushTimer = null;
@@ -230,59 +270,62 @@ const App: React.FC = () => {
 
     try {
       const response = await getAIResponse(
-        userMsg.content,
-        currentHistory.slice(0, -1),
+        userMsg.content, currentHistory.slice(0, -1),
         activeSession?.preferredModel || 'auto',
-        (routing) => setRoutingInfo(routing),
-        userMsg.image,
-        userMsg.documents || [],
+        routing => setRoutingInfo(routing),
+        userMsg.image, userMsg.documents || [],
         userSettings.personification,
-        (chunk) => {
+        chunk => {
           accumulatedText += chunk;
-          // Throttle UI updates to ~3/sec — prevents markdown re-parse jank
-          if (!flushTimer) {
-            flushTimer = setTimeout(flushToUI, 300);
-          }
+          if (!flushTimer) flushTimer = setTimeout(flushToUI, 80);
         },
         abortControllerRef.current.signal,
         `${user.id}:${sessionId}`
       );
-
-      // Final flush — use POST-PROCESSED content, not raw streamed text
-      // This ensures filler removal, trailing question stripping, etc. are visible
       if (flushTimer) clearTimeout(flushTimer);
+
+      // Extract artifact from response BEFORE saving
+      let finalContent = response.content;
+      const extracted  = extractArtifactFromResponse(response.content);
+
+      if (extracted && user) {
+        createArtifact({
+          sessionId:  sessionId,
+          userId:     user.id,
+          title:      extracted.title,
+          language:   extracted.language,
+          content:    extracted.content,
+          type:       extracted.type,
+          filePath:   extracted.filePath,
+        }).catch(() => {});
+        finalContent = extracted.reducedResponse;
+      }
+
       setSessions(prev => prev.map(s => s.id === sessionId ? {
         ...s,
-        messages: s.messages.map(m => m.id === assistantId ? { ...m, content: response.content } : m)
+        messages: s.messages.map(m => m.id === assistantId ? { ...m, content: finalContent } : m),
       } : s));
 
-      // Fire suggestions in background — don't block the main response
-      const suggestionsPromise = generateFollowUpSuggestions(response.content, previewRouting.intent).catch(() => []);
-
-      const savedAssistantMsg = await api.saveMessage(sessionId, {
-        role: 'assistant',
-        content: response.content,
-        model: response.model,
-        tokensUsed: response.tokens,
-        inputTokens: response.inputTokens,
-        outputTokens: response.outputTokens,
+      const suggestionsPromise = generateFollowUpSuggestions(response.content, previewRoute.intent).catch(() => []);
+      const savedMsg = await api.saveMessage(sessionId, {
+        role: 'assistant', content: finalContent,
+        model: response.model, tokensUsed: response.tokens,
+        inputTokens: response.inputTokens, outputTokens: response.outputTokens,
         groundingChunks: response.groundingChunks,
-        routingContext: response.routingContext,
-        timestamp: Date.now(),
+        routingContext: response.routingContext, timestamp: Date.now(),
       });
-      
+
       setSessions(prev => prev.map(s => s.id === sessionId ? {
         ...s,
-        messages: s.messages.map(m => m.id === assistantId ? savedAssistantMsg : m)
+        messages: s.messages.map(m => m.id === assistantId ? savedMsg : m),
       } : s));
 
-      // Apply suggestions when they arrive (non-blocking)
       suggestionsPromise.then(suggestions => {
         if (suggestions.length > 0) {
           startTransition(() => {
             setSessions(prev => prev.map(s => s.id === sessionId ? {
               ...s,
-              messages: s.messages.map(m => m.id === savedAssistantMsg.id ? { ...m, suggestions } : m)
+              messages: s.messages.map(m => m.id === savedMsg.id ? { ...m, suggestions } : m),
             } : s));
           });
         }
@@ -290,20 +333,54 @@ const App: React.FC = () => {
 
       getStats(user.id).then(s => startTransition(() => setUserStats(s)));
 
-      // Generate title in background — don't block UI
-      if (currentHistory.length === 1 && (activeSession?.title === "New Chat" || !activeSession?.title)) {
-        generateChatTitle(userMsg.content).then(newTitle => handleRenameSession(sessionId, newTitle)).catch(() => {});
+      const responseTimeMs = Date.now() - startTime;
+      analytics.logQuery({
+        userId:          user.id,
+        conversationId:  sessionId,
+        messageId:       savedMsg.id,
+        promptText:      userMsg.content,
+        responseText:    finalContent.slice(0, 2000),
+        intent:          previewRoute.intent,
+        modelUsed:       response.routingContext?.engine || String(response.model),
+        engine:          response.routingContext?.engine,
+        agentType:       response.routingContext?.agentType,
+        agentProvider:   response.routingContext?.agentProvider,
+        inputTokens:     response.inputTokens,
+        outputTokens:    response.outputTokens,
+        totalTokens:     response.tokens,
+        responseTimeMs,
+        hasImage:        !!userMsg.image,
+        hasDocuments:    (userMsg.documents?.length || 0) > 0,
+        hasCodebaseRef:  !!userMsg.codebaseRef,
+        artifactCreated: !!extracted,
+        slashCommand:    userMsg.content.startsWith('/') ? userMsg.content.split(' ')[0].slice(1) : undefined,
+        hadError:        false,
+      });
+
+      const isUntitled = !activeSession?.title ||
+        ['New Chat', 'New Session', ''].includes(activeSession.title.trim());
+      if (currentHistory.length === 1 && isUntitled) {
+        generateChatTitle(userMsg.content).then(t => handleRenameSession(sessionId, t)).catch(() => {});
       }
+
     } catch (error: any) {
       if (flushTimer) clearTimeout(flushTimer);
       if (error.name !== 'AbortError') {
-        setSessions(prev => prev.map(s => s.id === sessionId ? { 
-          ...s, 
+        setSessions(prev => prev.map(s => s.id === sessionId ? {
+          ...s,
           messages: s.messages.map(m => m.id === assistantId ? {
             ...m,
-            content: "Nexus is handling heavy traffic right now. I could not complete this response in full, but your request is safe. Please press Regenerate in a few seconds for the full answer."
-          } : m)
+            content: 'SEDREX is handling high traffic right now. Your request is safe — please press Regenerate in a few seconds.',
+          } : m),
         } : s));
+        analytics.logQuery({
+          userId:       user.id,
+          conversationId: sessionId,
+          promptText:   userMsg.content,
+          intent:       previewRoute.intent,
+          hadError:     true,
+          errorType:    error.message?.slice(0, 100),
+        });
       }
     } finally {
       setIsLoading(false);
@@ -315,93 +392,151 @@ const App: React.FC = () => {
     if (!user || !activeSessionId || !activeSession || isLoading) return;
     try {
       setSessions(prev => prev.map(s => s.id === activeSessionId ? {
-        ...s,
-        messages: s.messages.map(m => ({ ...m, suggestions: undefined }))
+        ...s, messages: s.messages.map(m => ({ ...m, suggestions: undefined })),
       } : s));
-
-      const savedUserMsg = await api.saveMessage(activeSessionId, { role: 'user', content, timestamp: Date.now(), image, documents: docs });
+      const savedUserMsg    = await api.saveMessage(activeSessionId, {
+        role: 'user',
+        codebaseRef: getProjectIndex() ? { projectName: getProjectIndex()!.projectName, totalFiles: getProjectIndex()!.totalFiles } : undefined,
+        content, timestamp: Date.now(), image, documents: docs,
+      });
       const updatedMessages = [...activeSession.messages, savedUserMsg];
       setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: updatedMessages } : s));
       await requestAIResponse(activeSessionId, updatedMessages);
-    } catch (error: any) { addToast(error.message, "error"); }
+    } catch (err: any) { addToast(err.message, 'error'); }
   };
 
   const handleEditMessage = async (messageId: string, newContent: string) => {
     if (!activeSession || isLoading) return;
-    const msgIndex = activeSession.messages.findIndex(m => m.id === messageId);
-    if (msgIndex === -1) return;
+    const idx = activeSession.messages.findIndex(m => m.id === messageId);
+    if (idx === -1) return;
     try {
-      const savedUserMsg = await api.saveMessage(activeSessionId, { role: 'user', content: newContent, timestamp: Date.now() });
-      const updatedHistory = [...activeSession.messages.slice(0, msgIndex), savedUserMsg];
-      setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: updatedHistory } : s));
-      await requestAIResponse(activeSessionId, updatedHistory);
-    } catch (error: any) { addToast(error.message, "error"); }
+      analytics.editMessage(messageId, activeSessionId);
+      const savedMsg = await api.saveMessage(activeSessionId, { role: 'user', content: newContent, timestamp: Date.now() });
+      const updated  = [...activeSession.messages.slice(0, idx), savedMsg];
+      setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: updated } : s));
+      await requestAIResponse(activeSessionId, updated);
+    } catch (err: any) { addToast(err.message, 'error'); }
   };
 
   const handleRegenerate = async (messageId: string) => {
     if (!activeSession || isLoading) return;
-    const msgIndex = activeSession.messages.findIndex(m => m.id === messageId);
-    if (msgIndex === -1) return;
-    const history = activeSession.messages.slice(0, msgIndex);
+    const idx = activeSession.messages.findIndex(m => m.id === messageId);
+    if (idx === -1) return;
+    analytics.regenerate(messageId, activeSessionId);
+    const history = activeSession.messages.slice(0, idx);
     setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: history } : s));
     await requestAIResponse(activeSessionId, history);
   };
 
   const handleFeedback = (messageId: string, feedback: 'good' | 'bad' | null) => {
+    if (feedback) analytics.feedback(messageId, feedback, activeSessionId);
     setSessions(prev => prev.map(s => s.id === activeSessionId ? {
-      ...s,
-      messages: s.messages.map(m => m.id === messageId ? { ...m, feedback } : m)
+      ...s, messages: s.messages.map(m => m.id === messageId ? { ...m, feedback } : m),
     } : s));
   };
 
-  const handleNewChat = useCallback(async () => { if (!user) return; const s = await api.createConversation("New Chat"); setSessions(p => [s, ...p]); setActiveSessionId(s.id); setView('chat'); if (window.innerWidth < 1024) setIsSidebarOpen(false); }, [user]);
-  const handleSelectSession = useCallback((id: string) => { setActiveSessionId(id); api.getMessages(id, 100).then(m => startTransition(() => setSessions(p => p.map(s => s.id === id ? { ...s, messages: m } : s)))); }, []);
-  const handleDeleteSession = useCallback((id: string) => api.deleteConversation(id).then(() => { setSessions(p => p.filter(s => s.id !== id)); if (activeSessionId === id) setActiveSessionId(''); }), [activeSessionId]);
-  const handleRenameSession = useCallback((id: string, t: string) => api.updateConversation(id, { title: t }).then(() => setSessions(p => p.map(s => s.id === id ? { ...s, title: t } : s))), []);
-  const handleToggleFavorite = useCallback((id: string) => { const sess = sessions.find(s => s.id === id); if (sess) api.updateConversation(id, { isFavorite: !sess.isFavorite }).then(() => setSessions(p => p.map(x => x.id === id ? { ...x, isFavorite: !x.isFavorite } : x))); }, [sessions]);
-  const handleModelChange = useCallback((m: AIModel | 'auto') => { if (activeSessionId) api.updateConversation(activeSessionId, { preferredModel: m }).then(() => setSessions(p => p.map(s => s.id === activeSessionId ? { ...s, preferredModel: m } : s))); }, [activeSessionId]);
-  const handleLogout = useCallback(() => { api.clearUserCache(); logout().then(() => { setUser(null); setSessions([]); setView('chat'); setIsSettingsOpen(false); }); }, []);
+  const handleNewChat = useCallback(async () => {
+    if (!user) return;
+    analytics.newChatCreated();
+    const s = await api.createConversation('New Chat');
+    setSessions(p => [s, ...p]);
+    setActiveSessionId(s.id);
+    // FIX 1: Do NOT clearArtifacts on new chat — keep cross-session artifacts visible
+    // clearArtifacts() removed here intentionally
+    analytics.viewChange('chat');
+    setView('chat');
+    if (window.innerWidth < 1024) setIsSidebarOpen(false);
+  }, [user]);
 
-  const completeOnboarding = () => { setShowOnboarding(false); localStorage.setItem('nexus_onboarding_done', 'true'); };
+  const handleSelectSession = useCallback((id: string) => {
+    setActiveSessionId(id);
+    if (window.innerWidth < 1024) setIsSidebarOpen(false);
+    api.getMessages(id, 100).then(m =>
+      startTransition(() => setSessions(p => p.map(s => s.id === id ? { ...s, messages: m } : s)))
+    );
+  }, []);
+
+  const handleDeleteSession = useCallback((id: string) =>
+    api.deleteConversation(id).then(() => {
+      setSessions(p => p.filter(s => s.id !== id));
+      if (activeSessionId === id) setActiveSessionId('');
+    }), [activeSessionId]);
+
+  const handleRenameSession = useCallback((id: string, t: string) =>
+    api.updateConversation(id, { title: t }).then(() =>
+      setSessions(p => p.map(s => s.id === id ? { ...s, title: t } : s))
+    ), []);
+
+  const handleToggleFavorite = useCallback((id: string) => {
+    const sess = sessions.find(s => s.id === id);
+    if (sess) api.updateConversation(id, { isFavorite: !sess.isFavorite }).then(() =>
+      setSessions(p => p.map(x => x.id === id ? { ...x, isFavorite: !x.isFavorite } : x))
+    );
+  }, [sessions]);
+
+  const handleModelChange = useCallback((m: AIModel | 'auto') => {
+    if (activeSessionId) {
+      const currentModel = sessions.find(s => s.id === activeSessionId)?.preferredModel ?? 'auto';
+      analytics.modelChange(String(currentModel), String(m));
+      api.updateConversation(activeSessionId, { preferredModel: m }).then(() =>
+        setSessions(p => p.map(s => s.id === activeSessionId ? { ...s, preferredModel: m } : s))
+      );
+    }
+  }, [activeSessionId, sessions]);
+
+  const handleLogout = useCallback(() => {
+    analytics.endSession('logout');
+    api.clearUserCache();
+    // Clear artifacts on logout only
+    clearArtifacts();
+    logout().then(() => { setUser(null); setSessions([]); setView('chat'); setIsSettingsOpen(false); });
+  }, []);
+
+  const completeOnboarding = () => {
+    setShowOnboarding(false);
+    localStorage.setItem('sedrex_onboarding_done', 'true');
+  };
 
   const handleSurveyComplete = (personification: string) => {
-    const updatedSettings = { ...userSettings, personification };
-    setUserSettings(updatedSettings);
-    localStorage.setItem('nexus_user_settings', JSON.stringify(updatedSettings));
-    localStorage.setItem('nexus_survey_done', 'true');
+    const updated = { ...userSettings, personification };
+    setUserSettings(updated);
+    localStorage.setItem('sedrex_user_settings', JSON.stringify(updated));
+    localStorage.setItem('sedrex_survey_done', 'true');
     setShowSurvey(false);
   };
 
-  if (isAuthChecking) return <div className="h-screen w-full flex items-center justify-center bg-[var(--bg-primary)]"><div className="w-10 h-10 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" /></div>;
-  
+  if (isAuthChecking)
+    return (
+      <div className="h-screen w-full flex flex-col items-center justify-center gap-4 bg-[var(--bg-primary)]">
+        <div className="w-12 h-12 border-4 border-sedrex/20 border-t-sedrex rounded-full animate-spin" />
+        <span className="app-init-text">SEDREX · Initializing</span>
+      </div>
+    );
+
   if (showResetPassword) {
     return (
       <Suspense fallback={<LazyFallback />}>
-      <ResetPasswordPage 
-        onResetSuccess={() => {
-          setShowResetPassword(false);
-          setShowAuth(true);
-          window.history.replaceState(null, '', window.location.pathname);
-        }}
-        onBackToAuth={() => {
-          setShowResetPassword(false);
-          setShowAuth(true);
-          window.history.replaceState(null, '', window.location.pathname);
-        }}
-      />
+        <ResetPasswordPage
+          onResetSuccess={() => { setShowResetPassword(false); setShowAuth(true); window.history.replaceState(null, '', window.location.pathname); }}
+          onBackToAuth={() => { setShowResetPassword(false); setShowAuth(true); window.history.replaceState(null, '', window.location.pathname); }}
+        />
       </Suspense>
     );
   }
 
-  // Always render router so /privacy, /terms, /contact are accessible
   if (!user) {
     return (
       <Routes>
         <Route path="/privacy" element={<Privacy />} />
-        <Route path="/terms" element={<Terms />} />
+        <Route path="/terms"   element={<Terms />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="*" element={
-          <Suspense fallback={<LazyFallback />}>{showAuth ? <AuthPage onAuthSuccess={(u) => { setUser(u); setShowAuth(false); if (!localStorage.getItem('nexus_survey_done')) setShowSurvey(true); }} /> : <LandingPage onOpenAuth={() => setShowAuth(true)} />}</Suspense>
+          <Suspense fallback={<LazyFallback />}>
+            {showAuth
+              ? <AuthPage onAuthSuccess={u => { setUser(u); setShowAuth(false); if (!localStorage.getItem('sedrex_survey_done')) setShowSurvey(true); }} />
+              : <LandingPage onOpenAuth={() => setShowAuth(true)} />
+            }
+          </Suspense>
         } />
       </Routes>
     );
@@ -409,77 +544,165 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <div className="flex h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden font-sans relative">
-      {showSurvey && <Suspense fallback={<LazyFallback />}><OnboardingSurvey onComplete={handleSurveyComplete} userName={user.personification || user.email} /></Suspense>}
-      <Sidebar sessions={sessions} activeSessionId={activeSessionId} onNewChat={handleNewChat} onSelectSession={handleSelectSession} view={view} onSetView={setView} stats={userStats} onDeleteSession={handleDeleteSession} onRenameSession={handleRenameSession} onToggleFavorite={handleToggleFavorite} onOpenSettings={() => setIsSettingsOpen(true)} searchInputRef={searchInputRef} isOpen={isSidebarOpen} onToggle={() => setIsSidebarOpen(!isSidebarOpen)} onOpenCommandPalette={() => setIsCommandPaletteOpen(true)} user={user} />
-      <main className="flex-1 flex flex-col min-w-0 relative">
-        <Routes>
-          <Route path="/" element={
-            view === 'chat' && activeSession ? (
-              <>
-                <ChatArea session={activeSession} isLoading={isLoading} routingInfo={routingInfo} onExport={handleExportChat} onShare={() => {}} onModelChange={handleModelChange} onToggleSidebar={() => setIsSidebarOpen(true)} isSidebarOpen={isSidebarOpen} onRegenerate={handleRegenerate} onEditMessage={handleEditMessage} onFeedback={handleFeedback} theme={theme} onThemeToggle={handleThemeToggle} onSuggestionClick={(txt) => handleSendMessage(txt)} />
-                {activeSession.messages.length === 0 ? (
-                  <div className="message-input-center-container">
-                    <div className="message-input-center-content">
-                      <h2 className="message-input-center-heading">Hello! How Can I help you?</h2>
-                      <MessageInput 
-                        onSendMessage={handleSendMessage}
-                        onStop={() => abortControllerRef.current?.abort()}
-                        isDisabled={isLoading}
-                        preferredModel={activeSession.preferredModel}
-                        onModelChange={handleModelChange}
-                        activeSessionId={activeSessionId}
-                      />
+      <div style={{
+        display: 'flex', height: '100vh', width: '100vw',
+        overflow: 'hidden', background: 'var(--bg-primary)',
+        color: 'var(--text-primary)', fontFamily: 'sans-serif', position: 'relative',
+      }}>
+
+        {showSurvey && (
+          <Suspense fallback={<LazyFallback />}>
+            <OnboardingSurvey onComplete={handleSurveyComplete} userName={user.personification || user.email} />
+          </Suspense>
+        )}
+
+        <Sidebar
+          id="app-sidebar"
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          onNewChat={handleNewChat}
+          onSelectSession={handleSelectSession}
+          view={view}
+          onSetView={handleSetView}
+          stats={userStats}
+          onDeleteSession={handleDeleteSession}
+          onRenameSession={handleRenameSession}
+          onToggleFavorite={handleToggleFavorite}
+          onOpenSettings={() => { analytics.settingsOpen(); setIsSettingsOpen(true); }}
+          searchInputRef={searchInputRef}
+          isOpen={isSidebarOpen}
+          onToggle={handleToggleSidebar}
+          onOpenCommandPalette={() => { analytics.commandPaletteOpen(); setIsCommandPaletteOpen(true); }}
+          user={user}
+          onRefreshArtifacts={() => loadAllUserArtifacts(user.id).catch(() => {})}
+        />
+
+        <main style={{
+          flex: 1, minWidth: 0, width: 0,
+          display: 'flex', flexDirection: 'row',
+          height: '100vh', overflow: 'hidden', position: 'relative',
+        }}>
+
+          {/* Chat column */}
+          <div style={{
+            flex: 1, minWidth: 0,
+            display: 'flex', flexDirection: 'column',
+            height: '100vh', overflow: 'hidden',
+          }}>
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <Routes>
+                <Route path="/" element={
+                  view === 'chat' && activeSession ? (
+                    <ChatArea
+                      session={activeSession}
+                      isLoading={isLoading}
+                      routingInfo={routingInfo}
+                      onExport={handleExportChat}
+                      onShare={() => {}}
+                      onModelChange={handleModelChange}
+                      onToggleSidebar={handleToggleSidebar}
+                      isSidebarOpen={isSidebarOpen}
+                      onRegenerate={handleRegenerate}
+                      onEditMessage={handleEditMessage}
+                      onFeedback={handleFeedback}
+                      theme={theme}
+                      onThemeToggle={handleThemeToggle}
+                      onSuggestionClick={txt => handleSendMessage(txt)}
+                    />
+                  ) : view === 'dashboard' ? (
+                    <Suspense fallback={<LazyFallback />}>
+                      <Dashboard stats={userStats!} onUpgrade={() => handleSetView('pricing')} />
+                    </Suspense>
+                  ) : view === 'pricing' ? (
+                    <Suspense fallback={<LazyFallback />}>
+                      <Pricing onUpgrade={() => handleSetView('billing')} onClose={() => handleSetView('chat')} />
+                    </Suspense>
+                  ) : view === 'billing' ? (
+                    <Suspense fallback={<LazyFallback />}>
+                      <Billing stats={userStats!} onCancel={() => {}} onUpgrade={() => handleSetView('pricing')} onClose={() => handleSetView('chat')} />
+                    </Suspense>
+                  ) : view === 'admin' ? (
+                    <Suspense fallback={<LazyFallback />}>
+                      <AdminDashboard />
+                    </Suspense>
+                  ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center p-10 text-center">
+                      <div className="empty-state-logo-container">
+                        <img src={SedrexLogo} alt="SEDREX" className="empty-state-logo" />
+                      </div>
+                      <div className="empty-state-label">SEDREX · Ready</div>
+                      <button onClick={handleNewChat} className="new-chat-button">New Chat</button>
                     </div>
-                  </div>
-                ) : (
-                  <MessageInput 
-                    onSendMessage={handleSendMessage}
-                    onStop={() => abortControllerRef.current?.abort()}
-                    isDisabled={isLoading}
-                    preferredModel={activeSession.preferredModel}
-                    onModelChange={handleModelChange}
-                    activeSessionId={activeSessionId}
-                  />
-                )}
-              </>
-            ) : view === 'dashboard' ? (
-              <Suspense fallback={<LazyFallback />}><Dashboard stats={userStats!} onUpgrade={() => setView('pricing')} /></Suspense>
-            ) : view === 'pricing' ? (
-              <Suspense fallback={<LazyFallback />}><Pricing onUpgrade={() => setView('billing')} onClose={() => setView('chat')} /></Suspense>
-            ) : view === 'billing' ? (
-              <Suspense fallback={<LazyFallback />}><Billing stats={userStats!} onCancel={() => {}} onUpgrade={() => setView('pricing')} onClose={() => setView('chat')} /></Suspense>
-            ) : view === 'admin' ? (
-              <Suspense fallback={<LazyFallback />}><AdminDashboard stats={getAdminStats()} /></Suspense>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center p-10 text-center">
-                <div className="w-20 h-20 bg-emerald-500/5 rounded-3xl flex items-center justify-center mb-8 border border-white/5 shadow-2xl">
-                  <img src={NexusLogo} alt="Nexus Logo" className="w-14 h-14 object-contain" />
-                </div>
-                <button onClick={handleNewChat} className="px-10 py-4 bg-emerald-500 rounded-2xl text-white font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all">New Chat</button>
+                  )
+                } />
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms"   element={<Terms />} />
+                <Route path="/contact" element={<Contact />} />
+              </Routes>
+            </div>
+
+            {view === 'chat' && activeSession && (
+              <div style={{ flexShrink: 0, width: '100%', display: 'block', alignSelf: 'stretch' }}>
+                <MessageInput
+                  onSendMessage={handleSendMessage}
+                  onStop={() => abortControllerRef.current?.abort()}
+                  isDisabled={isLoading}
+                  preferredModel={activeSession.preferredModel}
+                  onModelChange={handleModelChange}
+                  activeSessionId={activeSessionId}
+                />
               </div>
-            )
-          } />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/contact" element={<Contact />} />
-        </Routes>
-      </main>
-      
-      {showOnboarding && <Suspense fallback={<LazyFallback />}><MobileOnboarding onComplete={completeOnboarding} /></Suspense>}
-      <Suspense fallback={null}><SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userSettings={userSettings} onSave={(s) => { setUserSettings(s); localStorage.setItem('nexus_user_settings', JSON.stringify(s)); }} onPurgeHistory={() => api.purgeAllConversations().then(() => { setSessions([]); setActiveSessionId(''); })} onUpgrade={() => { setIsSettingsOpen(false); setView('pricing'); }} onLogout={handleLogout} user={user} stats={userStats} onThemeToggle={handleThemeToggle} theme={theme} /></Suspense>
-      <CommandPalette
-        isOpen={isCommandPaletteOpen}
-        onClose={() => setIsCommandPaletteOpen(false)}
-        onNewChat={handleNewChat}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        onGoChat={() => setView('chat')}
-        onGoDashboard={() => setView('dashboard')}
-        onGoPricing={() => setView('pricing')}
-        onGoBilling={() => setView('billing')}
-        onToggleTheme={handleThemeToggle}
-      />
-      <Toast toasts={toasts} onRemove={removeToast} />
+            )}
+          </div>
+
+          {/* Artifact Panel — sits right of chat when open */}
+          {artifactPanelOpen && (
+            <Suspense fallback={null}>
+              <ArtifactPanel onWidthChange={setArtifactPanelWidth} />
+            </Suspense>
+          )}
+        </main>
+
+        {showOnboarding && (
+          <Suspense fallback={<LazyFallback />}>
+            <MobileOnboarding onComplete={completeOnboarding} />
+          </Suspense>
+        )}
+
+        <Suspense fallback={null}>
+          <SettingsModal
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+            userSettings={userSettings}
+            onSave={s => {
+              setUserSettings(s);
+              localStorage.setItem('sedrex_user_settings', JSON.stringify(s));
+            }}
+            onPurgeHistory={() =>
+              api.purgeAllConversations().then(() => { setSessions([]); setActiveSessionId(''); })
+            }
+            onUpgrade={() => { setIsSettingsOpen(false); handleSetView('pricing'); }}
+            onLogout={handleLogout}
+            user={user}
+            stats={userStats}
+            onThemeToggle={handleThemeToggle}
+            theme={theme}
+          />
+        </Suspense>
+
+        <CommandPalette
+          isOpen={isCommandPaletteOpen}
+          onClose={() => setIsCommandPaletteOpen(false)}
+          onNewChat={handleNewChat}
+          onOpenSettings={() => { analytics.settingsOpen(); setIsSettingsOpen(true); }}
+          onGoChat={() => handleSetView('chat')}
+          onGoDashboard={() => handleSetView('dashboard')}
+          onGoPricing={() => handleSetView('pricing')}
+          onGoBilling={() => handleSetView('billing')}
+          onToggleTheme={handleThemeToggle}
+        />
+
+        <Toast toasts={toasts} onRemove={removeToast} />
       </div>
     </ErrorBoundary>
   );

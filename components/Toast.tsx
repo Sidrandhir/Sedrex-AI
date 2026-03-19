@@ -30,7 +30,7 @@ const ToastItem: React.FC<{ toast: ToastMessage; onRemove: (id: string) => void 
   }, [toast.id, onRemove]);
 
   const bgClass = {
-    success: 'bg-[#10a37f] border-emerald-400/20',
+    success: 'bg-[#c9a84c] border-emerald-400/20',
     error: 'bg-red-500 border-red-400/20',
     info: 'bg-indigo-500 border-indigo-400/20',
   }[toast.type];

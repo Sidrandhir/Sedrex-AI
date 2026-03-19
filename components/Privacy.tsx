@@ -17,7 +17,7 @@ const Privacy: React.FC = () => (
     >
     <h1 className="text-2xl sm:text-4xl font-black text-[var(--accent)] mb-2 tracking-tight leading-tight sm:leading-tight">Privacy Policy</h1>
     <p className="text-xs sm:text-sm text-[var(--text-secondary)] mb-6 sm:mb-8">Last updated: February 18, 2026</p>
-    <p className="mb-4 sm:mb-6 text-base sm:text-lg text-[var(--text-primary)] leading-relaxed sm:leading-relaxed">Nexus AI is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use our platform.</p>
+    <p className="mb-4 sm:mb-6 text-base sm:text-lg text-[var(--text-primary)] leading-relaxed sm:leading-relaxed">SEDREX is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use our platform.</p>
     <div className="space-y-6 sm:space-y-8">
       <div>
         <h2 className="text-lg sm:text-xl font-bold text-[var(--accent)] mb-2">Information We Collect</h2>
@@ -30,7 +30,7 @@ const Privacy: React.FC = () => (
       <div>
         <h2 className="text-lg sm:text-xl font-bold text-[var(--accent)] mb-2">How We Use Your Information</h2>
         <ul className="list-disc pl-4 sm:pl-6 space-y-1 text-[var(--text-primary)]">
-          <li>To provide, maintain, and improve Nexus AI services.</li>
+          <li>To provide, maintain, and improve SEDREX services.</li>
           <li>To personalize your experience and deliver relevant results.</li>
           <li>To ensure security, prevent fraud, and comply with legal obligations.</li>
           <li>To communicate updates, support, and important information.</li>
@@ -38,7 +38,7 @@ const Privacy: React.FC = () => (
       </div>
       <div>
         <h2 className="text-lg sm:text-xl font-bold text-[var(--accent)] mb-2">Data Sharing</h2>
-        <p className="text-[var(--text-primary)]">We do not sell your personal information. Data may be shared with trusted service providers (e.g., cloud hosting, analytics) under strict confidentiality and only as necessary to operate Nexus AI. We may disclose information if required by law or to protect our rights and users.</p>
+        <p className="text-[var(--text-primary)]">We do not sell your personal information. Data may be shared with trusted service providers (e.g., cloud hosting, analytics) under strict confidentiality and only as necessary to operate SEDREX. We may disclose information if required by law or to protect our rights and users.</p>
       </div>
       <div>
         <h2 className="text-lg sm:text-xl font-bold text-[var(--accent)] mb-2">Data Security</h2>
@@ -54,7 +54,7 @@ const Privacy: React.FC = () => (
       </div>
       <div>
         <h2 className="text-lg sm:text-xl font-bold text-[var(--accent)] mb-2">Children's Privacy</h2>
-        <p className="text-[var(--text-primary)]">Nexus AI is not intended for children under 13. We do not knowingly collect data from children under 13.</p>
+        <p className="text-[var(--text-primary)]">SEDREX is not intended for children under 13. We do not knowingly collect data from children under 13.</p>
       </div>
       <div>
         <h2 className="text-lg sm:text-xl font-bold text-[var(--accent)] mb-2">Changes to This Policy</h2>

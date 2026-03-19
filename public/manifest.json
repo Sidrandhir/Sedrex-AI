@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Nexus AI",
-  "short_name": "Nexus AI",
+  "name": "SEDREX",
+  "short_name": "SEDREX",
   "description": "Multi-Model AI Intelligence Platform",
   "start_url": "/",
   "display": "standalone",
@@ -10,7 +10,7 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "/nexus-logo-modern.svg",
+      "src": "/sedrex-logo.svg",
       "sizes": "32x32",
       "type": "image/svg+xml",
       "purpose": "any maskable"

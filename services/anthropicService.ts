@@ -1,22 +1,37 @@
-
+// services/anthropicService.ts
 import { Message } from "../types";
+import { buildSedrexSystemPrompt, sanitizeConversationHistory } from "./SedrexsystemPrompt";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
-// Fixed: Added systemInstructions parameter to match the 3-argument call in aiService.ts (Line 179)
-export const callClaude = async (prompt: string, history: Message[], systemInstructions?: string): Promise<string> => {
+export const callClaude = async (
+  prompt: string,
+  history: Message[],
+  systemInstructions?: string,
+): Promise<string> => {
   if (!ANTHROPIC_API_KEY) {
     return "Error: Anthropic API Key is missing. Please set process.env.ANTHROPIC_API_KEY.";
   }
 
   try {
-    const messages = history.map(m => ({
+    // ── FIXED: sanitize history before sending ──────────────────────
+    // Strips any leaked "I am built by Google / I am Claude" text from
+    // previous assistant messages so they don't re-anchor wrong identity
+    const cleanHistory = sanitizeConversationHistory(history);
+
+    const messages = cleanHistory.map(m => ({
       role: (m.role === 'assistant' ? 'assistant' : 'user') as 'assistant' | 'user',
-      content: m.content
+      content: m.content,
     }));
 
-    // Add current prompt
     messages.push({ role: 'user' as const, content: prompt });
+
+    // ── FIXED: always use Sedrex identity prompt, merge with any
+    //    caller-supplied systemInstructions (e.g. mode/format rules) ──
+    const sedrexPrompt  = buildSedrexSystemPrompt();
+    const finalSystem   = systemInstructions
+      ? `${sedrexPrompt}\n\n${systemInstructions}`
+      : sedrexPrompt;
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -24,15 +39,14 @@ export const callClaude = async (prompt: string, history: Message[], systemInstr
         "Content-Type": "application/json",
         "x-api-key": ANTHROPIC_API_KEY,
         "anthropic-version": "2023-06-01",
-        "dangerously-allow-browser": "true" // Note: In production, these calls should be server-side
+        "dangerously-allow-browser": "true",
       },
       body: JSON.stringify({
         model: "claude-3-5-sonnet-20240620",
         max_tokens: 4096,
-        messages: messages,
-        // Correctly passing the system instructions to the 'system' field for Claude 3 models
-        system: systemInstructions,
-      })
+        system: finalSystem,   // ← identity lock always injected here
+        messages,
+      }),
     });
 
     if (!response.ok) {

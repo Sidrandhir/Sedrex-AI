@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * NEXUS AI - Production-Hardened Cloud Configuration
+ * SEDREX - Production-Hardened Cloud Configuration
  * Relies strictly on process.env for security and professional deployment.
  */
 export const getSupabaseConfig = () => {

@@ -16,7 +16,7 @@ const Contact: React.FC = () => (
       style={{ wordBreak: 'break-word' }}
     >
     <h1 className="text-2xl sm:text-4xl font-black text-[var(--accent)] mb-2 tracking-tight leading-tight sm:leading-tight">Contact Us</h1>
-    <p className="mb-4 sm:mb-8 text-base sm:text-lg text-[var(--text-primary)] leading-relaxed sm:leading-relaxed">We value your feedback and are here to help with any questions about Nexus AI.</p>
+    <p className="mb-4 sm:mb-8 text-base sm:text-lg text-[var(--text-primary)] leading-relaxed sm:leading-relaxed">We value your feedback and are here to help with any questions about SEDREX.</p>
     <div className="space-y-6 sm:space-y-8">
       <div>
         <h2 className="text-lg sm:text-xl font-bold text-[var(--accent)] mb-2">Support</h2>
@@ -29,7 +29,7 @@ const Contact: React.FC = () => (
       <div>
         <h2 className="text-lg sm:text-xl font-bold text-[var(--accent)] mb-2">Address</h2>
         <address className="not-italic text-[var(--text-primary)] leading-relaxed text-sm sm:text-base">
-          Nexus AI, Inc.<br />123 Innovation Drive<br />San Francisco, CA 94107<br />USA
+          SEDREX, Inc.<br />123 Innovation Drive<br />San Francisco, CA 94107<br />USA
         </address>
       </div>
       <div>

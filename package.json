@@ -1,5 +1,5 @@
 {
-  "name": "copy-of-nexus-ai",
+  "name": "sedrex",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -31,6 +31,7 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.13.0",
     "recharts": "^2.12.7",
+    "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1",
     "tailwindcss": "^3.4.0",
     "xlsx": "^0.18.5"
@@ -38,6 +39,7 @@
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "supabase": "^2.81.3",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }
