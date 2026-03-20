@@ -198,6 +198,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const attachBtnRef  = useRef<HTMLButtonElement>(null);
   const modelBtnRef   = useRef<HTMLButtonElement>(null);
   const recognitionRef = useRef<any>(null);
+  const baseInputRef   = useRef('');
 
   const activeModel = MODEL_OPTIONS.find(m => m.id === preferredModel) ?? MODEL_OPTIONS[0];
 
@@ -298,7 +299,10 @@ const MessageInput: React.FC<MessageInputProps> = ({
       recognition.interimResults = true;
       recognition.lang = 'en-US';
 
-      recognition.onstart = () => setIsRecording(true);
+      recognition.onstart = () => {
+        setIsRecording(true);
+        baseInputRef.current = input;
+      };
       recognition.onend   = () => setIsRecording(false);
       recognition.onerror = (e: any) => {
         console.error('Speech recognition error:', e.error);
@@ -306,18 +310,21 @@ const MessageInput: React.FC<MessageInputProps> = ({
       };
 
       recognition.onresult = (event: any) => {
-        let transcript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
-        }
-        if (transcript) setInput(prev => {
-          // If the last part of input is not the transcript, add it
-          // This is a simple heuristic; a better one would track interim vs final
-          if (event.results[event.results.length - 1].isFinal) {
-            return prev + (prev ? ' ' : '') + transcript;
+        let sessionFinal = '';
+        let sessionInterim = '';
+
+        for (let i = 0; i < event.results.length; i++) {
+          const res = event.results[i];
+          if (res.isFinal) {
+            sessionFinal += res[0].transcript;
+          } else {
+            sessionInterim += res[0].transcript;
           }
-          return prev; // For interim results, we could show them in a preview
-        });
+        }
+
+        const base = baseInputRef.current.trim();
+        const fullFinal = (base ? base + ' ' : '') + sessionFinal.trim();
+        setInput(fullFinal + (sessionInterim ? ' ' + sessionInterim.trim() : ''));
       };
 
       recognition.start();
