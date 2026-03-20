@@ -323,7 +323,7 @@ const MermaidBlock = memo(({ code }: { code: string }) => {
       </div>
       {/* Soft warning banner — shown even when diagram renders successfully */}
       {warn && !error && (
-        <div style={{ padding: '6px 16px', background: 'rgba(201,168,76,0.07)', borderBottom: '1px solid rgba(201,168,76,0.15)', fontSize: 11, color: 'var(--accent,#c9a84c)', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ padding: '6px 16px', background: 'rgba(16,185,129,0.07)', borderBottom: '1px solid rgba(16,185,129,0.15)', fontSize: 11, color: 'var(--accent,#10B981)', display: 'flex', alignItems: 'center', gap: 6 }}>
           ⚠ {warn}
         </div>
       )}
@@ -582,9 +582,9 @@ const inlineCodeStyle: React.CSSProperties = {
   fontWeight: 500,
   padding: '0.15em 0.45em',
   borderRadius: 4,
-  background: 'rgba(201,168,76,0.1)',
-  color: 'var(--accent, #c9a84c)',
-  border: '1px solid rgba(201,168,76,0.2)',
+  background: 'rgba(16,185,129,0.1)',
+  color: 'var(--accent, #10B981)',
+  border: '1px solid rgba(16,185,129,0.2)',
   whiteSpace: 'nowrap' as const,
 };
 
@@ -626,8 +626,8 @@ const markdownComponents = {
   blockquote: ({ children }: any) => (
     <blockquote style={{
       margin: '1em 0', padding: '0.75em 1.25em',
-      borderLeft: '3px solid var(--accent, #c9a84c)',
-      background: 'rgba(201,168,76,0.05)',
+      borderLeft: '3px solid var(--accent, #10B981)',
+      background: 'rgba(16,185,129,0.05)',
       borderRadius: '0 8px 8px 0',
       color: 'var(--text-secondary)',
     }}>
@@ -683,7 +683,7 @@ const STREAMING_CURSOR_CSS = `
   margin-left: 2px;
   font-size: 0.9em;
   vertical-align: baseline;
-  color: var(--accent, #c9a84c);
+  color: var(--accent, #10B981);
   opacity: 0.85;
 }
 @keyframes blink-cursor {

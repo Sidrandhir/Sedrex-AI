@@ -196,7 +196,7 @@ export async function storeDiagram(input: ArtifactCreateInput): Promise<Artifact
     const { data, error } = await supabase!
       .from('artifacts')
       .insert({
-        conversation_id: input.sessionId,
+        session_id: input.sessionId,
         user_id:         input.userId,
         title:           input.title,
         language:        'mermaid',
@@ -212,7 +212,7 @@ export async function storeDiagram(input: ArtifactCreateInput): Promise<Artifact
 
     const saved: Artifact = {
       id:        data.id,
-      sessionId: data.conversation_id ?? input.sessionId,
+      sessionId: data.session_id ?? input.sessionId,
       userId:    data.user_id,
       title:     data.title,
       language:  'mermaid',
@@ -263,7 +263,7 @@ export async function createArtifact(input: ArtifactCreateInput): Promise<Artifa
     const { data, error } = await supabase!
       .from('artifacts')
       .insert({
-        conversation_id: input.sessionId,      // DB column name
+        session_id: input.sessionId,      // DB column name is session_id, not conversation_id!
         user_id:         input.userId,
         title:           input.title,
         language:        input.language,
@@ -283,7 +283,7 @@ export async function createArtifact(input: ArtifactCreateInput): Promise<Artifa
     // Step 3: Swap local placeholder with DB artifact (atomic, no duplicate key)
     const savedArtifact: Artifact = {
       id:        data.id,
-      sessionId: data.conversation_id ?? input.sessionId,
+      sessionId: data.session_id ?? input.sessionId,
       userId:    data.user_id,
       title:     data.title,
       language:  data.language,
@@ -332,7 +332,7 @@ export async function loadArtifactsForSession(sessionId: string): Promise<void> 
     const { data, error } = await supabase!
       .from('artifacts')
       .select('*')
-      .eq('conversation_id', sessionId)
+      .eq('session_id', sessionId)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -343,7 +343,7 @@ export async function loadArtifactsForSession(sessionId: string): Promise<void> 
 
     const all: Artifact[] = (data ?? []).map(row => ({
       id:        row.id,
-      sessionId: row.conversation_id ?? sessionId,
+      sessionId: row.session_id ?? sessionId,
       userId:    row.user_id,
       title:     row.title,
       language:  row.language ?? 'text',
@@ -387,7 +387,7 @@ export async function loadAllUserArtifacts(userId: string): Promise<void> {
 
     const all: Artifact[] = (data ?? []).map(row => ({
       id:        row.id,
-      sessionId: row.conversation_id ?? '',
+      sessionId: row.session_id ?? '',
       userId:    row.user_id,
       title:     row.title,
       language:  row.language ?? 'text',

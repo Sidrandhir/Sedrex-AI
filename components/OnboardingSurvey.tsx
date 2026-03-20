@@ -108,7 +108,7 @@ const OnboardingSurvey: React.FC<Props> = ({ onComplete, userName }) => {
             <h2 className="survey-step-title">
               {firstName ? `Hey ${firstName}, what describes you best?` : 'What describes you best?'}
             </h2>
-            <p className="survey-step-sub">This helps Nexus tailor every answer to you.</p>
+            <p className="survey-step-sub">This helps Sedrex tailor every answer to you.</p>
             <div className="survey-options">
               {roles.map(r => (
                 <button
@@ -136,7 +136,7 @@ const OnboardingSurvey: React.FC<Props> = ({ onComplete, userName }) => {
         return (
           <div className={`survey-step ${slideDir === 'in' ? 'slide-in' : 'slide-out'}`}>
             <div className="survey-step-emoji">🎯</div>
-            <h2 className="survey-step-title">What will you mostly use Nexus for?</h2>
+            <h2 className="survey-step-title">What will you mostly use Sedrex for?</h2>
             <p className="survey-step-sub">Pick the one that fits best — you can always change later.</p>
             <div className="survey-options">
               {purposes.map(p => (
@@ -165,7 +165,7 @@ const OnboardingSurvey: React.FC<Props> = ({ onComplete, userName }) => {
         return (
           <div className={`survey-step ${slideDir === 'in' ? 'slide-in' : 'slide-out'}`}>
             <div className="survey-step-emoji">💬</div>
-            <h2 className="survey-step-title">How should Nexus talk to you?</h2>
+            <h2 className="survey-step-title">How should Sedrex talk to you?</h2>
             <p className="survey-step-sub">Pick your vibe. This shapes every response.</p>
             <div className="survey-options">
               {styles.map(s => (

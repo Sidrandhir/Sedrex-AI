@@ -1,7 +1,7 @@
-/* ══════════════════════════════════════════════════════════════════
+/*
    SEDREX — Complete CSS
-   Brand: Gold (#c9a84c) on Deep Black (#020408)
-   ══════════════════════════════════════════════════════════════════ */
+   Brand: Emerald Green (#10B981) on Deep Black (#020408)
+*/
 
 /* ── SEDREX CSS Variables ─────────────────────────────────────────── */
 :root,
@@ -12,17 +12,17 @@
   --bg-hover:        #2e3044;
 
   --accent:          #10B981;
-  --accent-hover:    #e8c96a;
-  --accent-dark:     #8a6820;
-  --accent-gradient: #e8c96a;
+  --accent-hover:    #34d399;
+  --accent-dark:     #059669;
+  --accent-gradient: #10B981;
   --accent-glow:     rgba(16, 185, 129, 0.15);
   --accent-subtle:   rgba(16, 185, 129, 0.08);
   --accent-border:   rgba(16, 185, 129, 0.2);
 
-  --sedrex-gold:       #10B981;
-  --sedrex-gold-hover: #e8c96a;
-  --sedrex-gold-dark:  #8a6820;
-  --sedrex-gold-glow:  rgba(16, 185, 129, 0.15);
+  --sedrex-accent:       #10B981;
+  --sedrex-accent-hover: #34d399;
+  --sedrex-accent-dark:  #059669;
+  --sedrex-accent-glow:  rgba(16, 185, 129, 0.15);
 
   --text-primary:    #e8eaf0;
   --text-secondary:  #8b92b0;
@@ -44,7 +44,7 @@
 
   --shadow-sm:       0 2px 8px rgba(0, 0, 0, 0.4);
   --shadow-md:       0 4px 24px rgba(0, 0, 0, 0.5);
-  --shadow-gold:     0 0 40px rgba(16, 185, 129, 0.12);
+  --shadow-accent:     0 0 40px rgba(16, 185, 129, 0.12);
 
   --radius-sm:  4px;
   --radius-md:  8px;
@@ -58,16 +58,16 @@
   --bg-tertiary:   #e8e4d8;
   --bg-hover:      #e0dbd0;
 
-  --accent:        #8a6820;
+  --accent:        #059669;
   --accent-hover:  #10B981;
-  --accent-dark:   #5a4410;
+  --accent-dark:   #047857;
   --accent-gradient: #10B981;
-  --accent-glow:   rgba(138, 104, 32, 0.12);
-  --accent-subtle: rgba(138, 104, 32, 0.06);
-  --accent-border: rgba(138, 104, 32, 0.2);
+  --accent-glow:   rgba(16, 185, 129, 0.12);
+  --accent-subtle: rgba(16, 185, 129, 0.06);
+  --accent-border: rgba(16, 185, 129, 0.2);
 
-  --sedrex-gold:       #8a6820;
-  --sedrex-gold-hover: #10B981;
+  --sedrex-accent:       #059669;
+  --sedrex-accent-hover: #10B981;
 
   --text-primary:   #1a1a2e;
   --text-secondary: #6a6a8a;
@@ -101,16 +101,17 @@ code, pre, .code-block {
 
 /* ── Response text ────────────────────────────────────────────────── */
 .response-text {
-  font-family: 'IBM Plex Sans', ui-sans-serif, -apple-system, sans-serif;
+  font-family: var(--font-sans);
   font-size: 0.9375rem;
   font-weight: 400;
-  line-height: 1.80;
-  letter-spacing: 0.012em;
-  max-width: 100%;       /* FIXED: was 70ch — broke table rendering */
+  line-height: 1.85; /* Increased for premium readability */
+  letter-spacing: 0.015em;
+  max-width: 100%;
   min-width: 0;
   color: var(--text-primary);
   word-break: break-word;
   overflow-wrap: break-word;
+  -webkit-font-smoothing: antialiased;
 }
 
 [data-theme='dark'] .response-text {
@@ -196,10 +197,26 @@ code, pre, .code-block {
 }
 
 .chat-column {
-  max-width: 780px;
+  max-width: 820px; /* Slightly wider for modern displays */
   width: 100%;
   margin: 0 auto;
-  padding: 24px 20px 48px;
+  padding: 24px 20px 60px;
+  /* Safe area padding for mobile */
+  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 640px) {
+  .chat-column {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .chat-column {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
 }
 
 /* ── Message groups ────────────────────────────────────────────────── */
@@ -550,7 +567,7 @@ code, pre, .code-block {
 
 /* ══════════════════════════════════════════════════════════════════
    SEDREX Tailwind Overrides
-   Replace emerald → sedrex gold
+   Replace emerald → sedrex accent
    ══════════════════════════════════════════════════════════════════ */
 
 /* Spinner color override */

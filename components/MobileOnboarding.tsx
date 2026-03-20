@@ -10,7 +10,7 @@ const MobileOnboarding: React.FC<MobileOnboardingProps> = ({ onComplete }) => {
 
   const steps = [
     {
-      title: "Welcome to Nexus",
+      title: "Welcome to Sedrex",
       desc: "Your AI assistant, designed for mobile. Chat with multiple AI models in one place.",
       icon: <Icons.Robot className="w-8 h-8 text-emerald-500" />
     },

@@ -60,7 +60,6 @@ function mapStatusToErrorCode(status: number): string {
       return 'RATE_LIMIT';
     case 500:
     case 502:
-    case 503:
       return 'SERVER_ERROR';
     case 503:
       return 'SERVICE_UNAVAILABLE';

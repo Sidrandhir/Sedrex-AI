@@ -62,7 +62,7 @@ const Privacy: React.FC = () => (
       </div>
       <div>
         <h2 className="text-lg sm:text-xl font-bold text-[var(--accent)] mb-2">Contact Us</h2>
-        <p className="text-[var(--text-primary)]">If you have questions about this Privacy Policy, please contact us at <a href="mailto:support@nexusai.com" className="text-[var(--accent)] underline">support@nexusai.com</a>.</p>
+        <p className="text-[var(--text-primary)]">If you have questions about this Privacy Policy, please contact us at <a href="mailto:support@sedrexai.com" className="text-[var(--accent)] underline">support@sedrexai.com</a>.</p>
       </div>
     </div>
   </section>

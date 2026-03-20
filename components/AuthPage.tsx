@@ -104,7 +104,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
         {/* Logo */}
         <div className="mb-8 flex flex-col items-center">
           <div className="mb-5 flex items-center justify-center">
-            <img src={SedrexLogo} alt="SEDREX" className="nexus-logo" />
+            <img src={SedrexLogo} alt="SEDREX" className="sedrex-logo" />
           </div>
           <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
             {isForgotPassword ? 'Reset your password' : isLogin ? 'Welcome back' : 'Create your account'}

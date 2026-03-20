@@ -53,7 +53,7 @@ const EXT_MAP: Record<string, string> = {
 };
 
 const langLabel = (lang: string) => LANG_LABELS[lang.toLowerCase()] ?? lang.toUpperCase();
-const fileIcon  = (lang: string) => FILE_ICONS[lang.toLowerCase()] ?? '📄';
+const fileIcon = (lang: string) => FILE_ICONS[lang.toLowerCase()] ?? '📄';
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -61,8 +61,8 @@ function escapeHtml(s: string): string {
 
 function downloadFile(content: string, filename: string, mime: string): void {
   const blob = new Blob([content], { type: mime });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click();
   document.body.removeChild(a);
@@ -95,15 +95,15 @@ function buildSrcdoc(artifact: Artifact): string {
   // JSX / TSX — needs Babel transform
   if (lang === 'jsx' || lang === 'tsx') {
     const cleanCode = artifact.content
-      .replace(/^export\s+default\s+(\w+)\s*;?\s*$/gm,        '/* $1 */')
-      .replace(/^export\s+default\s+/gm,                       '')
-      .replace(/^export\s+(const|let|var|function|class)\s+/gm,'$1 ')
-      .replace(/^export\s*\{[^}]*\}\s*;?\s*$/gm,               '')
-      .replace(/^import\s+type\s+.*$/gm,                        '')
+      .replace(/^export\s+default\s+(\w+)\s*;?\s*$/gm, '/* $1 */')
+      .replace(/^export\s+default\s+/gm, '')
+      .replace(/^export\s+(const|let|var|function|class)\s+/gm, '$1 ')
+      .replace(/^export\s*\{[^}]*\}\s*;?\s*$/gm, '')
+      .replace(/^import\s+type\s+.*$/gm, '')
       .replace(/^import\s+.*from\s+['"][^'"]+['"]\s*;?\s*$/gm, '')
-      .replace(/^import\s+['"][^'"]+['"]\s*;?\s*$/gm,           '');
+      .replace(/^import\s+['"][^'"]+['"]\s*;?\s*$/gm, '');
 
-return `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
@@ -112,6 +112,23 @@ return `<!DOCTYPE html>
 
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+  <script>
+    // CRITICAL: Prevent Tracking Protection from crashing Babel
+    try { localStorage.setItem('sx', '1'); localStorage.removeItem('sx'); }
+    catch(e) {
+      Object.defineProperty(window, 'localStorage', {
+        value: {
+          _data: {},
+          setItem: function(id, val) { return this._data[id] = String(val); },
+          getItem: function(id) { return this._data.hasOwnProperty(id) ? this._data[id] : null; },
+          removeItem: function(id) { return delete this._data[id]; },
+          clear: function() { return this._data = {}; }
+        }
+      });
+    }
+  </script>
+
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
 
@@ -175,8 +192,8 @@ return `<!DOCTYPE html>
 
 // ── Diagram Viewer ────────────────────────────────────────────────
 const DiagramViewer = memo(({ artifact }: { artifact: Artifact }) => {
-  const [svg,    setSvg]    = useState('');
-  const [error,  setError]  = useState('');
+  const [svg, setSvg] = useState('');
+  const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -196,7 +213,7 @@ const DiagramViewer = memo(({ artifact }: { artifact: Artifact }) => {
   }, [artifact.content]);
 
   const handleCopy = async () => {
-    try { await navigator.clipboard.writeText(artifact.content); } catch {}
+    try { await navigator.clipboard.writeText(artifact.content); } catch { }
     setCopied(true); setTimeout(() => setCopied(false), 2000);
   };
 
@@ -249,7 +266,7 @@ const DiagramViewer = memo(({ artifact }: { artifact: Artifact }) => {
 
 // ── Code Viewer ───────────────────────────────────────────────────
 const CodeViewer = memo(({ artifact }: { artifact: Artifact }) => {
-  const [copied,      setCopied]      = useState(false);
+  const [copied, setCopied] = useState(false);
   const [highlighted, setHighlighted] = useState('');
 
   useEffect(() => {
@@ -258,7 +275,7 @@ const CodeViewer = memo(({ artifact }: { artifact: Artifact }) => {
       try {
         const hljs = (await import('highlight.js')).default;
         const lang = (artifact.language ?? '').toLowerCase();
-        const res  = lang && hljs.getLanguage(lang)
+        const res = lang && hljs.getLanguage(lang)
           ? hljs.highlight(artifact.content, { language: lang, ignoreIllegals: true }).value
           : hljs.highlightAuto(artifact.content).value;
         if (!cancelled) setHighlighted(res);
@@ -281,9 +298,9 @@ const CodeViewer = memo(({ artifact }: { artifact: Artifact }) => {
   }, [artifact.content]);
 
   const handleDownload = useCallback(() => {
-    const lang     = (artifact.language ?? '').toLowerCase();
-    const ext      = EXT_MAP[lang] || lang || 'txt';
-    const mime     = MIME_MAP[lang] || 'text/plain';
+    const lang = (artifact.language ?? '').toLowerCase();
+    const ext = EXT_MAP[lang] || lang || 'txt';
+    const mime = MIME_MAP[lang] || 'text/plain';
     const filename = artifact.filePath
       ? artifact.filePath.split('/').pop()!
       : `${artifact.title.replace(/[^a-z0-9]/gi, '_')}.${ext}`;
@@ -324,7 +341,7 @@ const CodeViewer = memo(({ artifact }: { artifact: Artifact }) => {
 
 // ── Preview Pane ──────────────────────────────────────────────────
 const PreviewPane = memo(({ artifact }: { artifact: Artifact }) => {
-  const iframeRef       = useRef<HTMLIFrameElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const [loaded, setLoaded] = useState(false);
   const [errMsg, setErrMsg] = useState('');
 
@@ -376,19 +393,17 @@ const PreviewPane = memo(({ artifact }: { artifact: Artifact }) => {
         ref={iframeRef}
         className={`ap-preview-iframe${loaded ? ' ap-preview-iframe--visible' : ''}`}
         // ── CRITICAL FIX ────────────────────────────────────────────
-        // REMOVED: allow-same-origin
-        //   With allow-same-origin + allow-scripts, the iframe can read
-        //   window.parent.location and navigate the parent app.
-        //   Modern browsers (Chrome 90+) also silently block rendering
-        //   when both are set for same-origin iframes → WHITE SCREEN.
-        //
-        // ADDED: allow-popups allow-popups-to-escape-sandbox
-        //   Links in previewed HTML open in new tabs instead of breaking.
+        // Restored: allow-same-origin
+        //   While `allow-scripts` + `allow-same-origin` generates a browser
+        //   warning ("sandbox escape"), it is STRICTLY REQUIRED for Babel standalone.
+        //   If omitted, the iframe executes in a "null" origin context. Babel tries
+        //   to access localStorage, and the browser crashes the script with a
+        //   SecurityError (Tracking Prevention blocks access).
         // ────────────────────────────────────────────────────────────
-        sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+        sandbox="allow-scripts allow-popups allow-forms allow-same-origin"
         title="Live preview"
         onLoad={() => {
-            setTimeout(() => setLoaded(true), 50);
+          setTimeout(() => setLoaded(true), 50);
         }}
         onError={() => setErrMsg('Failed to load preview')}
         style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
@@ -402,10 +417,10 @@ const HistoryPane = memo(({
   artifacts, diagrams, activeId, onSelect, onDelete,
 }: {
   artifacts: Artifact[];
-  diagrams:  Artifact[];
-  activeId:  string | null;
-  onSelect:  (id: string) => void;
-  onDelete:  (id: string) => void;
+  diagrams: Artifact[];
+  activeId: string | null;
+  onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
 }) => {
   const all = [...artifacts, ...diagrams];
 
@@ -447,7 +462,7 @@ const HistoryPane = memo(({
               title="Delete"
             >
               <svg viewBox="0 0 16 16" style={{ width: 12, height: 12 }} fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M2 2l12 12M14 2L2 14"/>
+                <path d="M2 2l12 12M14 2L2 14" />
               </svg>
             </button>
           </div>
@@ -459,7 +474,7 @@ const HistoryPane = memo(({
   return (
     <div className="ap-history-list">
       {renderSection(artifacts, 'Code Artifacts')}
-      {renderSection(diagrams,  'Diagrams')}
+      {renderSection(diagrams, 'Diagrams')}
     </div>
   );
 });
@@ -478,10 +493,10 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({ onWidthChange }) => {
     openArtifact, closePanel,
   } = useArtifacts();
 
-  const [tab,   setTab]   = useState<PanelTab>('code');
+  const [tab, setTab] = useState<PanelTab>('code');
   const [width, setWidth] = useState(480);
-  const panelRef          = useRef<HTMLDivElement>(null);
-  const dragRef           = useRef<{ startX: number; startW: number } | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ startX: number; startW: number } | null>(null);
 
   const totalCount = artifacts.length + diagrams.length;
 
@@ -499,7 +514,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({ onWidthChange }) => {
   const startDrag = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     dragRef.current = { startX: e.clientX, startW: width };
-    document.body.style.cursor     = 'col-resize';
+    document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
     const onMove = (ev: MouseEvent) => {
       if (!dragRef.current) return;
@@ -507,19 +522,19 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({ onWidthChange }) => {
     };
     const onUp = () => {
       dragRef.current = null;
-      document.body.style.cursor     = '';
+      document.body.style.cursor = '';
       document.body.style.userSelect = '';
       document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup',   onUp);
+      document.removeEventListener('mouseup', onUp);
     };
     document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup',   onUp);
+    document.addEventListener('mouseup', onUp);
   }, [width]);
 
   if (!panelOpen) return null;
 
-  const artifact   = activeArtifact;
-  const isDiagram  = artifact ? isDiagramArtifact(artifact) : false;
+  const artifact = activeArtifact;
+  const isDiagram = artifact ? isDiagramArtifact(artifact) : false;
   const canPreview = artifact && !isDiagram && canPreviewArtifact(artifact);
 
   return (
@@ -551,7 +566,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({ onWidthChange }) => {
                 onClick={() => setTab('code')}
               >
                 <svg viewBox="0 0 14 14" style={{ width: 11, height: 11 }} fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M4 3L1 7l3 4M10 3l3 4-3 4M8 1L6 13"/>
+                  <path d="M4 3L1 7l3 4M10 3l3 4-3 4M8 1L6 13" />
                 </svg>
                 {isDiagram ? 'Diagram' : 'Code'}
               </button>
@@ -563,8 +578,8 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({ onWidthChange }) => {
                   title={canPreview ? 'Live preview' : 'HTML/JSX/TSX only'}
                 >
                   <svg viewBox="0 0 14 14" style={{ width: 11, height: 11 }} fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <circle cx="7" cy="7" r="2.5"/>
-                    <path d="M1 7s2-5 6-5 6 5 6 5-2 5-6 5-6-5-6-5z"/>
+                    <circle cx="7" cy="7" r="2.5" />
+                    <path d="M1 7s2-5 6-5 6 5 6 5-2 5-6 5-6-5-6-5z" />
                   </svg>
                   Preview
                   {canPreview && <span className="ap-tab-live">●</span>}
@@ -576,8 +591,8 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({ onWidthChange }) => {
                 onClick={() => setTab('history')}
               >
                 <svg viewBox="0 0 14 14" style={{ width: 11, height: 11 }} fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect x="1" y="1" width="12" height="12" rx="1.5"/>
-                  <path d="M4 5h6M4 8h4"/>
+                  <rect x="1" y="1" width="12" height="12" rx="1.5" />
+                  <path d="M4 5h6M4 8h4" />
                 </svg>
                 History
                 {totalCount > 0 && <span className="ap-tab-badge">{totalCount}</span>}
@@ -592,8 +607,8 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({ onWidthChange }) => {
 
         {/* ── Content ────────────────────────────────────────── */}
         <div className="ap-content">
-          {tab === 'code' && artifact && isDiagram  && <DiagramViewer artifact={artifact} />}
-          {tab === 'code' && artifact && !isDiagram && <CodeViewer    artifact={artifact} />}
+          {tab === 'code' && artifact && isDiagram && <DiagramViewer artifact={artifact} />}
+          {tab === 'code' && artifact && !isDiagram && <CodeViewer artifact={artifact} />}
           {tab === 'code' && !artifact && (
             <div className="ap-empty">
               <div className="ap-empty-icon">📄</div>
@@ -626,4 +641,4 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({ onWidthChange }) => {
   );
 };
 
-export default ArtifactPanel;
+export default ArtifactPanel;

@@ -25,6 +25,7 @@
 // ══════════════════════════════════════════════════════════════════
 
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { getMonthlyLimit } from './tierConfig';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -351,7 +352,7 @@ export async function getStats(userId: string) {
       tier: 'free' as const,
       totalMessagesSent: 0,
       monthlyMessagesSent: 0,
-      monthlyMessagesLimit: 50,
+      monthlyMessagesLimit: getMonthlyLimit('free'),
       tokensEstimated: 0,
       modelUsage: {},
       dailyHistory: [],
@@ -368,7 +369,7 @@ export async function getStats(userId: string) {
       tier:                 data?.tier       ?? 'free',
       totalMessagesSent:    data?.total_messages    ?? 0,
       monthlyMessagesSent:  data?.monthly_messages  ?? 0,
-      monthlyMessagesLimit: 50,
+      monthlyMessagesLimit: getMonthlyLimit(data?.tier),
       tokensEstimated:      data?.tokens_estimated  ?? 0,
       modelUsage:           data?.model_usage       ?? {},
       dailyHistory:         data?.daily_history     ?? [],
@@ -377,7 +378,7 @@ export async function getStats(userId: string) {
     return {
       userId, tier: 'free' as const,
       totalMessagesSent: 0, monthlyMessagesSent: 0,
-      monthlyMessagesLimit: 50, tokensEstimated: 0,
+      monthlyMessagesLimit: getMonthlyLimit('free'), tokensEstimated: 0,
       modelUsage: {}, dailyHistory: [],
     };
   }

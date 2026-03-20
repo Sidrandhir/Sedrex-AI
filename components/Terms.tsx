@@ -53,7 +53,7 @@ const Terms: React.FC = () => (
       </div>
       <div>
         <h2 className="text-lg sm:text-xl font-bold text-[var(--accent)] mb-2">Contact</h2>
-        <p className="text-[var(--text-primary)]">For questions about these Terms, contact <a href="mailto:support@nexusai.com" className="text-[var(--accent)] underline">support@nexusai.com</a>.</p>
+        <p className="text-[var(--text-primary)]">For questions about these Terms, contact <a href="mailto:support@sedrexai.com" className="text-[var(--accent)] underline">support@sedrexai.com</a>.</p>
       </div>
     </div>
   </section>

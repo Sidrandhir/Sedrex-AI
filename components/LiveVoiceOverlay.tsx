@@ -103,7 +103,7 @@ const LiveVoiceOverlay: React.FC<LiveVoiceOverlayProps> = ({ onClose, isOpen }) 
           },
           onmessage: async (m) => {
             if (m.serverContent?.inputTranscription) setTranscription(p => [...p.slice(-4), `You: ${m.serverContent?.inputTranscription?.text}`]);
-            if (m.serverContent?.outputTranscription) setTranscription(p => [...p.slice(-4), `Nexus: ${m.serverContent?.outputTranscription?.text}`]);
+            if (m.serverContent?.outputTranscription) setTranscription(p => [...p.slice(-4), `Sedrex: ${m.serverContent?.outputTranscription?.text}`]);
             const audioData = m.serverContent?.modelTurn?.parts?.find(p => p.inlineData)?.inlineData?.data;
             if (audioData) {
               const buffer = await decodeAudioData(decode(audioData), outputCtx, 24000, 1);

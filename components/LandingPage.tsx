@@ -84,10 +84,12 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
 
   // ── SEDREX logo SVG ─────────────────────────────────────────────
   const SedrexLogoSVG = () => (
-    <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: 36, height: 36 }}>
-      <rect width="36" height="36" rx="9" fill="rgba(201,168,76,0.1)" stroke="rgba(201,168,76,0.3)" strokeWidth="1"/>
-      <path d="M24 10H14C11.8 10 10 11.8 10 14V16C10 18.2 11.8 20 14 20H22C24.2 20 26 21.8 26 24V26C26 28.2 24.2 30 22 30H10" stroke="#c9a84c" strokeWidth="2.2" strokeLinecap="round"/>
-      <circle cx="29" cy="7" r="3" fill="#c9a84c" opacity="0.5"/>
+    <svg viewBox="0 0 28 28" fill="none" style={{ width: 36, height: 36 }}>
+      <rect width="28" height="28" rx="7" fill="rgba(16,185,129,0.1)" stroke="rgba(16,185,129,0.3)" strokeWidth="1" />
+      <path
+        d="M19 8H11C9.3 8 8 9.3 8 11V12.5C8 14.2 9.3 15.5 11 15.5H17C18.7 15.5 20 16.8 20 18.5V20C20 21.7 18.7 23 17 23H8"
+        stroke="#10B981" strokeWidth="1.8" strokeLinecap="round"
+      />
     </svg>
   );
 

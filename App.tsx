@@ -642,7 +642,7 @@ const App: React.FC = () => {
             </div>
 
             {view === 'chat' && activeSession && (
-              <div style={{ flexShrink: 0, width: '100%', display: 'block', alignSelf: 'stretch' }}>
+              <div className="pb-safe" style={{ flexShrink: 0, width: '100%', display: 'block', alignSelf: 'stretch' }}>
                 <MessageInput
                   onSendMessage={handleSendMessage}
                   onStop={() => abortControllerRef.current?.abort()}

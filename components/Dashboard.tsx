@@ -113,7 +113,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onUpgrade }) => {
           {/* Side Module: Intelligence Tier */}
           <div className="bg-emerald-500 p-6 sm:p-8 md:p-10 rounded-2xl sm:rounded-[3rem] flex flex-col justify-between text-[#0d0d0d] shadow-2xl shadow-emerald-500/20">
              <div>
-                <h4 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tighter uppercase italic leading-none">NEXUS<br/>{stats.tier}</h4>
+                <h4 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tighter uppercase italic leading-none">SEDREX<br/>{stats.tier}</h4>
 
              </div>
              

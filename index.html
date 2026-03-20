@@ -4,7 +4,11 @@
     <!-- Apple Touch Icon for iOS Home Screen -->
     <link rel="apple-touch-icon" sizes="180x180" href="/sedrex-logo.svg">
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="color-scheme" content="dark light">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>SEDREX | Multi-Model Intelligence</title>
   <meta name="description" content="Professional AI routing to GPT-4, Claude, and Gemini.">
   
@@ -34,7 +38,7 @@
       --text-primary: #d4d4d8; 
       --text-secondary: #a1a1aa;
       --border: rgba(255, 255, 255, 0.08);
-      --accent: #c9a84c;
+      --accent: #10B981;
       --header-bg: rgba(23, 23, 23, 0.85);
       --highlight: #f4f4f5;
       --code-bg: #0a0a0a;
@@ -51,7 +55,7 @@
       --text-secondary: #4b5563;
       --border: #e5e7eb;
       --highlight: #111827;
-      --accent: #8a6820;
+      --accent: #059669;
       --header-bg: rgba(255, 255, 255, 0.9);
       --code-bg: #f3f4f6;
       --code-header: #e5e7eb;
@@ -105,18 +109,18 @@
       width: 40px;
       height: 40px;
       border: 3px solid rgba(16, 163, 127, 0.2);
-      border-top-color: #c9a84c;
+      border-top-color: #10B981;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Professional Nexus Tooltip System */
-    [data-nexus-tooltip] {
+    /* Professional Sedrex Tooltip System */
+    [data-sedrex-tooltip] {
       position: relative;
     }
-    [data-nexus-tooltip]::after {
-      content: attr(data-nexus-tooltip);
+    [data-sedrex-tooltip]::after {
+      content: attr(data-sedrex-tooltip);
       position: absolute;
       top: 100%;
       margin-top: 4px;
@@ -138,7 +142,7 @@
       transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
       z-index: 1000;
     }
-    [data-nexus-tooltip]:hover::after {
+    [data-sedrex-tooltip]:hover::after {
       opacity: 1;
       transform: translateX(-50%) translateY(0);
     }
@@ -337,8 +341,32 @@
     ::-webkit-scrollbar-thumb { background: var(--text-secondary); opacity: 0.3; border-radius: 10px; }
     ::-webkit-scrollbar-track { background: transparent; }
     
-    .glass { background: var(--header-bg); -webkit-backdrop-filter: blur(25px); backdrop-filter: blur(25px); border-bottom: 1px solid var(--border); }
-    .sidebar-transition { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .glass { 
+      background: var(--header-bg); 
+      -webkit-backdrop-filter: blur(20px) saturate(180%); 
+      backdrop-filter: blur(20px) saturate(180%); 
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    }
+    .sidebar-transition { 
+      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), width 0.4s cubic-bezier(0.4, 0, 0.2, 1); 
+    }
+
+    /* ── Premium Micro-interactions ───────────────────────────────────── */
+    button:active, 
+    .chat-ctrl-btn:active, 
+    .message-action-btn:active, 
+    .sidebar-nav-item:active,
+    .suggestion-chip:active {
+      transform: scale(0.96);
+      transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Smooth momentum scrolling for iOS */
+    .overflow-y-auto {
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+    }
 
     @keyframes thought-pulse {
       0%, 100% { opacity: 0.3; transform: scale(1); }

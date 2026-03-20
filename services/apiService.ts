@@ -2,10 +2,12 @@
 import { ChatSession, Message, AIModel, MessageImage, UserStats, User, UserTier } from '../types';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { validateInput } from './validationService';
+import { getMonthlyLimit } from './tierConfig';
 
 export const api = {
   _cachedUserId: null as string | null,
   _cacheExpiry: 0,
+
 
   async _getUserId(): Promise<string> {
     if (!isSupabaseConfigured) throw new Error("Cloud Connectivity not established.");
@@ -170,7 +172,7 @@ export const api = {
       tier: data?.tier || 'free',
       totalMessagesSent: data?.total_messages || 0,
       monthlyMessagesSent: data?.monthly_messages || 0,
-      monthlyMessagesLimit: 50,
+      monthlyMessagesLimit: getMonthlyLimit(data?.tier),
       tokensEstimated: data?.tokens_estimated || 0,
       modelUsage: data?.model_usage || {},
       dailyHistory: data?.daily_history || []

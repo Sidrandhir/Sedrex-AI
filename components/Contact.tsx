@@ -20,11 +20,11 @@ const Contact: React.FC = () => (
     <div className="space-y-6 sm:space-y-8">
       <div>
         <h2 className="text-lg sm:text-xl font-bold text-[var(--accent)] mb-2">Support</h2>
-        <p className="text-[var(--text-primary)]">Email: <a href="mailto:support@nexusai.com" className="text-[var(--accent)] underline">support@nexusai.com</a></p>
+        <p className="text-[var(--text-primary)]">Email: <a href="mailto:support@sedrexai.com" className="text-[var(--accent)] underline">support@sedrexai.com</a></p>
       </div>
       <div>
         <h2 className="text-lg sm:text-xl font-bold text-[var(--accent)] mb-2">Business Inquiries</h2>
-        <p className="text-[var(--text-primary)]">Email: <a href="mailto:business@nexusai.com" className="text-[var(--accent)] underline">business@nexusai.com</a></p>
+        <p className="text-[var(--text-primary)]">Email: <a href="mailto:business@sedrexai.com" className="text-[var(--accent)] underline">business@sedrexai.com</a></p>
       </div>
       <div>
         <h2 className="text-lg sm:text-xl font-bold text-[var(--accent)] mb-2">Address</h2>
@@ -35,8 +35,8 @@ const Contact: React.FC = () => (
       <div>
         <h2 className="text-lg sm:text-xl font-bold text-[var(--accent)] mb-2">Social</h2>
         <ul className="flex gap-4 sm:gap-6 mt-2">
-          <li><a href="https://twitter.com/nexusai" target="_blank" rel="noopener noreferrer" className="text-[var(--accent)] hover:underline">Twitter</a></li>
-          <li><a href="https://linkedin.com/company/nexusai" target="_blank" rel="noopener noreferrer" className="text-[var(--accent)] hover:underline">LinkedIn</a></li>
+          <li><a href="https://twitter.com/sedrexai" target="_blank" rel="noopener noreferrer" className="text-[var(--accent)] hover:underline">Twitter</a></li>
+          <li><a href="https://linkedin.com/company/sedrexai" target="_blank" rel="noopener noreferrer" className="text-[var(--accent)] hover:underline">LinkedIn</a></li>
         </ul>
       </div>
       <div>
