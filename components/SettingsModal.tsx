@@ -5,7 +5,7 @@ import { api } from '../services/apiService';
 
 // ══════════════════════════════════════════════════════════════════
 // SEDREX — SETTINGS MODAL
-// Gold (#c9a84c) theme · Verification-First Intelligence
+// Emerald Green (#10B981) theme · Verification-First Intelligence
 // ══════════════════════════════════════════════════════════════════
 
 interface SettingsModalProps {
@@ -34,17 +34,18 @@ const TAB_LABELS: Record<TabType, string> = {
 // ── Inline SEDREX S logomark ───────────────────────────────────────
 const SedrexMark = ({ size = 20 }: { size?: number }) => (
   <svg viewBox="0 0 20 20" fill="none" style={{ width: size, height: size, flexShrink: 0 }}>
-    <rect width="20" height="20" rx="5" fill="rgba(201,168,76,0.1)" stroke="rgba(201,168,76,0.3)" strokeWidth="1"/>
-    <path d="M14 6H8C6.9 6 6 6.9 6 8V9C6 10.1 6.9 11 8 11H12C13.1 11 14 11.9 14 13V14C14 15.1 13.1 16 12 16H6"
-      stroke="#c9a84c" strokeWidth="1.5" strokeLinecap="round"/>
+    <rect width="20" height="20" rx="5" fill="rgba(16,185,129,0.1)" stroke="rgba(16,185,129,0.3)" strokeWidth="1"/>
+    <path d="M5 10l3 3 7-7"
+      stroke="#10B981" strokeWidth="1.5" strokeLinecap="round"/>
   </svg>
 );
 
 // ── Gold accent style ──────────────────────────────────────────────
 const goldActive = {
-  background: 'var(--accent, #c9a84c)',
+  background: 'var(--accent, #10B981)',
   color:      '#020408',
-  boxShadow:  '0 4px 20px rgba(201,168,76,0.25)',
+  border:     'none',
+  boxShadow:  '0 4px 20px rgba(16,185,129,0.25)',
 } as React.CSSProperties;
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -185,7 +186,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           onChange={e => setLanguage(e.target.value)}
           className="w-full bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl p-3 text-sm font-bold outline-none text-[var(--text-primary)] transition-all cursor-pointer"
           style={{ '--tw-ring-color': 'var(--accent)' } as any}
-          onFocus={e => (e.target.style.borderColor = 'rgba(201,168,76,0.4)')}
+          onFocus={e => (e.target.style.borderColor = 'rgba(16,185,129,0.4)')}
           onBlur={e  => (e.target.style.borderColor = '')}
         >
           <option value="en">English (Global)</option>
@@ -204,7 +205,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="flex items-center gap-3">
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center text-[14px] font-black text-[#020408] flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg, #c9a84c, #8a6820)' }}
+            style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
           >
             {user.email.charAt(0).toUpperCase()}
           </div>
@@ -212,7 +213,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             <p className="text-[13px] font-bold text-[var(--text-primary)] truncate">{user.email}</p>
             <p
               className="text-[10px] font-black uppercase tracking-widest"
-              style={{ color: 'var(--accent, #c9a84c)' }}
+              style={{ color: 'var(--accent, #10B981)' }}
             >
               {user.tier} plan
             </p>
@@ -237,7 +238,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           rows={5}
           placeholder="Tell SEDREX how you'd like it to respond. For example: 'Be concise and use bullet points' or 'I am a medical researcher — use technical terminology'..."
           className="w-full bg-[var(--bg-primary)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 text-sm font-medium outline-none resize-none leading-relaxed text-[var(--text-primary)] transition-all placeholder:text-[var(--text-secondary)] placeholder:opacity-40"
-          onFocus={e => (e.target.style.borderColor = 'rgba(201,168,76,0.4)')}
+          onFocus={e => (e.target.style.borderColor = 'rgba(16,185,129,0.4)')}
           onBlur={e  => (e.target.style.borderColor = '')}
         />
         <p className="text-[11px] text-[var(--text-secondary)] px-1">
@@ -312,7 +313,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             </h4>
             <span
               className="text-[11px] font-black"
-              style={{ color: pct > 80 ? '#e84a6a' : 'var(--accent, #c9a84c)' }}
+              style={{ color: pct > 80 ? '#e84a6a' : 'var(--accent, #10B981)' }}
             >
               {monthly}/{limit > 0 ? limit : '∞'}
             </span>
@@ -325,7 +326,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 width: 0,
                 background: pct > 80
                   ? 'linear-gradient(90deg, #e84a6a, #ff6b8a)'
-                  : 'linear-gradient(90deg, #c9a84c, #e8c96a)',
+                  : 'linear-gradient(90deg, #10B981, #34d399)',
               }}
             />
           </div>
@@ -352,7 +353,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         data-progress={pctModel}
                         style={{
                           width: 0,
-                          background: 'linear-gradient(90deg, #c9a84c, #e8c96a)',
+                          background: 'linear-gradient(90deg, #10B981, #34d399)',
                         }}
                       />
                     </div>
@@ -448,7 +449,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       <div
         ref={modalRef}
         className="bg-[var(--bg-secondary)] w-full max-w-4xl max-h-[90vh] rounded-2xl sm:rounded-[2.5rem] border border-[var(--border)] shadow-2xl flex flex-col sm:flex-row overflow-hidden animate-in zoom-in-95 duration-200"
-        style={{ boxShadow: '0 0 80px rgba(201,168,76,0.06), 0 25px 60px rgba(0,0,0,0.5)' }}
+        style={{ boxShadow: '0 0 80px rgba(16,185,129,0.06), 0 25px 60px rgba(0,0,0,0.5)' }}
       >
 
         {/* ── Desktop sidebar ────────────────────────────────── */}
@@ -464,7 +465,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 fontWeight:    900,
                 letterSpacing: 4,
                 textTransform: 'uppercase',
-                color:         'var(--accent, #c9a84c)',
+                color:         'var(--accent, #10B981)',
               }}>
                 SEDREX
               </span>
@@ -528,7 +529,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 fontSize:      9,
                 letterSpacing: 3,
                 textTransform: 'uppercase',
-                color:         'var(--accent, #c9a84c)',
+                color:         'var(--accent, #10B981)',
                 marginTop:     2,
               }}>
                 SEDREX · Verification-First Intelligence

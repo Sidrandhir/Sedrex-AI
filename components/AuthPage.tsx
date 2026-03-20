@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Icons } from '../constants';
-import SedrexLogo from '../public/sedrex-logo.svg';
+const SedrexLogo = '/sedrex-logo.svg';
 import { login, signup, loginWithGoogle, forgotPassword } from '../services/authService';
 import { User } from '../types';
 

@@ -267,45 +267,42 @@ function sanitizeMermaid(raw: string): string {
 const MermaidBlock = memo(({ code }: { code: string }) => {
   const [svg, setSvg]       = useState('');
   const [error, setError]   = useState('');
-  const [warn, setWarn]     = useState('');   // soft warning — renders but cautions user
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let cancelled = false;
+    let active = true;
+    const id = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
 
-    // Hard limit: char count (genuine OOM risk)
-    if (code.length > MAX_MERMAID_CHARS) {
-      setError(`Diagram too large (${code.length.toLocaleString()} chars, max ${MAX_MERMAID_CHARS.toLocaleString()}).`);
-      return;
-    }
-
-    // Edge count — soft warn above MERMAID_WARN_EDGES, hard block above MAX_MERMAID_EDGES
-    const edgeCount = (code.match(/<-->|<--|-->|==>|-.->|--\|/g) || []).length;
-    if (edgeCount > MAX_MERMAID_EDGES) {
-      // Still attempt render but tell user it may be slow
-      setWarn(`Large diagram (${edgeCount} connections) — may render slowly on some devices.`);
-    } else if (edgeCount > MERMAID_WARN_EDGES) {
-      setWarn(`Complex diagram (${edgeCount} connections).`);
-    }
-
-    (async () => {
+    const renderDiagram = async () => {
       try {
+        setLoading(true);
         const mermaid = (await import('mermaid')).default;
-        mermaid.initialize({
-          startOnLoad: false,
-          theme: 'dark',
-          // FIX: 'loose' allowed arbitrary JS via click handlers (XSS).
-          // 'strict' sanitizes SVG output — safe for dangerouslySetInnerHTML.
-          securityLevel: 'strict',
-        });
-        const id = 'mermaid-' + Math.random().toString(36).slice(2, 9);
-        const { svg: rendered } = await mermaid.render(id, sanitizeMermaid(code));
-        if (!cancelled) setSvg(rendered);
-      } catch (e: any) {
-        if (!cancelled) setError(e.message || 'Invalid diagram syntax');
-      }
-    })();
 
-    return () => { cancelled = true; };
+        // Initialize only once globally for the session
+        if (!(window as any).__MERMAID_READY__) {
+          mermaid.initialize({
+            startOnLoad: false,
+            theme: 'dark',
+            securityLevel: 'strict',
+            fontFamily: 'Inter, system-ui, sans-serif'
+          });
+          (window as any).__MERMAID_READY__ = true;
+        }
+
+        const { svg: rendered } = await mermaid.render(id, sanitizeMermaid(code));
+        if (active) {
+          setSvg(rendered);
+          setError('');
+        }
+      } catch (err: any) {
+        if (active) setError(err.message || 'Syntax error in diagram');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    renderDiagram();
+    return () => { active = false; };
   }, [code]);
 
   return (
@@ -322,20 +319,15 @@ const MermaidBlock = memo(({ code }: { code: string }) => {
         )}
       </div>
       {/* Soft warning banner — shown even when diagram renders successfully */}
-      {warn && !error && (
-        <div style={{ padding: '6px 16px', background: 'rgba(16,185,129,0.07)', borderBottom: '1px solid rgba(16,185,129,0.15)', fontSize: 11, color: 'var(--accent,#10B981)', display: 'flex', alignItems: 'center', gap: 6 }}>
-          ⚠ {warn}
-        </div>
-      )}
       {error ? (
         <div className="diagram-error">
-          <div style={{ marginBottom: 8 }}>⚠ Diagram error: {error}</div>
+          <div style={{ marginBottom: 8 }}>⚠ Diagram Error</div>
           <pre style={{ fontSize: 11, opacity: 0.6, overflowX: 'auto', margin: 0 }}>{code}</pre>
         </div>
-      ) : svg ? (
-        <div className="nx-diagram-body" dangerouslySetInnerHTML={{ __html: svg }} />
-      ) : (
+      ) : loading ? (
         <div className="nx-diagram-loading"><div className="nx-spinner" /></div>
+      ) : (
+        <div className="nx-diagram-body" dangerouslySetInnerHTML={{ __html: svg }} />
       )}
     </div>
   );

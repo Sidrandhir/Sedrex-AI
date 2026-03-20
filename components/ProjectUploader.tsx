@@ -155,14 +155,14 @@ export const ProjectIndexChip: React.FC = () => {
         animation: 'chipPulse 1.5s ease-in-out infinite',
       }}>
         {/* Spinner */}
-        <svg style={{ width: 13, height: 13, flexShrink: 0, animation: 'spin 0.8s linear infinite', color: 'var(--accent, #c9a84c)' }}
+        <svg style={{ width: 13, height: 13, flexShrink: 0, animation: 'spin 0.8s linear infinite', color: 'var(--accent, #10B981)' }}
           viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
           <path d="M8 1.5A6.5 6.5 0 118 14.5" strokeLinecap="round"/>
         </svg>
 
         {/* Progress info */}
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ color: 'var(--accent, #c9a84c)', fontWeight: 600, fontSize: 11 }}>
+          <div style={{ color: 'var(--accent, #10B981)', fontWeight: 600, fontSize: 11 }}>
             Indexing {progress.pct}%
           </div>
           <div style={{
@@ -181,7 +181,7 @@ export const ProjectIndexChip: React.FC = () => {
         }}>
           <div style={{
             width: `${progress.pct}%`, height: '100%',
-            background: 'var(--accent, #c9a84c)',
+            background: 'var(--accent, #10B981)',
             borderRadius: 2, transition: 'width 0.3s ease',
           }}/>
         </div>

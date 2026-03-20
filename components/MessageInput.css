@@ -96,7 +96,7 @@
   box-shadow: 0 2px 12px rgba(0,0,0,0.06);
 }
 [data-theme='light'] .mi-box:focus-within {
-  border-color: rgba(138,104,32,0.4);
+  border-color: rgba(16, 185, 129, 0.4);
   box-shadow: 0 4px 16px rgba(0,0,0,0.08);
 }
 
@@ -242,7 +242,9 @@
 .mi-textarea {
   flex: 1;
   background: transparent; border: none; outline: none;
-  -webkit-appearance: none; box-shadow: none; resize: none;
+  -webkit-appearance: none;
+  appearance: none;
+  box-shadow: none; resize: none;
   font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
   font-size: 15px; line-height: 1.65; color: var(--text-primary);
   padding: 8px 4px; max-height: 120px; /* ~5 lines like Claude */

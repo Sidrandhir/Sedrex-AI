@@ -211,13 +211,13 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
                   </div>
                   {/* Confidence indicator */}
                   <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ fontSize: 10, fontFamily: 'IBM Plex Mono', letterSpacing: 2, color: 'rgba(201,168,76,0.6)', textTransform: 'uppercase' }}>
+                    <div style={{ fontSize: 10, fontFamily: 'IBM Plex Mono', letterSpacing: 2, color: 'rgba(16,185,129,0.6)', textTransform: 'uppercase' }}>
                       Confidence
                     </div>
                     <div style={{ flex: 1, height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden' }}>
-                      <div style={{ width: '87%', height: '100%', background: 'linear-gradient(90deg, #c9a84c, #e8c96a)', borderRadius: 2, animation: 'confBarLoad 1.2s ease both' }} />
+                      <div style={{ width: '87%', height: '100%', background: 'linear-gradient(90deg, #10B981, #34d399)', borderRadius: 2, animation: 'confBarLoad 1.2s ease both' }} />
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'IBM Plex Mono', color: '#c9a84c', fontWeight: 700 }}>87%</div>
+                    <div style={{ fontSize: 11, fontFamily: 'IBM Plex Mono', color: '#10B981', fontWeight: 700 }}>87%</div>
                   </div>
                   <div className="card-response">
                     <div className="response-line rl-1" />

@@ -2,14 +2,14 @@ import React from 'react';
 
 // ══════════════════════════════════════════════════════════════════
 // SEDREX — Design Tokens & Icons
-// Brand color: #c9a84c (SEDREX Gold)
+// Brand color: #10B981 (SEDREX Emerald)
 // ══════════════════════════════════════════════════════════════════
 
 export const COLORS = {
   bg:         '#020408',
   sidebar:    '#060c14',
   userMsg:    '#0f1828',
-  // SEDREX Gold — replaces ChatGPT green
+  // SEDREX Emerald — replaces ChatGPT green
   accent:     '#10B981',
   accentDark: '#059669',
   accentGlow: 'rgba(16,185,129,0.15)',

@@ -11,7 +11,7 @@ import { getCurrentUser, logout } from './services/authService';
 import { getAdminStats } from './services/analyticsService';
 import { api } from './services/apiService';
 import { Icons } from './constants';
-import SedrexLogo from './public/sedrex-logo.svg';
+const SedrexLogo = '/sedrex-logo.svg';
 import { Routes, Route } from 'react-router-dom';
 import Privacy from './components/Privacy';
 import Terms from './components/Terms';

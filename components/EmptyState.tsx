@@ -66,7 +66,7 @@ const EmptyState: React.FC<EmptyStateProps> = memo(({ onSuggestionClick, userNam
             <svg viewBox="0 0 28 28" fill="none" width="28" height="28">
               <path
                 d="M19 8H11C9.3 8 8 9.3 8 11V12.5C8 14.2 9.3 15.5 11 15.5H17C18.7 15.5 20 16.8 20 18.5V20C20 21.7 18.7 23 17 23H8"
-                stroke="#c9a84c"
+                stroke="#10B981"
                 strokeWidth="1.8"
                 strokeLinecap="round"
               />

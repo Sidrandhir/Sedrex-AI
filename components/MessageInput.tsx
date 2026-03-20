@@ -15,6 +15,7 @@ import { AIModel, MessageImage, AttachedDocument } from '../types';
 import { Icons } from '../constants';
 import SlashCommandMenu from './SlashCommandMenu';
 import { ProjectUploaderMenuItem, ProjectIndexChip } from './ProjectUploader';
+import { useCodebaseIndex } from '../services/codebaseContext';
 import CodeChip, { detectPastedCode } from './CodeChip';
 import './MessageInput.css';
 
@@ -176,6 +177,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   onSendMessage, onStop, isDisabled,
   preferredModel = 'auto', onModelChange, activeSessionId,
 }) => {
+  const { hasIndex } = useCodebaseIndex();
   const [input,          setInput]          = useState('');
   const [attachedImage,  setAttachedImage]  = useState<MessageImage | null>(null);
   const [imagePreview,   setImagePreview]   = useState<string | null>(null);
@@ -345,7 +347,11 @@ const MessageInput: React.FC<MessageInputProps> = ({
   }, [input, attachedImage, attachedDocs, codeChips, onSendMessage]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey && !showSlashMenu) { e.preventDefault(); if (!isDisabled) handleSubmit(); }
+    if (e.key === 'Enter' && !e.shiftKey && !showSlashMenu) {
+      if (window.innerWidth < 768) return; // Let Enter create newline on mobile
+      e.preventDefault();
+      if (!isDisabled) handleSubmit();
+    }
   }, [handleSubmit, isDisabled, showSlashMenu]);
 
   const handleSlashSelect = useCallback((t: string) => {
@@ -353,8 +359,8 @@ const MessageInput: React.FC<MessageInputProps> = ({
     setTimeout(() => textareaRef.current?.focus(), 50);
   }, []);
 
-  const hasContent     = !!(input.trim() || attachedImage || attachedDocs.length || codeChips.length);
-  const hasAttachments = !!(attachedImage || attachedDocs.length || codeChips.length);
+  const hasContent     = !!(input.trim() || attachedImage || attachedDocs.length || codeChips.length || hasIndex);
+  const hasAttachments = !!(attachedImage || attachedDocs.length || codeChips.length || hasIndex);
 
   // Shared button row item style
   const itemStyle: React.CSSProperties = {

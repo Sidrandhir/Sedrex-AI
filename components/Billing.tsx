@@ -35,7 +35,7 @@ const Billing: React.FC<BillingProps> = ({ stats, onCancel, onUpgrade, onClose }
               <p className="text-[12px] text-[var(--text-secondary)] font-black uppercase tracking-widest mb-1">Current Plan</p>
               <h3 className="text-2xl font-black text-[var(--text-primary)] flex items-center gap-3">
                 {isPro ? 'SEDREX Pro' : 'SEDREX Free'}
-                <span className={`text-[12px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${stats.subscriptionStatus === 'active' ? 'bg-[#c9a84c]/10 text-[#c9a84c]' : 'bg-[var(--text-secondary)]/10 text-[var(--text-secondary)]'}`}>
+                <span className={`text-[12px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${stats.subscriptionStatus === 'active' ? 'bg-[#10B981]/10 text-[#10B981]' : 'bg-[var(--text-secondary)]/10 text-[var(--text-secondary)]'}`}>
                   {stats.subscriptionStatus?.toUpperCase() || 'NONE'}
                 </span>
               </h3>

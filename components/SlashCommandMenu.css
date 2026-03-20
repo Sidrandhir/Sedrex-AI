@@ -76,7 +76,7 @@
 
 [data-theme='light'] .slash-item:hover,
 [data-theme='light'] .slash-item.slash-item--active {
-  background: rgba(138,104,32,0.06);
+  background: rgba(16, 185, 129, 0.06);
 }
 
 .slash-item-icon {

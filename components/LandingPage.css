@@ -27,21 +27,21 @@
 
 .landing-page.light {
   --bg:           #f8f6f0;
-  --bg-card:      rgba(138,104,32,0.04);
-  --bg-card-hover:rgba(138,104,32,0.08);
+  --bg-card:      rgba(16, 185, 129, 0.04);
+  --bg-card-hover:rgba(16, 185, 129, 0.08);
   --text-primary: #1a1a2e;
   --text-secondary:rgba(26,26,46,0.6);
   --text-muted:   rgba(26,26,46,0.35);
-  --accent:       #8a6820;
+  --accent:       #059669;
   --accent-hover: #10B981;
-  --accent-glow:  rgba(138,104,32,0.2);
+  --accent-glow:  rgba(16, 185, 129, 0.2);
   --accent-2:     #0ea5e9;
   --accent-soft:  #10B981;
-  --border:       rgba(138,104,32,0.1);
-  --border-hover: rgba(138,104,32,0.2);
+  --border:       rgba(16, 185, 129, 0.1);
+  --border-hover: rgba(16, 185, 129, 0.2);
   --green:        #10B981;
   --red:          #ef4444;
-  --surface:      rgba(138,104,32,0.03);
+  --surface:      rgba(16, 185, 129, 0.03);
   --glass:        rgba(248,246,240,0.85);
   --shadow-card:  0 4px 24px rgba(0,0,0,0.08);
 }
