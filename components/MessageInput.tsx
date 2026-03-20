@@ -17,16 +17,17 @@ import SlashCommandMenu from './SlashCommandMenu';
 import { ProjectUploaderMenuItem, ProjectIndexChip } from './ProjectUploader';
 import { useCodebaseIndex } from '../services/codebaseContext';
 import CodeChip, { detectPastedCode } from './CodeChip';
+import heic2any from 'heic2any';
 import './MessageInput.css';
 
 // ── Model definitions ─────────────────────────────────────────────
 interface ModelOption {
-  id:      AIModel | 'auto';
-  label:   string;
-  icon:    string;
-  color:   string;
-  bg:      string;
-  desc:    string;
+  id: AIModel | 'auto';
+  label: string;
+  icon: string;
+  color: string;
+  bg: string;
+  desc: string;
   example: string;
 }
 
@@ -62,22 +63,22 @@ const ACCEPTED_DOC_TYPES =
   ',.html,.css,.sql,.yaml,.yml,.toml,.sh,.bash,.rs,.go,.java,.cpp,.c,.rb,.php,.swift,.kt';
 
 const DOC_META: Record<string, { icon: string; color: string; bg: string }> = {
-  pdf:  { icon: '📄', color: '#f87171', bg: 'rgba(248,113,113,0.08)' },
-  doc:  { icon: '📝', color: '#60a5fa', bg: 'rgba(96,165,250,0.08)'  },
-  docx: { icon: '📝', color: '#60a5fa', bg: 'rgba(96,165,250,0.08)'  },
-  xlsx: { icon: '📊', color: '#34d399', bg: 'rgba(52,211,153,0.08)'  },
-  xls:  { icon: '📊', color: '#34d399', bg: 'rgba(52,211,153,0.08)'  },
-  csv:  { icon: '📊', color: '#34d399', bg: 'rgba(52,211,153,0.08)'  },
-  json: { icon: '{ }',color: '#fbbf24', bg: 'rgba(251,191,36,0.08)'  },
-  md:   { icon: '📑', color: '#a78bfa', bg: 'rgba(167,139,250,0.08)' },
-  txt:  { icon: '📃', color: '#9ca3af', bg: 'rgba(156,163,175,0.08)' },
+  pdf: { icon: '📄', color: '#f87171', bg: 'rgba(248,113,113,0.08)' },
+  doc: { icon: '📝', color: '#60a5fa', bg: 'rgba(96,165,250,0.08)' },
+  docx: { icon: '📝', color: '#60a5fa', bg: 'rgba(96,165,250,0.08)' },
+  xlsx: { icon: '📊', color: '#34d399', bg: 'rgba(52,211,153,0.08)' },
+  xls: { icon: '📊', color: '#34d399', bg: 'rgba(52,211,153,0.08)' },
+  csv: { icon: '📊', color: '#34d399', bg: 'rgba(52,211,153,0.08)' },
+  json: { icon: '{ }', color: '#fbbf24', bg: 'rgba(251,191,36,0.08)' },
+  md: { icon: '📑', color: '#a78bfa', bg: 'rgba(167,139,250,0.08)' },
+  txt: { icon: '📃', color: '#9ca3af', bg: 'rgba(156,163,175,0.08)' },
 };
 const getDocMeta = (fn: string) => {
   const ext = fn.split('.').pop()?.toLowerCase() ?? '';
   return DOC_META[ext] ?? { icon: '📎', color: '#10B981', bg: 'rgba(16,185,129,0.08)' };
 };
 
-const readText   = (f: File) => new Promise<string>((res, rej) => {
+const readText = (f: File) => new Promise<string>((res, rej) => {
   const r = new FileReader();
   r.onload = () => res(r.result as string);
   r.onerror = () => rej();
@@ -93,17 +94,17 @@ const readBase64 = (f: File) => new Promise<string>((res, rej) => {
 // ── Portal dropdown ───────────────────────────────────────────────
 interface PortalDropdownProps {
   anchorRef: React.RefObject<HTMLElement | null>;
-  isOpen:    boolean;
-  onClose:   () => void;
-  children:  React.ReactNode;
+  isOpen: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
   minWidth?: number;
-  align?:    'left' | 'right';
+  align?: 'left' | 'right';
 }
 
 const PortalDropdown: React.FC<PortalDropdownProps> = ({
   anchorRef, isOpen, onClose, children, minWidth = 200, align = 'left',
 }) => {
-  const [pos,    setPos]    = useState({ top: 0, left: 0 });
+  const [pos, setPos] = useState({ top: 0, left: 0 });
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -111,21 +112,21 @@ const PortalDropdown: React.FC<PortalDropdownProps> = ({
     const update = () => {
       if (!anchorRef.current) return;
       const rect = anchorRef.current.getBoundingClientRect();
-      const pH   = panelRef.current?.offsetHeight ?? 240;
-      const pW   = panelRef.current?.offsetWidth  ?? minWidth;
+      const pH = panelRef.current?.offsetHeight ?? 240;
+      const pW = panelRef.current?.offsetWidth ?? minWidth;
       const openUp = rect.top > pH || rect.top > (window.innerHeight - rect.bottom);
-      const top  = openUp ? rect.top - pH - 8 : rect.bottom + 8;
+      const top = openUp ? rect.top - pH - 8 : rect.bottom + 8;
       const left = align === 'right'
         ? Math.max(8, rect.right - pW)
         : Math.min(rect.left, window.innerWidth - pW - 8);
       setPos({ top, left });
     };
     update();
-    window.addEventListener('resize',  update);
-    window.addEventListener('scroll',  update, true);
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
     return () => {
-      window.removeEventListener('resize',  update);
-      window.removeEventListener('scroll',  update, true);
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
     };
   }, [isOpen, anchorRef, minWidth, align]);
 
@@ -133,7 +134,7 @@ const PortalDropdown: React.FC<PortalDropdownProps> = ({
     if (!isOpen) return;
     const h = (e: MouseEvent) => {
       if (
-        panelRef.current  && !panelRef.current.contains(e.target as Node) &&
+        panelRef.current && !panelRef.current.contains(e.target as Node) &&
         anchorRef.current && !anchorRef.current.contains(e.target as Node)
       ) onClose();
     };
@@ -147,12 +148,12 @@ const PortalDropdown: React.FC<PortalDropdownProps> = ({
     <div ref={panelRef} style={{
       position: 'fixed', top: pos.top, left: pos.left,
       zIndex: 99999, minWidth,
-      background:   'var(--bg-secondary, #0d1117)',
-      border:       '1px solid var(--border, rgba(255,255,255,0.12))',
+      background: 'var(--bg-secondary, #0d1117)',
+      border: '1px solid var(--border, rgba(255,255,255,0.12))',
       borderRadius: 12,
-      boxShadow:    '0 12px 40px rgba(0,0,0,0.7)',
-      overflow:     'hidden',
-      animation:    'miDropIn 0.12s ease',
+      boxShadow: '0 12px 40px rgba(0,0,0,0.7)',
+      overflow: 'hidden',
+      animation: 'miDropIn 0.12s ease',
     }}>
       {children}
     </div>,
@@ -165,11 +166,11 @@ const PortalDropdown: React.FC<PortalDropdownProps> = ({
 // ═══════════════════════════════════════════════════════════════════
 
 interface MessageInputProps {
-  onSendMessage:    (content: string, images?: MessageImage[], docs?: AttachedDocument[]) => void;
-  onStop:           () => void;
-  isDisabled:       boolean;
-  preferredModel?:  AIModel | 'auto';
-  onModelChange?:   (model: AIModel | 'auto') => void;
+  onSendMessage: (content: string, images?: MessageImage[], docs?: AttachedDocument[]) => void;
+  onStop: () => void;
+  isDisabled: boolean;
+  preferredModel?: AIModel | 'auto';
+  onModelChange?: (model: AIModel | 'auto') => void;
   activeSessionId?: string;
 }
 
@@ -178,29 +179,29 @@ const MessageInput: React.FC<MessageInputProps> = ({
   preferredModel = 'auto', onModelChange, activeSessionId,
 }) => {
   const { hasIndex } = useCodebaseIndex();
-  const [input,          setInput]          = useState('');
+  const [input, setInput] = useState('');
   const [attachedImages, setAttachedImages] = useState<MessageImage[]>([]);
-  const [imagePreviews,  setImagePreviews]  = useState<string[]>([]);
-  const [attachedDocs,   setAttachedDocs]   = useState<AttachedDocument[]>([]);
-  const [isDragOver,     setIsDragOver]     = useState(false);
-  const [isRecording,    setIsRecording]    = useState(false);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [attachedDocs, setAttachedDocs] = useState<AttachedDocument[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
-  const [showModelDrop,  setShowModelDrop]  = useState(false);
-  const [hoveredModel,   setHoveredModel]   = useState<ModelOption | null>(null);
-  const [showSlashMenu,  setShowSlashMenu]  = useState(false);
-  const [slashQuery,     setSlashQuery]     = useState('');
-  const [isProcessing,   setIsProcessing]   = useState(false);
-  const [codeChips,      setCodeChips]      = useState<Array<{
+  const [showModelDrop, setShowModelDrop] = useState(false);
+  const [hoveredModel, setHoveredModel] = useState<ModelOption | null>(null);
+  const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const [slashQuery, setSlashQuery] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [codeChips, setCodeChips] = useState<Array<{
     id: string; language: string; content: string; lineCount: number;
   }>>([]);
 
-  const textareaRef   = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const docInputRef   = useRef<HTMLInputElement>(null);
-  const attachBtnRef  = useRef<HTMLButtonElement>(null);
-  const modelBtnRef   = useRef<HTMLButtonElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
+  const attachBtnRef = useRef<HTMLButtonElement>(null);
+  const modelBtnRef = useRef<HTMLButtonElement>(null);
   const recognitionRef = useRef<any>(null);
-  const baseInputRef   = useRef('');
+  const baseInputRef = useRef('');
 
   const activeModel = MODEL_OPTIONS.find(m => m.id === preferredModel) ?? MODEL_OPTIONS[0];
 
@@ -242,8 +243,27 @@ const MessageInput: React.FC<MessageInputProps> = ({
         e.preventDefault();
         const f = item.getAsFile(); if (!f) return;
         setIsProcessing(true);
-        try { const b = await readBase64(f); setAttachedImage({ inlineData: { data: b }, mimeType: f.type }); setImagePreview(URL.createObjectURL(f)); }
-        catch {} finally { setIsProcessing(false); }
+        try {
+          let currentFile = f;
+          const isHeic = f.type === 'image/heic' || f.type === 'image/heif' || 
+                        /\.(heic|heif)$/i.test(f.name);
+          
+          if (isHeic) {
+            try {
+              const blob = await heic2any({ blob: f, toType: 'image/jpeg', quality: 0.8 });
+              const convertedBlob = Array.isArray(blob) ? blob[0] : blob;
+              currentFile = new File([convertedBlob], f.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+            } catch (convErr) {
+              console.warn('[SEDREX] HEIC conversion failed, using original file:', convErr);
+            }
+          }
+          const b = await readBase64(currentFile);
+          // Safety: If mimeType is still empty (browser quirk), default to image/jpeg
+          const mimeType = currentFile.type || (f.name.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg');
+          setAttachedImages(p => [...p, { inlineData: { data: b }, mimeType }]);
+          setImagePreviews(p => [...p, URL.createObjectURL(currentFile)]);
+        }
+        catch (err) { console.error('Paste error:', err); } finally { setIsProcessing(false); }
         return;
       }
     }
@@ -256,13 +276,28 @@ const MessageInput: React.FC<MessageInputProps> = ({
     const newPreviews: string[] = [];
     try {
       for (const f of Array.from(files)) {
-        const b = await readBase64(f);
-        newImages.push({ inlineData: { data: b }, mimeType: f.type });
-        newPreviews.push(URL.createObjectURL(f));
+        let currentFile = f;
+        const isHeic = f.type === 'image/heic' || f.type === 'image/heif' || 
+                      /\.(heic|heif)$/i.test(f.name);
+
+        if (isHeic) {
+          try {
+            const blob = await heic2any({ blob: f, toType: 'image/jpeg', quality: 0.8 });
+            const convertedBlob = Array.isArray(blob) ? blob[0] : blob;
+            currentFile = new File([convertedBlob], f.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+          } catch (e) { 
+            console.warn('[SEDREX] HEIC conversion failed, using original file:', e); 
+          }
+        }
+        const b = await readBase64(currentFile);
+        // Safety: If mimeType is still empty (browser quirk), default to image/jpeg
+        const mimeType = currentFile.type || (f.name.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg');
+        newImages.push({ inlineData: { data: b }, mimeType });
+        newPreviews.push(URL.createObjectURL(currentFile));
       }
       setAttachedImages(p => [...p, ...newImages]);
       setImagePreviews(p => [...p, ...newPreviews]);
-    } catch {} finally { setIsProcessing(false); if (imageInputRef.current) imageInputRef.current.value = ''; }
+    } catch (err) { console.error('Image upload error:', err); } finally { setIsProcessing(false); if (imageInputRef.current) imageInputRef.current.value = ''; }
   }, []);
 
   const handleDocFiles = useCallback(async (files: FileList | null) => {
@@ -270,12 +305,12 @@ const MessageInput: React.FC<MessageInputProps> = ({
     setIsProcessing(true);
     const added: AttachedDocument[] = [];
     try { for (const f of Array.from(files)) added.push({ title: f.name, content: await readText(f), type: f.type || 'text/plain' }); setAttachedDocs(p => [...p, ...added]); }
-    catch {} finally { setIsProcessing(false); if (docInputRef.current) docInputRef.current.value = ''; }
+    catch { } finally { setIsProcessing(false); if (docInputRef.current) docInputRef.current.value = ''; }
   }, []);
 
-  const handleDragOver  = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); }, []);
+  const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); }, []);
   const handleDragLeave = useCallback(() => setIsDragOver(false), []);
-  const handleDrop      = useCallback(async (e: React.DragEvent) => {
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault(); setIsDragOver(false);
     const files = e.dataTransfer.files; if (!files.length) return;
     const imgs: File[] = [], docs: File[] = [];
@@ -307,7 +342,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
         setIsRecording(true);
         baseInputRef.current = input;
       };
-      recognition.onend   = () => setIsRecording(false);
+      recognition.onend = () => setIsRecording(false);
       recognition.onerror = (e: any) => {
         console.error('Speech recognition error:', e.error);
         setIsRecording(false);
@@ -337,7 +372,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
       console.error('Failed to start speech recognition:', err);
       setIsRecording(false);
     }
-  }, [isRecording]);
+  }, [input, isRecording]);
 
   const handleSubmit = useCallback(() => {
     const trimmed = input.trim();
@@ -361,7 +396,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
     setTimeout(() => textareaRef.current?.focus(), 50);
   }, []);
 
-  const hasContent     = !!(input.trim() || attachedImages.length || attachedDocs.length || codeChips.length || hasIndex);
+  const hasContent = !!(input.trim() || attachedImages.length || attachedDocs.length || codeChips.length || hasIndex);
   const hasAttachments = !!(attachedImages.length || attachedDocs.length || codeChips.length || hasIndex);
 
   // Shared button row item style
@@ -394,7 +429,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
           <span>{activeModel.label}</span>
           <svg className={`mi-model-chevron${showModelDrop ? ' mi-model-chevron--open' : ''}`}
             style={{ width: 10, height: 10 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M6 9l6 6 6-6"/>
+            <path d="M6 9l6 6 6-6" />
           </svg>
         </button>
 
@@ -409,19 +444,21 @@ const MessageInput: React.FC<MessageInputProps> = ({
         >
           <div style={{ display: 'flex', transition: 'width 0.15s' }}>
             {/* Left list — always visible */}
-            <div style={{ width: 190, flexShrink: 0, padding: '6px 0',
-              borderRight: hoveredModel ? '1px solid var(--border, rgba(255,255,255,0.08))' : 'none' }}>
+            <div style={{
+              width: 190, flexShrink: 0, padding: '6px 0',
+              borderRight: hoveredModel ? '1px solid var(--border, rgba(255,255,255,0.08))' : 'none'
+            }}>
               {MODEL_OPTIONS.map(m => (
                 <button
                   key={m.id}
                   style={{
                     ...itemStyle,
                     fontWeight: m.id === preferredModel ? 700 : 500,
-                    color:      m.id === preferredModel ? m.color : 'var(--text-primary, #e4e8f0)',
+                    color: m.id === preferredModel ? m.color : 'var(--text-primary, #e4e8f0)',
                     background: m.id === preferredModel ? m.bg : 'transparent',
                   }}
                   onClick={() => { onModelChange?.(m.id); setShowModelDrop(false); setHoveredModel(null); }}
-                  onMouseEnter={e => { hover(e, true);  setHoveredModel(m); }}
+                  onMouseEnter={e => { hover(e, true); setHoveredModel(m); }}
                   onMouseLeave={e => { hover(e, false); }}
                 >
                   <span style={{ fontSize: 15, flexShrink: 0 }}>{m.icon}</span>
@@ -432,9 +469,11 @@ const MessageInput: React.FC<MessageInputProps> = ({
 
             {/* Right detail — ONLY when hovering */}
             {hoveredModel && (
-              <div style={{ width: 190, padding: '14px 14px',
+              <div style={{
+                width: 190, padding: '14px 14px',
                 display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                animation: 'miDropIn 0.1s ease' }}>
+                animation: 'miDropIn 0.1s ease'
+              }}>
                 <p style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: hoveredModel.color }}>
                   {hoveredModel.icon} {hoveredModel.label}
                 </p>
@@ -448,16 +487,17 @@ const MessageInput: React.FC<MessageInputProps> = ({
             )}
           </div>
         </PortalDropdown>
-
-        {isProcessing && (
-          <div className="mi-processing">
-            <span className="mi-processing-dot" /><span>Processing…</span>
-          </div>
-        )}
       </div>
 
       {/* Main input box */}
-      <div className={`mi-box${isDragOver ? ' mi-box--drag' : ''}`}>
+      <div className={`mi-box${isDragOver ? ' mi-box--drag' : ''}${isProcessing ? ' mi-box--processing' : ''}`}>
+
+        {isProcessing && (
+          <div className="mi-loading-overlay">
+            <div className="mi-loading-spinner" />
+            <span className="mi-loading-text">Processing attachments...</span>
+          </div>
+        )}
 
         {isDragOver && (
           <div className="mi-drag-overlay">
@@ -528,9 +568,9 @@ const MessageInput: React.FC<MessageInputProps> = ({
                 onClick={() => { imageInputRef.current?.click(); setShowAttachMenu(false); }}>
                 <svg style={{ width: 16, height: 16, color: '#818cf8', flexShrink: 0 }}
                   viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="3" width="18" height="18" rx="2"/>
-                  <circle cx="8.5" cy="8.5" r="1.5"/>
-                  <polyline points="21 15 16 10 5 21"/>
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
                 </svg>
                 Upload image
               </button>
@@ -538,10 +578,10 @@ const MessageInput: React.FC<MessageInputProps> = ({
                 onClick={() => { docInputRef.current?.click(); setShowAttachMenu(false); }}>
                 <svg style={{ width: 16, height: 16, color: '#10B981', flexShrink: 0 }}
                   viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
-                  <line x1="16" y1="13" x2="8" y2="13"/>
-                  <line x1="16" y1="17" x2="8" y2="17"/>
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
                 </svg>
                 Upload file
               </button>
@@ -602,7 +642,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
           onSelect={handleSlashSelect} onClose={() => setShowSlashMenu(false)} />
       )}
 
-      <input ref={imageInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
+      <input ref={imageInputRef} type="file" accept="image/*,.heic,.heif" multiple style={{ display: 'none' }}
         onChange={e => handleImageFiles(e.target.files)} />
       <input ref={docInputRef} type="file" accept={ACCEPTED_DOC_TYPES} multiple style={{ display: 'none' }}
         onChange={e => handleDocFiles(e.target.files)} />
