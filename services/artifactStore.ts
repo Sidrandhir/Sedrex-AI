@@ -168,6 +168,18 @@ export function extractArtifactFromResponse(response: string): ExtractedArtifact
   return { title, language: lang, content: code, type, filePath, lineCount: bestLines, reducedResponse };
 }
 
+// ── NEW: Extract all diagrams for sidebar storage ──────────────────
+export function extractDiagramsFromResponse(response: string): string[] {
+  const FENCE_RE = /```mermaid\n([\s\S]*?)```/g;
+  const codes: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = FENCE_RE.exec(response)) !== null) {
+    const code = match[1].trim();
+    if (code) codes.push(code);
+  }
+  return codes;
+}
+
 // ── Store mermaid diagram separately (called from aiService) ──────
 export async function storeDiagram(input: ArtifactCreateInput): Promise<Artifact> {
   const lineCount = input.content.split('\n').length;
@@ -185,6 +197,10 @@ export async function storeDiagram(input: ArtifactCreateInput): Promise<Artifact
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
+
+  // Simple deduplication check for the current session
+  const exists = _diagrams.some(d => d.sessionId === input.sessionId && d.content === input.content);
+  if (exists) return _diagrams.find(d => d.sessionId === input.sessionId && d.content === input.content)!;
 
   _diagrams = [diagram, ..._diagrams];
   notify();

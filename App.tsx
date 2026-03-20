@@ -12,6 +12,17 @@ import { getAdminStats } from './services/analyticsService';
 import { api } from './services/apiService';
 import { Icons } from './constants';
 const SedrexLogo = '/sedrex-logo.svg';
+import {
+  loadArtifactsForSession,
+  loadAllUserArtifacts,
+  clearArtifacts,
+  extractArtifactFromResponse,
+  createArtifact,
+  isPanelOpen,
+  subscribeToArtifacts,
+  storeDiagram,
+  extractDiagramsFromResponse,
+} from './services/artifactStore';
 import { Routes, Route } from 'react-router-dom';
 import Privacy from './components/Privacy';
 import Terms from './components/Terms';
@@ -21,15 +32,6 @@ import { isSupabaseConfigured as initialConfigured, supabase } from './services/
 import { getProjectIndex } from './services/codebaseContext';
 import { analytics } from './services/analyticsService';
 import { storageService } from './services/storageService';
-import {
-  loadArtifactsForSession,
-  loadAllUserArtifacts,   // ← FIX 1: load ALL user artifacts on login
-  clearArtifacts,
-  extractArtifactFromResponse,
-  createArtifact,
-  isPanelOpen,
-  subscribeToArtifacts,
-} from './services/artifactStore';
 
 const Dashboard      = lazy(() => import('./components/Dashboard'));
 const Pricing        = lazy(() => import('./components/Pricing'));
@@ -299,6 +301,21 @@ const App: React.FC = () => {
           filePath:   extracted.filePath,
         }).catch(() => {});
         finalContent = extracted.reducedResponse;
+      }
+
+      // NEW: Extract & Store Diagrams for Sidebar
+      const diagramCodes = extractDiagramsFromResponse(response.content);
+      if (diagramCodes.length > 0 && user) {
+        diagramCodes.forEach(dg => {
+          storeDiagram({
+            sessionId: sessionId,
+            userId:    user.id,
+            title:     'Architecture Diagram',
+            language:  'mermaid',
+            content:   dg,
+            type:      'diagram',
+          }).catch(() => {});
+        });
       }
 
       setSessions(prev => prev.map(s => s.id === sessionId ? {

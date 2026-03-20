@@ -258,8 +258,15 @@ function sanitizeMermaid(raw: string): string {
     (_m, id, label) => `${id}("${label}")`
   );
 
-  // Fix: empty or malformed pipes
-  code = code.replace(/\s+\|\s+\|/g, ' ');
+  // Fix: subgraph id [label] -> subgraph id ["label"] (sensitive to special chars)
+  code = code.replace(/subgraph\s+([A-Za-z0-9_]+)\s*\[([^\]\n]+)\]/g, 'subgraph $1 ["$2"]');
+
+  // Fix: subgraph [label] -> subgraph ["label"]
+  code = code.replace(/subgraph\s+\[([^\]\n]+)\]/g, 'subgraph ["$1"]');
+
+  // Fix: malformed labels with & or : that break parser
+  code = code.replace(/\[\s*([^\]"]*&[^\]"]*)\s*\]/g, '["$1"]');
+  code = code.replace(/\[\s*([^\]"]*:[^\]"]*)\s*\]/g, '["$1"]');
 
   return code;
 }
@@ -321,8 +328,9 @@ const MermaidBlock = memo(({ code }: { code: string }) => {
       {/* Soft warning banner — shown even when diagram renders successfully */}
       {error ? (
         <div className="diagram-error">
-          <div style={{ marginBottom: 8 }}>⚠ Diagram Error</div>
-          <pre style={{ fontSize: 11, opacity: 0.6, overflowX: 'auto', margin: 0 }}>{code}</pre>
+          <div style={{ marginBottom: 8, color: '#ef4444', fontWeight: 'bold' }}>⚠ Diagram Error</div>
+          <div style={{ fontSize: 11, color: '#ef4444', marginBottom: 8 }}>{error}</div>
+          <pre style={{ fontSize: 10, opacity: 0.5, overflowX: 'auto', margin: 0 }}>{code}</pre>
         </div>
       ) : loading ? (
         <div className="nx-diagram-loading"><div className="nx-spinner" /></div>
