@@ -29,7 +29,8 @@
 .ap-root {
   display: flex;
   flex-direction: column;
-  height: 100vh;           /* full viewport height */
+  height: 100vh;
+  height: 100dvh;           /* full viewport height */
   background: var(--bg-secondary, #0a0f1a);
   border-left: 1px solid var(--border);
   flex-shrink: 0;

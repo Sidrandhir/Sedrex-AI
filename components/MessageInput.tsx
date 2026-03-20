@@ -1,4 +1,4 @@
-﻿// components/MessageInput.tsx
+// components/MessageInput.tsx
 // ══════════════════════════════════════════════════════════════════
 // SEDREX — Message Input v4.3
 //
@@ -197,8 +197,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const docInputRef   = useRef<HTMLInputElement>(null);
   const attachBtnRef  = useRef<HTMLButtonElement>(null);
   const modelBtnRef   = useRef<HTMLButtonElement>(null);
-  const mediaRecRef   = useRef<MediaRecorder | null>(null);
-  const chunksRef     = useRef<Blob[]>([]);
+  const recognitionRef = useRef<any>(null);
 
   const activeModel = MODEL_OPTIONS.find(m => m.id === preferredModel) ?? MODEL_OPTIONS[0];
 
@@ -280,15 +279,53 @@ const MessageInput: React.FC<MessageInputProps> = ({
     if (docs.length) { const dt = new DataTransfer(); docs.forEach(f => dt.items.add(f)); await handleDocFiles(dt.files); }
   }, [handleImageFiles, handleDocFiles]);
 
-  const handleMicToggle = useCallback(async () => {
-    if (isRecording) { mediaRecRef.current?.stop(); setIsRecording(false); return; }
+  const handleMicToggle = useCallback(() => {
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      setIsRecording(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Speech recognition is not supported in this browser.');
+      return;
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream); chunksRef.current = [];
-      mr.ondataavailable = e => chunksRef.current.push(e.data);
-      mr.onstop = () => { setInput(p => p + ' [Voice message recorded]'); stream.getTracks().forEach(t => t.stop()); };
-      mr.start(); mediaRecRef.current = mr; setIsRecording(true);
-    } catch {}
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => setIsRecording(true);
+      recognition.onend   = () => setIsRecording(false);
+      recognition.onerror = (e: any) => {
+        console.error('Speech recognition error:', e.error);
+        setIsRecording(false);
+      };
+
+      recognition.onresult = (event: any) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        if (transcript) setInput(prev => {
+          // If the last part of input is not the transcript, add it
+          // This is a simple heuristic; a better one would track interim vs final
+          if (event.results[event.results.length - 1].isFinal) {
+            return prev + (prev ? ' ' : '') + transcript;
+          }
+          return prev; // For interim results, we could show them in a preview
+        });
+      };
+
+      recognition.start();
+      recognitionRef.current = recognition;
+    } catch (err) {
+      console.error('Failed to start speech recognition:', err);
+      setIsRecording(false);
+    }
   }, [isRecording]);
 
   const handleSubmit = useCallback(() => {
