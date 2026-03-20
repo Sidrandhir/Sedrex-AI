@@ -864,6 +864,19 @@ const MessageItem = memo(
         {/* ── USER ──────────────────────────────────────────────── */}
         {isUser && (
           <div>
+            {((msg.images?.length ? msg.images : (msg.image ? [msg.image] : [])) as MessageImage[]).map((img, idx) => (
+              <img
+                key={idx}
+                src={`data:${img.mimeType};base64,${img.inlineData.data}`}
+                alt="attachment"
+                style={{
+                  maxWidth: '100%', maxHeight: '400px',
+                  borderRadius: '12px', marginBottom: '8px',
+                  border: '1px solid rgba(16, 185, 129, 0.2)',
+                  display: 'block'
+                }}
+              />
+            ))}
             {msg.documents && msg.documents.length > 0 && (
               <div className="doc-attachments">
                 {msg.documents.map((doc, i) => {
@@ -933,14 +946,6 @@ const MessageItem = memo(
                   </span>
                 </div>
               </div>
-            )}
-
-            {msg.image && (
-              <img
-                src={`data:${msg.image.mimeType};base64,${msg.image.inlineData.data}`}
-                alt="Attached"
-                className="message-image"
-              />
             )}
 
             {!isEditing && (

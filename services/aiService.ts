@@ -1,4 +1,4 @@
-﻿import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import {
   AIModel,
   Message,
@@ -1010,7 +1010,7 @@ export const getAIResponse = async (
   history:          Message[],
   manualModel?:     AIModel | "auto",
   onRouting?:       (result: RouterResult) => void,
-  image?:           MessageImage,
+  images?:          MessageImage[],
   documents:        AttachedDocument[] = [],
   personification = "",
   onStreamChunk?:   (text: string) => void,
@@ -1024,7 +1024,7 @@ export const getAIResponse = async (
     /^\s*(build|create|make|write)\s*(a\s+)?table\s*$/i.test(prompt.trim());
 
   if (isClientRateLimited(clientId)) {
-    const limitedRoute = routePrompt(prompt, !!image, documents.length > 0);
+    const limitedRoute = routePrompt(prompt, !!(images?.length), documents.length > 0);
     onRouting?.(limitedRoute);
     return buildSafeModeResponse(prompt, limitedRoute, "You sent too many requests. Please wait a few seconds.");
   }
@@ -1047,7 +1047,7 @@ export const getAIResponse = async (
   const work = requestQueue
     .add(
       () => processRequest(
-        prompt, history, manualModel, onRouting, image, documents,
+        prompt, history, manualModel, onRouting, images, documents,
         personification, onStreamChunk, signal,
       ),
       effectiveQueueKey,
@@ -1062,7 +1062,7 @@ export const getAIResponse = async (
       return res;
     })
     .catch((err) => {
-      const fallbackRoute = routePrompt(prompt, !!image, documents.length > 0);
+      const fallbackRoute = routePrompt(prompt, !!(images?.length), documents.length > 0);
       return buildSafeModeResponse(prompt, fallbackRoute, normalizeErrorMessage(err));
     })
     .finally(() => { inFlightByFingerprint.delete(fingerprint); });
@@ -1076,7 +1076,7 @@ async function processRequest(
   history:          Message[],
   manualModel?:     AIModel | "auto",
   onRouting?:       (result: RouterResult) => void,
-  image?:           MessageImage,
+  images?:          MessageImage[],
   documents:        AttachedDocument[] = [],
   personification = "",
   onStreamChunk?:   (text: string) => void,
@@ -1085,7 +1085,7 @@ async function processRequest(
   if (signal?.aborted) throw new DOMException("Request aborted before processing", "AbortError");
 
   const startTime = Date.now();
-  const hasImage  = !!image;
+  const hasImage  = !!(images?.length);
   const hasDocs   = documents.length > 0;
 
   const routing: RouterResult =
@@ -1133,7 +1133,11 @@ async function processRequest(
   for (const doc of documents) {
     parts.push({ text: `[DOCUMENT: ${doc.title}]\n\`\`\`\n${doc.content}\n\`\`\`\n` });
   }
-  if (image) parts.push({ inlineData: { data: image.inlineData.data, mimeType: image.mimeType } });
+  if (images?.length) {
+    images.forEach((img: MessageImage) => {
+      parts.push({ inlineData: { data: img.inlineData.data, mimeType: img.mimeType } });
+    });
+  }
   parts.push({ text: prompt });
   geminiContents.push({ role: "user", parts });
 

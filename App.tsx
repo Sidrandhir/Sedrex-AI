@@ -242,7 +242,7 @@ const App: React.FC = () => {
     setIsLoading(true);
     abortControllerRef.current = new AbortController();
     const userMsg      = currentHistory[currentHistory.length - 1];
-    const previewRoute = routePrompt(userMsg.content, !!userMsg.image, (userMsg.documents?.length || 0) > 0);
+    const previewRoute = routePrompt(userMsg.content, !!(userMsg.images?.length || userMsg.image), (userMsg.documents?.length || 0) > 0);
     const assistantId  = 'assistant-' + Math.random().toString(36).substr(2, 9);
     const startTime    = Date.now();
 
@@ -275,7 +275,8 @@ const App: React.FC = () => {
         userMsg.content, currentHistory.slice(0, -1),
         activeSession?.preferredModel || 'auto',
         routing => setRoutingInfo(routing),
-        userMsg.image, userMsg.documents || [],
+        userMsg.images || (userMsg.image ? [userMsg.image] : []),
+        userMsg.documents || [],
         userSettings.personification,
         chunk => {
           accumulatedText += chunk;
@@ -329,7 +330,7 @@ const App: React.FC = () => {
         model: response.model, tokensUsed: response.tokens,
         inputTokens: response.inputTokens, outputTokens: response.outputTokens,
         groundingChunks: response.groundingChunks,
-        routingContext: response.routingContext, timestamp: Date.now(),
+        routingContext: response.routingContext as any, timestamp: Date.now(),
       });
 
       setSessions(prev => prev.map(s => s.id === sessionId ? {
@@ -405,7 +406,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSendMessage = async (content: string, image?: MessageImage, docs?: AttachedDocument[]) => {
+  const handleSendMessage = async (content: string, images?: MessageImage[], docs?: AttachedDocument[]) => {
     if (!user || !activeSessionId || !activeSession || isLoading) return;
     try {
       setSessions(prev => prev.map(s => s.id === activeSessionId ? {
@@ -414,7 +415,7 @@ const App: React.FC = () => {
       const savedUserMsg    = await api.saveMessage(activeSessionId, {
         role: 'user',
         codebaseRef: getProjectIndex() ? { projectName: getProjectIndex()!.projectName, totalFiles: getProjectIndex()!.totalFiles } : undefined,
-        content, timestamp: Date.now(), image, documents: docs,
+        content, timestamp: Date.now(), images, documents: docs,
       });
       const updatedMessages = [...activeSession.messages, savedUserMsg];
       setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: updatedMessages } : s));

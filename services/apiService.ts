@@ -115,21 +115,27 @@ export const api = {
       .eq('conversation_id', conversationId)
       .order('timestamp', { ascending: true })
       .limit(limit);
-    return (data || []).map(row => ({
-      id: row.id,
-      role: row.role,
-      content: row.content,
-      model: row.model as AIModel,
-      timestamp: new Date(row.timestamp).getTime(),
-      image: row.image_data,
-      documents: row.documents || [],
-      conversationId: row.conversation_id,
-      tokensUsed: row.tokens_used || 0,
-      inputTokens: row.input_tokens || 0,
-      outputTokens: row.output_tokens || 0,
-      groundingChunks: row.grounding_chunks,
-      routingContext: row.metadata
-    }));
+    return (data || []).map(row => {
+      const images = Array.isArray(row.image_data) 
+        ? row.image_data 
+        : (row.image_data ? [row.image_data] : []);
+      return {
+        id: row.id,
+        role: row.role,
+        content: row.content,
+        model: row.model as AIModel,
+        timestamp: new Date(row.timestamp).getTime(),
+        image: images[0],
+        images: images,
+        documents: row.documents || [],
+        conversationId: row.conversation_id,
+        tokensUsed: row.tokens_used || 0,
+        inputTokens: row.input_tokens || 0,
+        outputTokens: row.output_tokens || 0,
+        groundingChunks: row.grounding_chunks,
+        routingContext: row.metadata
+      };
+    });
   },
 
   async saveMessage(conversationId: string, message: Partial<Message>): Promise<Message> {
@@ -138,7 +144,7 @@ export const api = {
       role: message.role,
       content: message.content,
       model: message.model,
-      image_data: message.image,
+      image_data: message.images || (message.image ? [message.image] : null),
       documents: message.documents || [],
       grounding_chunks: message.groundingChunks,
       metadata: message.routingContext,
@@ -147,13 +153,17 @@ export const api = {
       output_tokens: message.outputTokens
     }).select().single();
     if (error) throw error;
+    const images = Array.isArray(data.image_data) 
+      ? data.image_data 
+      : (data.image_data ? [data.image_data] : []);
     return {
       id: data.id,
       role: data.role,
       content: data.content,
       model: data.model as AIModel,
       timestamp: new Date(data.timestamp).getTime(),
-      image: data.image_data,
+      image: images[0],
+      images: images,
       documents: data.documents || [],
       conversationId: data.conversation_id,
       tokensUsed: data.tokens_used,

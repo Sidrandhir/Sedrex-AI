@@ -63,6 +63,7 @@ export interface Message {
   model?: AIModel;
   timestamp: number;
   image?: MessageImage;
+  images?: MessageImage[];
   documents?: AttachedDocument[];
   conversationId?: string;
   tokensUsed?: number;

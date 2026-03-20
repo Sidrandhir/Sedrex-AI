@@ -165,7 +165,7 @@ const PortalDropdown: React.FC<PortalDropdownProps> = ({
 // ═══════════════════════════════════════════════════════════════════
 
 interface MessageInputProps {
-  onSendMessage:    (content: string, image?: MessageImage, docs?: AttachedDocument[]) => void;
+  onSendMessage:    (content: string, images?: MessageImage[], docs?: AttachedDocument[]) => void;
   onStop:           () => void;
   isDisabled:       boolean;
   preferredModel?:  AIModel | 'auto';
@@ -179,8 +179,8 @@ const MessageInput: React.FC<MessageInputProps> = ({
 }) => {
   const { hasIndex } = useCodebaseIndex();
   const [input,          setInput]          = useState('');
-  const [attachedImage,  setAttachedImage]  = useState<MessageImage | null>(null);
-  const [imagePreview,   setImagePreview]   = useState<string | null>(null);
+  const [attachedImages, setAttachedImages] = useState<MessageImage[]>([]);
+  const [imagePreviews,  setImagePreviews]  = useState<string[]>([]);
   const [attachedDocs,   setAttachedDocs]   = useState<AttachedDocument[]>([]);
   const [isDragOver,     setIsDragOver]     = useState(false);
   const [isRecording,    setIsRecording]    = useState(false);
@@ -252,14 +252,16 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const handleImageFiles = useCallback(async (files: FileList | null) => {
     if (!files?.length) return;
     setIsProcessing(true);
+    const newImages: MessageImage[] = [];
+    const newPreviews: string[] = [];
     try {
-      const b = await readBase64(files[0]);
-      setAttachedImage({ inlineData: { data: b }, mimeType: files[0].type });
-      setImagePreview(URL.createObjectURL(files[0]));
-      for (let i = 1; i < files.length; i++) {
-        const xb = await readBase64(files[i]);
-        setAttachedDocs(p => [...p, { title: files[i].name, content: `[IMAGE:${files[i].name}]\nbase64:${xb}`, type: files[i].type }]);
+      for (const f of Array.from(files)) {
+        const b = await readBase64(f);
+        newImages.push({ inlineData: { data: b }, mimeType: f.type });
+        newPreviews.push(URL.createObjectURL(f));
       }
+      setAttachedImages(p => [...p, ...newImages]);
+      setImagePreviews(p => [...p, ...newPreviews]);
     } catch {} finally { setIsProcessing(false); if (imageInputRef.current) imageInputRef.current.value = ''; }
   }, []);
 
@@ -339,12 +341,12 @@ const MessageInput: React.FC<MessageInputProps> = ({
 
   const handleSubmit = useCallback(() => {
     const trimmed = input.trim();
-    if (!trimmed && !attachedImage && !attachedDocs.length && !codeChips.length) return;
+    if (!trimmed && !attachedImages.length && !attachedDocs.length && !codeChips.length) return;
     const codeDocs = codeChips.map(c => ({ title: `${c.language}-snippet.${c.language}`, content: c.content, type: `text/${c.language}` }));
-    onSendMessage(trimmed, attachedImage || undefined, [...attachedDocs, ...codeDocs]);
-    setInput(''); setAttachedImage(null); setImagePreview(null); setAttachedDocs([]); setCodeChips([]); setShowSlashMenu(false);
+    onSendMessage(trimmed, attachedImages.length ? attachedImages : undefined, [...attachedDocs, ...codeDocs]);
+    setInput(''); setAttachedImages([]); setImagePreviews([]); setAttachedDocs([]); setCodeChips([]); setShowSlashMenu(false);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
-  }, [input, attachedImage, attachedDocs, codeChips, onSendMessage]);
+  }, [input, attachedImages, attachedDocs, codeChips, onSendMessage]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !showSlashMenu) {
@@ -359,8 +361,8 @@ const MessageInput: React.FC<MessageInputProps> = ({
     setTimeout(() => textareaRef.current?.focus(), 50);
   }, []);
 
-  const hasContent     = !!(input.trim() || attachedImage || attachedDocs.length || codeChips.length || hasIndex);
-  const hasAttachments = !!(attachedImage || attachedDocs.length || codeChips.length || hasIndex);
+  const hasContent     = !!(input.trim() || attachedImages.length || attachedDocs.length || codeChips.length || hasIndex);
+  const hasAttachments = !!(attachedImages.length || attachedDocs.length || codeChips.length || hasIndex);
 
   // Shared button row item style
   const itemStyle: React.CSSProperties = {
@@ -466,14 +468,17 @@ const MessageInput: React.FC<MessageInputProps> = ({
         {/* Attachments */}
         {hasAttachments && (
           <div className="mi-attach-row">
-            {attachedImage && imagePreview && (
-              <div className="mi-img-card">
-                <img src={imagePreview} className="mi-img-card-img" alt="Attached" />
-                <button className="mi-img-card-remove" onClick={() => { setAttachedImage(null); setImagePreview(null); }}>
+            {imagePreviews.map((preview, i) => (
+              <div key={`img-${i}`} className="mi-img-card">
+                <img src={preview} className="mi-img-card-img" alt="Attached" />
+                <button className="mi-img-card-remove" onClick={() => {
+                  setAttachedImages(p => p.filter((_, j) => j !== i));
+                  setImagePreviews(p => p.filter((_, j) => j !== i));
+                }}>
                   <Icons.X className="icon-sm" />
                 </button>
               </div>
-            )}
+            ))}
             {attachedDocs.map((doc, i) => {
               const m = getDocMeta(doc.title);
               return (
