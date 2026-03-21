@@ -166,11 +166,7 @@ const App: React.FC = () => {
       setUser(u);
       if (u) {
         analytics.startSession(u.id);
-        // ── FIX 1: Load ALL user artifacts from all sessions on login ──
-        // This is the key change — artifacts from every chat session are
-        // loaded once at login so the sidebar shows everything, and
-        // [ARTIFACT:title] markers in old chats can find their artifacts.
-        loadAllUserArtifacts(u.id).catch(() => {});
+        // Shadow artifacts sync removed - consolidated into Phase 3 for total stability
         if (!localStorage.getItem('sedrex_survey_done')) setShowSurvey(true);
         if (window.innerWidth < 1024 && !localStorage.getItem('sedrex_onboarding_done'))
           setShowOnboarding(true);
@@ -208,6 +204,11 @@ const App: React.FC = () => {
         }
 
         // Phase 2: Background Sync (Cloud Data)
+        // STAGGER: Wait 1000ms to let Phase 1 (Cache) render and settle
+        // This ensures the initial frame is at 60fps and interactive immediately
+        await new Promise(r => setTimeout(r, 1000));
+        if (!isMounted) return;
+
         const [stats, cloudSessions] = await Promise.all([
           getStats(user.id),
           api.getConversations(50, 0),
@@ -232,7 +233,8 @@ const App: React.FC = () => {
         }
 
         // Phase 3: Global Metadata Sync (Ultra-lean)
-        loadAllUserArtifacts(user.id).catch(() => {});
+        // Strictly metadata-only to prevent 500/timeout during initialization
+        loadAllUserArtifacts(user.id, true).catch(() => {});
         if (cloudSessions[0]?.id) loadArtifactsForSession(cloudSessions[0].id, true).catch(() => {});
 
       } catch (error) {
@@ -249,11 +251,15 @@ const App: React.FC = () => {
 
   // ── FIX 1: On session switch, load that session's artifacts and MERGE
   // (do NOT clearArtifacts — that was wiping all cross-session artifacts)
+  // ── FIX 1: Staggered Full-Content Hydration ───────────────────
+  // Delay loading full artifacts for 1500ms after session switch
+  // to avoid competing with background sync (Phase 2).
   useEffect(() => {
-    if (activeSessionId) {
-      // Merge session artifacts into the global store (no clear)
+    if (!activeSessionId) return;
+    const timer = setTimeout(() => {
       loadArtifactsForSession(activeSessionId).catch(() => {});
-    }
+    }, 1500);
+    return () => clearTimeout(timer);
   }, [activeSessionId]);
 
   const activeSession = sessions.find(s => s.id === activeSessionId);

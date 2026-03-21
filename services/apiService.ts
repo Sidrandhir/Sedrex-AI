@@ -554,22 +554,17 @@ export const api = {
 
   /**
    * Batch load messages for multiple sessions (for sidebar preview)
+   * Processed sequentially with metadataOnly:true to avoid database saturation
    */
   async loadSessionPreviews(sessionIds: string[]): Promise<Record<string, Message[]>> {
-    try {
-      const results = await Promise.allSettled(
-        sessionIds.map(id => this.getMessages(id, 5))
-      );
-
-      const previews: Record<string, Message[]> = {};
-      sessionIds.forEach((id, idx) => {
-        previews[id] = results[idx].status === 'fulfilled' ? results[idx].value : [];
-      });
-
-      return previews;
-    } catch (error) {
-      console.error('[API] Error loading session previews:', error);
-      return {};
+    const previews: Record<string, Message[]> = {};
+    for (const id of sessionIds) {
+      try {
+        previews[id] = await this.getMessages(id, 5, true); // Metadata only
+      } catch (error) {
+        previews[id] = [];
+      }
     }
+    return previews;
   },
 };

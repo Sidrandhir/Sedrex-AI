@@ -454,26 +454,32 @@ export async function loadArtifactsForSession(sessionId: string, metadataOnly = 
 
 // Loads ALL artifacts for a user across ALL sessions (for sidebar panel)
 // Now using queryOptimizer for retry logic, timeout protection, and chunking
-export async function loadAllUserArtifacts(userId: string): Promise<void> {
+export async function loadAllUserArtifacts(userId: string, metadataOnly = false): Promise<void> {
   if (!isSupabaseConfigured) return;
   
   try {
-    // Use optimized query with timeout protection, exponential backoff, and chunking
-    const data = await getAllUserArtifactsByUserId(userId);
+    // Use optimized query with timeout protection, sequential chunking, and metadata filter
+    const data = await getAllUserArtifactsByUserId(userId, metadataOnly);
 
-    const all: Artifact[] = (data ?? []).map(row => ({
-      id:        row.id,
-      sessionId: row.session_id ?? '',
-      userId:    row.user_id,
-      title:     row.title,
-      language:  row.language ?? 'text',
-      content:   (row as any).content ?? '', // Restored so visual panel works!
-      type:      ((row as any).artifact_type ?? (row as any).type ?? 'code') as ArtifactType,
-      filePath:  row.file_path ?? undefined,
-      lineCount: row.line_count ?? 0,
-      createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
-      updatedAt: row.updated_at ? new Date(row.updated_at).getTime() : Date.now(),
-    }));
+    const all: Artifact[] = (data ?? []).map(row => {
+      // PRESERVE CONTENT: Check if we already have this artifact with content
+      const existing = _artifacts.find(a => a.id === row.id) || _diagrams.find(d => d.id === row.id);
+      
+      return {
+        id:        row.id,
+        sessionId: row.session_id ?? '',
+        userId:    row.user_id,
+        title:     row.title,
+        language:  row.language ?? 'text',
+        // If metadataOnly sync, but we already have content, keep it!
+        content:   (row as any).content ?? (existing?.content || ''),
+        type:      ((row as any).artifact_type ?? (row as any).type ?? 'code') as ArtifactType,
+        filePath:  row.file_path ?? undefined,
+        lineCount: row.line_count ?? 0,
+        createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+        updatedAt: row.updated_at ? new Date(row.updated_at).getTime() : Date.now(),
+      };
+    });
 
     _diagrams  = all.filter(a => a.type === 'diagram' || a.language === 'mermaid');
     _artifacts = all.filter(a => !(a.type === 'diagram' || a.language === 'mermaid'));

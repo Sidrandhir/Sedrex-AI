@@ -14,6 +14,31 @@ export class QueryOptimizer {
   private static readonly MAX_RETRIES = 3;
   private static readonly RETRY_DELAY = 1500; // Increased backoff delay
 
+  // ── NEW: Global Concurrency Limiter ─────────────────────────────
+  // Limits the number of concurrent Supabase queries to prevent saturation
+  private static activeQueries = 0;
+  private static readonly MAX_CONCURRENT = 2; // Strict limit
+  private static queue: (() => void)[] = [];
+
+  private static async enqueue(): Promise<void> {
+    if (this.activeQueries < this.MAX_CONCURRENT) {
+      this.activeQueries++;
+      return;
+    }
+    return new Promise(resolve => this.queue.push(resolve));
+  }
+
+  private static dequeue(): void {
+    this.activeQueries--;
+    if (this.queue.length > 0) {
+      const next = this.queue.shift();
+      if (next) {
+        this.activeQueries++;
+        next();
+      }
+    }
+  }
+
   /**
    * Execute query with timeout protection and retries
    */
@@ -23,6 +48,8 @@ export class QueryOptimizer {
     maxRetries = this.MAX_RETRIES
   ): Promise<T> {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      await this.enqueue(); // Wait for a slot in the queue
+      
       try {
         // Wrap query with timeout
         const timeoutPromise = new Promise<T>((_, reject) =>
@@ -33,8 +60,10 @@ export class QueryOptimizer {
         );
 
         const result = await Promise.race([query(), timeoutPromise]);
+        this.dequeue(); // Release slot
         return result;
       } catch (error: any) {
+        this.dequeue(); // Release slot on error
         const errorMsg = error?.message || '';
         const isTimeout =
           errorMsg.includes('timeout') ||
@@ -91,13 +120,19 @@ export class QueryOptimizer {
 /**
  * Optimized artifact queries - FIXED to query ONLY artifacts table
  */
-export async function getAllUserArtifactsByUserId(userId: string) {
+/**
+ * Optimized artifact queries
+ */
+export async function getAllUserArtifactsByUserId(userId: string, metadataOnly = false) {
   return QueryOptimizer.executeWithTimeout(
     async () => {
+      let selectCols = 'id, user_id, session_id, title, language, artifact_type, line_count, created_at, updated_at, file_path';
+      if (!metadataOnly) selectCols += ', content';
+
       // Single, optimized query to artifacts table with essential columns only
       const { data, error } = await supabase!
         .from('artifacts')
-        .select('id, user_id, session_id, title, language, artifact_type, content, line_count, created_at, updated_at, file_path')
+        .select(selectCols)
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(100);
@@ -105,7 +140,7 @@ export async function getAllUserArtifactsByUserId(userId: string) {
       if (error) throw error;
       return data || [];
     },
-    'getAllUserArtifacts'
+    `getAllUserArtifacts:${metadataOnly ? 'meta' : 'full'}`
   );
 }
 
