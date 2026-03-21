@@ -219,14 +219,29 @@ const App: React.FC = () => {
 
         if (cloudSessions.length > 0) {
           const firstId = cloudSessions[0].id;
-          // OPTIMIZATION: Background sync only needs metadata to check for new turns
+          // OPTIMIZATION: Background sync only needs metadata
           const cloudMessages = await api.getMessages(firstId, 50, true);
           
           if (!isMounted) return;
           startTransition(() => {
-            setSessions(cloudSessions);
-            setActiveSessionId(firstId);
-            setSessions(prev => prev.map(s => s.id === firstId ? { ...s, messages: cloudMessages } : s));
+            // ── SMART MERGE ──────────────────────────────────────────
+            // Merge cloud sessions into existing ones to preserve brand-new chats
+            setSessions(prev => {
+              const merged = [...cloudSessions];
+              prev.forEach(local => {
+                // If a local session isn't in cloud list yet, it's presumably NEW
+                if (!merged.find(c => c.id === local.id)) {
+                  merged.push(local);
+                }
+              });
+              // Sort by lastModified to keep UI consistent
+              return merged.sort((a,b) => b.lastModified - a.lastModified);
+            });
+            
+            // If we don't have an active session, or it's the first sync, pick the top one
+            if (!activeSessionId) {
+              setActiveSessionId(firstId);
+            }
           });
           
           api.loadSessionPreviews(cloudSessions.slice(0, 5).map(s => s.id));
@@ -341,7 +356,11 @@ const App: React.FC = () => {
           if (!flushTimer) flushTimer = setTimeout(flushToUI, 80);
         },
         abortControllerRef.current.signal,
+<<<<<<< HEAD
         sessionId
+=======
+        getArtifactsForSession(sessionId).map(a => `[ARTIFACT: ${a.title}]`).join('\n')
+>>>>>>> c81520e (latency improved of artifacts, diagrams and images generation and sidebar improvement)
       );
       if (flushTimer) clearTimeout(flushTimer);
 

@@ -1,7 +1,9 @@
 /**
- * SEDREX — Advanced Caching Service v1.0
- * Intelligent multi-layer caching with TTL, size limits, and smart invalidation
- * Built for professional AI applications with 30+ years of optimization expertise
+ * SEDREX — Advanced Caching Service v1.1
+ * FIX: invalidateConversation() now clears all message cache key variants
+ *      that match msgs:${id}:* — previously it deleted `messages:${id}`
+ *      which never matched the actual stored key format `msgs:${id}:${limit}:meta/full`
+ *      so stale messages persisted indefinitely after save/update/delete.
  */
 
 export interface CacheEntry<T> {
@@ -103,6 +105,17 @@ class CacheLayer<T> {
     return this.store.delete(key);
   }
 
+  // ── FIX: Delete all keys that start with a given prefix ──────────
+  // Used by invalidateConversation to clear ALL variants of a message
+  // cache key regardless of limit/metadataOnly suffix.
+  deleteByPrefix(prefix: string): void {
+    for (const key of this.store.keys()) {
+      if (key.startsWith(prefix)) {
+        this.store.delete(key);
+      }
+    }
+  }
+
   clear(): void {
     this.store.clear();
     this.hits = 0;
@@ -154,14 +167,14 @@ class RequestDeduplicator<T> {
 // ─────────────────────────────────────────────────────────────────
 
 export const ConversationCache = new CacheLayer(100, 15 * 60 * 1000);
-export const MessageCache = new CacheLayer(200, 10 * 60 * 1000);
-export const ArtifactCache = new CacheLayer(150, 10 * 60 * 1000);
-export const UserStatsCache = new CacheLayer(50, 5 * 60 * 1000);
-export const PreferenceCache = new CacheLayer(20, 30 * 60 * 1000);
+export const MessageCache      = new CacheLayer(200, 10 * 60 * 1000);
+export const ArtifactCache     = new CacheLayer(150, 10 * 60 * 1000);
+export const UserStatsCache    = new CacheLayer(50,   5 * 60 * 1000);
+export const PreferenceCache   = new CacheLayer(20,  30 * 60 * 1000);
 
 // Request deduplication
-export const ConversationDeduplicator = new RequestDeduplicator();
-export const MessageDeduplicator = new RequestDeduplicator();
+export const ConversationDeduplicator = new RequestDeduplicator<any>();
+export const MessageDeduplicator      = new RequestDeduplicator<any>();
 
 // ─────────────────────────────────────────────────────────────────
 // Cache Management Utilities
@@ -169,8 +182,15 @@ export const MessageDeduplicator = new RequestDeduplicator();
 
 export const CacheManager = {
   invalidateConversation(id: string): void {
-    ConversationCache.delete(id);
-    MessageCache.delete(`messages:${id}`);
+    // Invalidate conversation list caches (prefix-based since limit varies)
+    ConversationCache.deleteByPrefix(`convs:`);
+
+    // ── FIX: Use prefix delete to catch ALL message cache variants ──
+    // Old code: MessageCache.delete(`messages:${id}`)
+    //   → Wrong! Stored keys are `msgs:${id}:${limit}:meta/full`
+    //   → Old key never matched → stale data served forever
+    // New code: deleteByPrefix catches every variant regardless of limit or meta flag
+    MessageCache.deleteByPrefix(`msgs:${id}:`);
   },
 
   invalidateAllConversations(): void {
@@ -185,10 +205,10 @@ export const CacheManager = {
   getStats() {
     return {
       conversations: ConversationCache.getStats(),
-      messages: MessageCache.getStats(),
-      artifacts: ArtifactCache.getStats(),
-      userStats: UserStatsCache.getStats(),
-      preferences: PreferenceCache.getStats(),
+      messages:      MessageCache.getStats(),
+      artifacts:     ArtifactCache.getStats(),
+      userStats:     UserStatsCache.getStats(),
+      preferences:   PreferenceCache.getStats(),
     };
   },
 
@@ -196,9 +216,9 @@ export const CacheManager = {
     const stats = this.getStats();
     console.table({
       'Conversations': `${stats.conversations.size}/${stats.conversations.capacity} (${(stats.conversations.hitRate * 100).toFixed(1)}% hit)`,
-      'Messages': `${stats.messages.size}/${stats.messages.capacity} (${(stats.messages.hitRate * 100).toFixed(1)}% hit)`,
-      'Artifacts': `${stats.artifacts.size}/${stats.artifacts.capacity} (${(stats.artifacts.hitRate * 100).toFixed(1)}% hit)`,
-      'User Stats': `${stats.userStats.size}/${stats.userStats.capacity} (${(stats.userStats.hitRate * 100).toFixed(1)}% hit)`,
+      'Messages':      `${stats.messages.size}/${stats.messages.capacity} (${(stats.messages.hitRate * 100).toFixed(1)}% hit)`,
+      'Artifacts':     `${stats.artifacts.size}/${stats.artifacts.capacity} (${(stats.artifacts.hitRate * 100).toFixed(1)}% hit)`,
+      'User Stats':    `${stats.userStats.size}/${stats.userStats.capacity} (${(stats.userStats.hitRate * 100).toFixed(1)}% hit)`,
     });
   },
 

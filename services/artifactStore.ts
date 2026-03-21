@@ -1,19 +1,3 @@
-// services/artifactStore.ts
-// ══════════════════════════════════════════════════════════════════
-// SEDREX — Artifact Store v3.0
-//
-// FIXES in this version:
-//   ✅ Mermaid/chart/products EXCLUDED from artifact extraction
-//      → they stay in chat as MermaidBlock / EnhancedChart / ProductGrid
-//   ✅ artifact_type NOT NULL satisfied — always sent to DB
-//   ✅ conversation_id column used (not session_id)
-//   ✅ Diagram type added — separate from code artifacts
-//   ✅ loadArtifactsForSession loads ALL user artifacts (for sidebar)
-//   ✅ getDiagrams() returns mermaid diagrams stored separately
-//   ✅ In-memory first — panel opens before DB responds
-//   ✅ No duplicate keys on DB swap
-// ══════════════════════════════════════════════════════════════════
-
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { getArtifactsBySessionId, getAllUserArtifactsByUserId } from './queryOptimizer';
 
@@ -513,6 +497,74 @@ export function getAllArtifacts(): Artifact[] {
 // ── React hook ─────────────────────────────────────────────────────
 import { useState, useEffect } from 'react';
 
+
+// ── Load content for a single artifact by ID ─────────────────────
+// Called by ArtifactPanel when artifact.content is empty string
+// (happens when metadataOnly=true was used for initial load).
+// Tries each write-target table until content is found.
+export async function loadArtifactContent(id: string): Promise<string> {
+  if (!isSupabaseConfigured || !id) return '';
+  try {
+    // Try generated_code first (most common)
+    const { data: codeRow } = await supabase!
+      .from('generated_code')
+      .select('id, code_content')
+      .eq('id', id)
+      .maybeSingle();
+    if (codeRow?.code_content) {
+      const content = codeRow.code_content as string;
+      _artifacts = _artifacts.map(a => a.id === id ? { ...a, content } : a);
+      notify();
+      return content;
+    }
+
+    // Try generated_diagrams
+    const { data: diagRow } = await supabase!
+      .from('generated_diagrams')
+      .select('id, mermaid_code')
+      .eq('id', id)
+      .maybeSingle();
+    if (diagRow?.mermaid_code) {
+      const content = diagRow.mermaid_code as string;
+      _diagrams = _diagrams.map(d => d.id === id ? { ...d, content } : d);
+      notify();
+      return content;
+    }
+
+    // Try generated_images
+    const { data: imgRow } = await supabase!
+      .from('generated_images')
+      .select('id, base64_data')
+      .eq('id', id)
+      .maybeSingle();
+    if (imgRow?.base64_data) {
+      const content = imgRow.base64_data as string;
+      _artifacts = _artifacts.map(a => a.id === id ? { ...a, content } : a);
+      notify();
+      return content;
+    }
+
+    // Fallback: try artifacts table (for any directly-written rows)
+    const { data: artRow } = await supabase!
+      .from('artifacts')
+      .select('id, content')
+      .eq('id', id)
+      .maybeSingle();
+    if (artRow?.content) {
+      const content = artRow.content as string;
+      _artifacts = _artifacts.map(a => a.id === id ? { ...a, content } : a);
+      _diagrams  = _diagrams.map(d => d.id === id ? { ...d, content } : d);
+      notify();
+      return content;
+    }
+
+    return '';
+  } catch (e) {
+    console.warn('[SEDREX Artifacts] loadArtifactContent failed:', e);
+    return '';
+  }
+}
+
 export function useArtifacts() {
   const [artifacts, setArtifacts] = useState<Artifact[]>(_artifacts);
   const [diagrams,  setDiagrams]  = useState<Artifact[]>(_diagrams);
@@ -547,3 +599,7 @@ export function useArtifacts() {
     updateArtifact,
   };
 }
+
+================================================================================
+FILE: services\authService.ts
+MODIFIED: 2026-03-20 17:41  SIZE: 6031 bytes
