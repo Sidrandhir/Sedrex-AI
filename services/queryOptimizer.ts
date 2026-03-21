@@ -10,9 +10,9 @@ import { supabase } from './supabaseClient';
  * Query timeout handler with automatic retries
  */
 export class QueryOptimizer {
-  private static readonly TIMEOUT_MS = 25000; // 25 second client timeout for large queries
+  private static readonly TIMEOUT_MS = 30000; // Increased to 30s for heavy loads
   private static readonly MAX_RETRIES = 3;
-  private static readonly RETRY_DELAY = 1000;
+  private static readonly RETRY_DELAY = 1500; // Increased backoff delay
 
   /**
    * Execute query with timeout protection and retries
@@ -112,13 +112,18 @@ export async function getAllUserArtifactsByUserId(userId: string) {
 /**
  * Optimized session artifact queries - FIXED to query ONLY artifacts table
  */
-export async function getArtifactsBySessionId(sessionId: string) {
+/**
+ * Optimized session artifact queries
+ */
+export async function getArtifactsBySessionId(sessionId: string, metadataOnly = false) {
   return QueryOptimizer.executeWithTimeout(
     async () => {
-      // Single, optimized query to artifacts table with essential columns only
+      let selectCols = 'id, user_id, session_id, title, language, artifact_type, line_count, created_at, updated_at, file_path';
+      if (!metadataOnly) selectCols += ', content'; // Only include content if needed
+
       const { data, error } = await supabase!
         .from('artifacts')
-        .select('id, user_id, session_id, title, language, artifact_type, content, line_count, created_at, updated_at, file_path')
+        .select(selectCols)
         .eq('session_id', sessionId)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -126,47 +131,54 @@ export async function getArtifactsBySessionId(sessionId: string) {
       if (error) throw error;
       return data || [];
     },
-    `getArtifactsBySessionId:${sessionId}`
+    `getArtifactsBySessionId:${sessionId}:${metadataOnly ? 'meta' : 'full'}`
   );
 }
 
 /**
- * Optimized message queries with chunking
+ * Optimized message queries with sequential chunking to prevent 57014 (timeout)
  */
-export async function getMessagesByConversationId(conversationId: string, limit = 100) {
+export async function getMessagesByConversationId(
+  conversationId: string, 
+  limit = 100, 
+  metadataOnly = false
+) {
   return QueryOptimizer.executeWithTimeout(
     async () => {
-      // Split into 2 queries if limit > 50 to avoid timeout
+      let selectCols = 'id, role, model, timestamp, image_data, documents, conversation_id, tokens_used, input_tokens, output_tokens, grounding_chunks, metadata';
+      if (!metadataOnly) selectCols += ', content';
+
+      // ── SURGICAL FETCHING: Sequential Chunking ──────────────────────
+      // We avoid Promise.all for large selects as it saturates the 
+      // statement timeout limits on small Supabase instances.
       if (limit > 50) {
-        const [part1, part2] = await Promise.all([
-          supabase!
+        const { data: part1, error: err1 } = await supabase!
+          .from('messages')
+          .select(selectCols)
+          .eq('conversation_id', conversationId)
+          .order('timestamp', { ascending: true })
+          .limit(50);
+        
+        if (err1) throw err1;
+
+        // Only fetch second part if we hit the limit of the first
+        if (part1 && part1.length === 50) {
+          const { data: part2, error: err2 } = await supabase!
             .from('messages')
-            .select(
-              'id, role, content, model, timestamp, image_data, documents, conversation_id, tokens_used, input_tokens, output_tokens, grounding_chunks, metadata'
-            )
+            .select(selectCols)
             .eq('conversation_id', conversationId)
             .order('timestamp', { ascending: true })
-            .limit(50),
-          supabase!
-            .from('messages')
-            .select(
-              'id, role, content, model, timestamp, image_data, documents, conversation_id, tokens_used, input_tokens, output_tokens, grounding_chunks, metadata'
-            )
-            .eq('conversation_id', conversationId)
-            .order('timestamp', { ascending: true })
-            .range(50, Math.min(50 + limit - 50, 100)),
-        ]);
+            .range(50, limit - 1);
+          
+          if (err2) throw err2;
+          return [...(part1 || []), ...(part2 || [])];
+        }
 
-        if (part1.error) throw part1.error;
-        if (part2.error) throw part2.error;
-
-        return [...(part1.data || []), ...(part2.data || [])];
+        return part1 || [];
       } else {
         const { data, error } = await supabase!
           .from('messages')
-          .select(
-            'id, role, content, model, timestamp, image_data, documents, conversation_id, tokens_used, input_tokens, output_tokens, grounding_chunks, metadata'
-          )
+          .select(selectCols)
           .eq('conversation_id', conversationId)
           .order('timestamp', { ascending: true })
           .limit(limit);
@@ -175,7 +187,7 @@ export async function getMessagesByConversationId(conversationId: string, limit 
         return data || [];
       }
     },
-    `getMessages:${conversationId}`
+    `getMessages:${conversationId}:${metadataOnly ? 'meta' : 'full'}`
   );
 }
 

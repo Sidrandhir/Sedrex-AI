@@ -408,25 +408,28 @@ export async function deleteArtifact(id: string): Promise<void> {
 
 // Loads code artifacts AND diagrams for a session from DB
 // Now using queryOptimizer for retry logic and timeout protection
-export async function loadArtifactsForSession(sessionId: string): Promise<void> {
+export async function loadArtifactsForSession(sessionId: string, metadataOnly = false): Promise<void> {
   if (!isSupabaseConfigured) return;
   try {
-    // Use optimized query with timeout protection and exponential backoff
-    const data = await getArtifactsBySessionId(sessionId);
+    // Use optimized query with timeout protection and metadata filter
+    const data = await getArtifactsBySessionId(sessionId, metadataOnly);
 
-    const all: Artifact[] = (data ?? []).map(row => ({
-      id:        row.id,
-      sessionId: row.session_id ?? sessionId,
-      userId:    row.user_id,
-      title:     row.title,
-      language:  row.language ?? 'text',
-      content:   (row as any).content ?? '', // Restored so visual panel works!
-      type:      (row.artifact_type ?? 'code') as ArtifactType,
-      filePath:  row.file_path ?? undefined,
-      lineCount: row.line_count ?? 0,
-      createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
-      updatedAt: row.updated_at ? new Date(row.updated_at).getTime() : Date.now(),
-    }));
+    const all: Artifact[] = (data ?? []).map(row => {
+      const existing = _artifacts.find(a => a.id === row.id) || _diagrams.find(d => d.id === row.id);
+      return {
+        id:        row.id,
+        sessionId: row.session_id ?? sessionId,
+        userId:    row.user_id,
+        title:     row.title,
+        language:  row.language ?? 'text',
+        content:   (row as any).content ?? (existing?.content || ''),
+        type:      (row.artifact_type ?? 'code') as ArtifactType,
+        filePath:  row.file_path ?? undefined,
+        lineCount: row.line_count ?? 0,
+        createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+        updatedAt: row.updated_at ? new Date(row.updated_at).getTime() : Date.now(),
+      };
+    });
 
     // Separate diagrams from code artifacts
     const dbDiagrams  = all.filter(a => a.type === 'diagram' || a.language === 'mermaid');
@@ -491,6 +494,14 @@ export function clearArtifacts(): void {
   _activeId   = null;
   _panelOpen  = false;
   notify();
+}
+
+export function getArtifactsForSession(sessionId: string): Artifact[] {
+  return [..._artifacts, ..._diagrams].filter(a => a.sessionId === sessionId);
+}
+
+export function getAllArtifacts(): Artifact[] {
+  return [..._artifacts, ..._diagrams];
 }
 
 // ── React hook ─────────────────────────────────────────────────────

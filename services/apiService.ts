@@ -19,6 +19,7 @@ import {
   getUserStats as getOptimizedUserStats,
   getUserPreferences,
 } from './queryOptimizer';
+import { persistenceService } from './persistenceService';
 
 // ═══════════════════════════════════════════════════════════════════
 // SEDREX API SERVICE v2.0 — OPTIMIZED FOR PERFORMANCE
@@ -163,6 +164,11 @@ export const api = {
 
         // Cache result (25 min for conversations)
         ConversationCache.set(cacheKey, sessions, 25 * 60 * 1000);
+        
+        // ── PERSISTENCE SYNC ──────────────────────────────────────────
+        // Save to persistent local storage for 0ms load next time
+        if (offset === 0) persistenceService.saveSessions(sessions);
+        
         return sessions;
       });
     } catch (error: any) {
@@ -256,9 +262,9 @@ export const api = {
    * Parallel-ready for faster message loading
    * Now using queryOptimizer for chunking and exponential backoff on retries
    */
-  async getMessages(conversationId: string, limit = 50): Promise<Message[]> {
+  async getMessages(conversationId: string, limit = 50, metadataOnly = false): Promise<Message[]> {
     try {
-      const cacheKey = `msgs:${conversationId}:${limit}`;
+      const cacheKey = `msgs:${conversationId}:${limit}:${metadataOnly ? 'meta' : 'full'}`;
 
       // Check cache first
       const cached = MessageCache.get(cacheKey);
@@ -266,8 +272,8 @@ export const api = {
 
       // Deduplicate parallel requests
       return await MessageDeduplicator.deduplicate(cacheKey, async () => {
-        // Use optimized query with timeout protection, chunking, and retry logic
-        const data = await getMessagesByConversationId(conversationId, limit);
+        // Use optimized query with timeout protection, sequential chunking, and retry logic
+        const data = await getMessagesByConversationId(conversationId, limit, metadataOnly);
 
         const messages = (data || []).map(row => {
           const images = Array.isArray(row.image_data)
@@ -297,6 +303,14 @@ export const api = {
 
         // Cache result
         MessageCache.set(cacheKey, messages, 20 * 60 * 1000); // 20 min cache
+        
+        // ── PERSISTENCE SYNC ──────────────────────────────────────────
+        // Save to persistent local storage for 0ms load next time
+        // IMPORTANT: Never save metadata-only syncs to persistence to avoid overwriting full content
+        if (limit >= 30 && !metadataOnly) {
+          persistenceService.saveMessages(conversationId, messages);
+        }
+        
         return messages;
       });
     } catch (error: any) {
@@ -365,6 +379,12 @@ export const api = {
 
         // Invalidate message cache
         MessageCache.delete(`msgs:${conversationId}:100`);
+        
+        // ── PERSISTENCE SYNC ──────────────────────────────────────────
+        // Update local persistent history immediately
+        const history = persistenceService.loadMessages(conversationId);
+        persistenceService.saveMessages(conversationId, [...history, result]);
+
         return result;
       } catch (error) {
         if (attempt === maxRetries - 1) {
@@ -486,9 +506,24 @@ export const api = {
   async loadInitialChatData(limit = 20): Promise<{
     sessions: ChatSession[];
     firstSessionMessages: Message[];
+    fromCache: boolean;
   }> {
     try {
-      // OPTIMIZATION: Load only recent conversations (20 instead of 50)
+      // ── HYPER-OPTIMIZATION: Instant Persistent Load ────────────────
+      const cachedSessions = persistenceService.loadSessions() as ChatSession[];
+      const lastId = persistenceService.getLastActiveSessionId();
+      const cachedMsgs = lastId ? persistenceService.loadMessages(lastId) : [];
+
+      if (cachedSessions.length > 0) {
+        console.log('[API] Instant Loading from Persistence Cache...');
+        return { 
+          sessions: cachedSessions, 
+          firstSessionMessages: cachedMsgs,
+          fromCache: true 
+        };
+      }
+
+      // ── FALLBACK: Fetch from Cloud if cache empty ──────────────────
       const sessions = await this.getConversations(limit, 0);
 
       if (sessions.length === 0) {
@@ -498,7 +533,7 @@ export const api = {
       // OPTIMIZATION: Load only recent messages (30 instead of 100)
       const firstSessionMessages = await this.getMessages(sessions[0].id, 30);
 
-      return { sessions, firstSessionMessages };
+      return { sessions, firstSessionMessages, fromCache: false };
     } catch (error: any) {
       // TIMEOUT HANDLING: Return partial data on timeout
       if (error?.code === '57014' || error?.message?.includes('timeout')) {

@@ -23,6 +23,7 @@ import {
   storeDiagram,
   extractDiagramsFromResponse,
   storeImage,
+  getArtifactsForSession,
 } from './services/artifactStore';
 import { Routes, Route } from 'react-router-dom';
 import Privacy from './components/Privacy';
@@ -191,110 +192,52 @@ const App: React.FC = () => {
 
     (async () => {
       try {
-        // Parallel load: stats + initial chat data
-        const [stats, chatData] = await Promise.all([
-          getStats(user.id),
-          api.loadInitialChatData(50),
-        ]);
-
+        // Phase 1: Instant Hydration from Persistence Cache
+        const chatData = await api.loadInitialChatData(50);
         if (!isMounted || controller.signal.aborted) return;
 
-        // Validate and update state in batch
-        if (stats) {
-          startTransition(() => setUserStats(stats));
-        }
-
-        if (!Array.isArray(chatData.sessions)) {
-          console.error('[APP] Invalid sessions data returned:', chatData.sessions);
-          chatData.sessions = [];
-        }
-
-        // Update sessions
-        startTransition(() => setSessions(chatData.sessions));
-
         if (chatData.sessions.length > 0) {
-          const firstSessionId = chatData.sessions[0].id;
-          setActiveSessionId(firstSessionId);
-
-          // Store first session with messages if available
-          if (Array.isArray(chatData.firstSessionMessages) && chatData.firstSessionMessages.length > 0) {
-            startTransition(() =>
-              setSessions(prev =>
-                prev.map(s =>
-                  s.id === firstSessionId
-                    ? { ...s, messages: chatData.firstSessionMessages }
-                    : s
-                )
-              )
-            );
-          } else {
-            // Fallback: load messages if not already loaded
-            api.getMessages(firstSessionId, 100)
-              .then(messages => {
-                if (!isMounted) return;
-                if (Array.isArray(messages)) {
-                  startTransition(() =>
-                    setSessions(p =>
-                      p.map(s =>
-                        s.id === firstSessionId
-                          ? { ...s, messages }
-                          : s
-                      )
-                    )
-                  );
-                }
-              })
-              .catch(err => console.error('[APP] Error loading messages:', err));
-          }
-
-          // Load artifacts for first session
-          loadArtifactsForSession(firstSessionId).catch(() => {});
-        } else {
-          // No conversations yet - this is a new user
-          console.log('[APP] No existing conversations found for user');
+          startTransition(() => {
+            setSessions(chatData.sessions);
+            const firstId = chatData.sessions[0].id;
+            setActiveSessionId(firstId);
+            if (chatData.firstSessionMessages?.length > 0) {
+              setSessions(prev => prev.map(s => s.id === firstId ? { ...s, messages: chatData.firstSessionMessages } : s));
+            }
+          });
         }
 
-        // Load all user artifacts in background for sidebar
-        loadAllUserArtifacts(user.id).catch(err =>
-          console.error('[APP] Error loading all artifacts:', err)
-        );
+        // Phase 2: Background Sync (Cloud Data)
+        const [stats, cloudSessions] = await Promise.all([
+          getStats(user.id),
+          api.getConversations(50, 0),
+        ]);
+
+        if (!isMounted) return;
+        if (stats) startTransition(() => setUserStats(stats));
+
+        if (cloudSessions.length > 0) {
+          const firstId = cloudSessions[0].id;
+          // OPTIMIZATION: Background sync only needs metadata to check for new turns
+          const cloudMessages = await api.getMessages(firstId, 50, true);
+          
+          if (!isMounted) return;
+          startTransition(() => {
+            setSessions(cloudSessions);
+            setActiveSessionId(firstId);
+            setSessions(prev => prev.map(s => s.id === firstId ? { ...s, messages: cloudMessages } : s));
+          });
+          
+          api.loadSessionPreviews(cloudSessions.slice(0, 5).map(s => s.id));
+        }
+
+        // Phase 3: Global Metadata Sync (Ultra-lean)
+        loadAllUserArtifacts(user.id).catch(() => {});
+        if (cloudSessions[0]?.id) loadArtifactsForSession(cloudSessions[0].id, true).catch(() => {});
+
       } catch (error) {
         if (!isMounted) return;
-        console.error('[APP] Error loading initial chat data:', error);
-
-        // Attempt fallback loading without parallelization
-        api.getConversations(50)
-          .then(convs => {
-            if (!isMounted) return;
-
-            if (!Array.isArray(convs)) {
-              console.error('[APP] Invalid conversations returned:', convs);
-              return;
-            }
-
-            startTransition(() => setSessions(convs));
-
-            if (convs.length > 0) {
-              setActiveSessionId(convs[0].id);
-              api.getMessages(convs[0].id, 100)
-                .then(m => {
-                  if (!isMounted) return;
-                  if (Array.isArray(m)) {
-                    startTransition(() =>
-                      setSessions(p =>
-                        p.map(s => (s.id === convs[0].id ? { ...s, messages: m } : s))
-                      )
-                    );
-                  }
-                })
-                .catch(err =>
-                  console.error('[APP] Error loading messages in fallback:', err)
-                );
-            }
-          })
-          .catch(err =>
-            console.error('[APP] Error in fallback conversations load:', err)
-          );
+        console.error('[APP] Error in hyper-load initialization:', error);
       }
     })();
 
@@ -392,7 +335,7 @@ const App: React.FC = () => {
           if (!flushTimer) flushTimer = setTimeout(flushToUI, 80);
         },
         abortControllerRef.current.signal,
-        `${user.id}:${sessionId}`
+        getArtifactsForSession(sessionId)
       );
       if (flushTimer) clearTimeout(flushTimer);
 

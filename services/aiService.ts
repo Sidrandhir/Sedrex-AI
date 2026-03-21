@@ -36,7 +36,7 @@ const MODELS = {
 const MAX_RETRIES  = 4;
 const MAX_MSG_LEN  = 4_000;
 const MAX_HISTORY: Record<string, number> = {
-  technical: 8, analytical: 10, live: 4, general: 6,
+  technical: 50, analytical: 60, live: 20, general: 40,
 };
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -866,9 +866,10 @@ async function callOpenAIProvider(
   signal?: AbortSignal,
 ): Promise<{ text: string; inputTokens: number; outputTokens: number }> {
   const cleanHistory = sanitizeConversationHistory(history);
+  const max = MAX_HISTORY.general; // Increased history
   const messages = [
     { role: "system" as const, content: systemInstruction },
-    ...cleanHistory.slice(-8).map((m) => ({
+    ...cleanHistory.slice(-max).map((m) => ({
       role: (m.role === "assistant" ? "assistant" : "user") as "assistant" | "user",
       content: m.content,
     })),
@@ -938,8 +939,9 @@ async function callClaudeProvider(
   signal?: AbortSignal,
 ): Promise<{ text: string; inputTokens: number; outputTokens: number }> {
   const cleanHistory = sanitizeConversationHistory(history);
+  const max = MAX_HISTORY.technical; // Use expanded history
   const messages = [
-    ...cleanHistory.slice(-8).map((m) => ({
+    ...cleanHistory.slice(-max).map((m) => ({
       role: (m.role === "assistant" ? "assistant" : "user") as "assistant" | "user",
       content: m.content,
     })),
@@ -1105,6 +1107,7 @@ async function processRequest(
   personification = "",
   onStreamChunk?:   (text: string) => void,
   signal?:          AbortSignal,
+  artifacts:        any[] = [], // NEW: Current session artifacts
 ): Promise<SedrexResponse> {
   if (signal?.aborted) throw new DOMException("Request aborted before processing", "AbortError");
 
@@ -1149,7 +1152,16 @@ async function processRequest(
     return buildSafeModeResponse(prompt, routing, "High load protection is active. Please retry in a few seconds.");
   }
 
-  const systemInstruction = buildSystemInstruction(sedrexIntent, personification, isProductQuery);
+  // ── Workspace Context Injection ───────────────────────────────────
+  // Construct a concise summary of the current workspace state
+  // to ensure the AI "remembers" every code file it has generated.
+  const workspaceContext = artifacts.length > 0
+    ? `\n\nCURRENT WORKSPACE ARTIFACTS:\n${artifacts.map(a => 
+        `- [ARTIFACT:${a.title}] (${a.language})\n${a.content.slice(0, 1500)}${a.content.length > 1500 ? '...' : ''}`
+      ).join('\n')}`
+    : '';
+
+  const systemInstruction = buildSystemInstruction(sedrexIntent, personification + workspaceContext, isProductQuery);
   const genConfig         = getGenerationConfig(sedrexIntent, routing.complexity, prompt);
 
   const geminiContents = buildHistory(history, sedrexIntent);
