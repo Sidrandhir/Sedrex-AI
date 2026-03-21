@@ -233,7 +233,7 @@ export async function storeDiagram(input: ArtifactCreateInput): Promise<Artifact
       userId:    data.user_id,
       title:     data.title,
       language:  'mermaid',
-      content:   data.mermaid_code ?? input.content, // Mapped from mermaid_code
+      content:   data.mermaid_code ?? input.content,
       type:      'diagram',
       lineCount: data.line_count ?? lineCount,
       createdAt: data.created_at ? new Date(data.created_at).getTime() : Date.now(),
@@ -344,12 +344,12 @@ export async function createArtifact(input: ArtifactCreateInput): Promise<Artifa
     const { data, error } = await supabase!
       .from('generated_code')
       .insert({
-        session_id: input.sessionId,      // DB column name is session_id, not conversation_id!
+        session_id: input.sessionId,
         user_id:         input.userId,
         title:           input.title,
         language:        input.language,
         code_content:    input.content,
-        artifact_type:   input.type,           // DB column is artifact_type NOT NULL
+        artifact_type:   input.type,
         file_path:       input.filePath ?? null,
         line_count:      lineCount,
       })

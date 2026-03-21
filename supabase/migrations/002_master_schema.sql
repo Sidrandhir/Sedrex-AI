@@ -400,6 +400,9 @@ ALTER TABLE public.user_query_log      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_daily_metrics  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.admin_audit_log     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.file_uploads        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.generated_images    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.generated_diagrams  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.generated_code      ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Enable all for profiles" ON public.profiles FOR ALL USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 CREATE POLICY "Enable all for user_stats" ON public.user_stats FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
@@ -410,6 +413,9 @@ CREATE POLICY "Users manage own messages" ON public.messages FOR ALL USING (
   EXISTS (SELECT 1 FROM public.conversations WHERE conversations.id = messages.conversation_id AND conversations.user_id = auth.uid())
 );
 CREATE POLICY "Users manage own artifacts" ON public.artifacts FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Users manage own images" ON public.generated_images FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Users manage own diagrams" ON public.generated_diagrams FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Users manage own code" ON public.generated_code FOR ALL USING (auth.uid() = user_id);
 
 CREATE POLICY "Users manage own file records" ON public.file_uploads FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Users manage own sessions" ON public.user_sessions FOR ALL USING (auth.uid() = user_id);

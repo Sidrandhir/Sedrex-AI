@@ -89,58 +89,42 @@ export class QueryOptimizer {
 }
 
 /**
- * Optimized artifact queries with chunking for performance
+ * Optimized artifact queries - FIXED to query ONLY artifacts table
  */
 export async function getAllUserArtifactsByUserId(userId: string) {
   return QueryOptimizer.executeWithTimeout(
     async () => {
-      // Parallel fetch across the decoupled architecture plus legacy fallback
-      const queries = [
-        supabase!.from('artifacts').select('id, user_id, session_id, title, language, artifact_type, file_path, line_count, created_at, updated_at, content').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
-        supabase!.from('generated_images').select('id, user_id, session_id, title, language, artifact_type, file_path, line_count, created_at, updated_at, base64_data').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
-        supabase!.from('generated_diagrams').select('id, user_id, session_id, title, language, artifact_type, file_path, line_count, created_at, updated_at, mermaid_code').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
-        supabase!.from('generated_code').select('id, user_id, session_id, title, language, artifact_type, file_path, line_count, created_at, updated_at, code_content').eq('user_id', userId).order('created_at', { ascending: false }).limit(50)
-      ];
+      // Single, optimized query to artifacts table with essential columns only
+      const { data, error } = await supabase!
+        .from('artifacts')
+        .select('id, user_id, session_id, title, language, artifact_type, content, line_count, created_at, updated_at, file_path')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(100);
 
-      const results = await Promise.all(queries);
-      
-      const unified = [
-        ...(results[0].data || []),
-        ...(results[1].data || []).map(r => ({ ...r, content: r.base64_data })),
-        ...(results[2].data || []).map(r => ({ ...r, content: r.mermaid_code })),
-        ...(results[3].data || []).map(r => ({ ...r, content: r.code_content }))
-      ];
-
-      return unified.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 100);
+      if (error) throw error;
+      return data || [];
     },
     'getAllUserArtifacts'
   );
 }
 
 /**
- * Optimized session artifact queries
+ * Optimized session artifact queries - FIXED to query ONLY artifacts table
  */
 export async function getArtifactsBySessionId(sessionId: string) {
   return QueryOptimizer.executeWithTimeout(
     async () => {
-      // Parallel fetch across the decoupled architecture plus legacy fallback
-      const queries = [
-        supabase!.from('artifacts').select('id, user_id, session_id, title, language, artifact_type, file_path, line_count, created_at, updated_at, content').eq('session_id', sessionId).order('created_at', { ascending: false }).limit(50),
-        supabase!.from('generated_images').select('id, user_id, session_id, title, language, artifact_type, file_path, line_count, created_at, updated_at, base64_data').eq('session_id', sessionId).order('created_at', { ascending: false }).limit(50),
-        supabase!.from('generated_diagrams').select('id, user_id, session_id, title, language, artifact_type, file_path, line_count, created_at, updated_at, mermaid_code').eq('session_id', sessionId).order('created_at', { ascending: false }).limit(50),
-        supabase!.from('generated_code').select('id, user_id, session_id, title, language, artifact_type, file_path, line_count, created_at, updated_at, code_content').eq('session_id', sessionId).order('created_at', { ascending: false }).limit(50)
-      ];
+      // Single, optimized query to artifacts table with essential columns only
+      const { data, error } = await supabase!
+        .from('artifacts')
+        .select('id, user_id, session_id, title, language, artifact_type, content, line_count, created_at, updated_at, file_path')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: false })
+        .limit(50);
 
-      const results = await Promise.all(queries);
-      
-      const unified = [
-        ...(results[0].data || []),
-        ...(results[1].data || []).map(r => ({ ...r, content: r.base64_data })),
-        ...(results[2].data || []).map(r => ({ ...r, content: r.mermaid_code })),
-        ...(results[3].data || []).map(r => ({ ...r, content: r.code_content }))
-      ];
-
-      return unified.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      if (error) throw error;
+      return data || [];
     },
     `getArtifactsBySessionId:${sessionId}`
   );
