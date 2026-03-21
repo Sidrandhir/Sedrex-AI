@@ -414,15 +414,16 @@ const PreviewPane = memo(({ artifact }: { artifact: Artifact }) => {
 
 // ── History Pane ──────────────────────────────────────────────────
 const HistoryPane = memo(({
-  artifacts, diagrams, activeId, onSelect, onDelete,
+  artifacts, diagrams, images, activeId, onSelect, onDelete,
 }: {
   artifacts: Artifact[];
   diagrams: Artifact[];
+  images: Artifact[];
   activeId: string | null;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
 }) => {
-  const all = [...artifacts, ...diagrams];
+  const all = [...artifacts, ...diagrams, ...images];
 
   if (all.length === 0) {
     return (
@@ -475,6 +476,41 @@ const HistoryPane = memo(({
     <div className="ap-history-list">
       {renderSection(artifacts, 'Code Artifacts')}
       {renderSection(diagrams, 'Diagrams')}
+      {renderSection(images, 'Images')}
+    </div>
+  );
+});
+
+// ── Image Viewer ──────────────────────────────────────────────────
+const ImageViewer = memo(({ artifact }: { artifact: Artifact }) => {
+  return (
+    <div className="ap-code-viewer" style={{ display: 'flex', flexDirection: 'column' }}>
+      <div className="ap-code-toolbar">
+        <div className="ap-code-meta">
+          <span className="ap-code-icon">🖼️</span>
+          <span className="ap-code-lang">Generated Image</span>
+        </div>
+        <div className="ap-code-actions">
+          <button className="ap-action-btn"
+            onClick={() => {
+              const a = document.createElement('a');
+              a.href = artifact.content; 
+              a.download = artifact.title || 'image.png';
+              document.body.appendChild(a); a.click();
+              document.body.removeChild(a);
+            }}
+            title="Download image">
+            <Icons.Download className="icon-12" /><span>Download</span>
+          </button>
+        </div>
+      </div>
+      <div className="ap-code-scroll" style={{ padding: 20, display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1, backgroundColor: '#000' }}>
+        <img 
+          src={artifact.content} 
+          alt={artifact.title} 
+          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }} 
+        />
+      </div>
     </div>
   );
 });
@@ -489,7 +525,7 @@ interface ArtifactPanelProps {
 
 const ArtifactPanel: React.FC<ArtifactPanelProps> = ({ onWidthChange }) => {
   const {
-    artifacts, diagrams, activeId, panelOpen, activeArtifact,
+    artifacts, diagrams, images, activeId, panelOpen, activeArtifact,
     openArtifact, closePanel,
   } = useArtifacts();
 
@@ -498,7 +534,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({ onWidthChange }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startX: number; startW: number } | null>(null);
 
-  const totalCount = artifacts.length + diagrams.length;
+  const totalCount = artifacts.length + diagrams.length + images.length;
 
   useEffect(() => { if (activeId) setTab('code'); }, [activeId]);
   useEffect(() => { onWidthChange?.(panelOpen ? width : 0); }, [panelOpen, width, onWidthChange]);
@@ -607,8 +643,9 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({ onWidthChange }) => {
 
         {/* ── Content ────────────────────────────────────────── */}
         <div className="ap-content">
+          {tab === 'code' && artifact && artifact.type === 'image' && <ImageViewer artifact={artifact} />}
           {tab === 'code' && artifact && isDiagram && <DiagramViewer artifact={artifact} />}
-          {tab === 'code' && artifact && !isDiagram && <CodeViewer artifact={artifact} />}
+          {tab === 'code' && artifact && !isDiagram && artifact.type !== 'image' && <CodeViewer artifact={artifact} />}
           {tab === 'code' && !artifact && (
             <div className="ap-empty">
               <div className="ap-empty-icon">📄</div>
@@ -630,6 +667,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({ onWidthChange }) => {
             <HistoryPane
               artifacts={artifacts}
               diagrams={diagrams}
+              images={images}
               activeId={activeId}
               onSelect={id => { openArtifact(id); setTab('code'); }}
               onDelete={deleteArtifact}

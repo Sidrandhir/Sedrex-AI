@@ -9,7 +9,7 @@
 //         Zero code changes needed.
 // ══════════════════════════════════════════════════════════════════
 
-import { Message, AttachedDocument, QueryIntent, RouterResult } from "../../types";
+import { Message, AttachedDocument, QueryIntent, SedrexRoute } from "../../types";
 import { buildAgentSystemPrompt } from "../SedrexsystemPrompt";
 import { callReasoningAgent } from "./reasoningAgent";
 import { callCodingAgent    } from "./codingAgent";
@@ -49,7 +49,7 @@ function intentToAgentType(
 export async function dispatch(
   prompt:         string,
   history:        Message[],
-  routing:        RouterResult,
+  routing:        SedrexRoute,
   documents:      AttachedDocument[],
   sessionContext: string,
   maxTokens:      number,

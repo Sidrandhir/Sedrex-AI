@@ -7,6 +7,7 @@ export enum AIModel {
   GPT4   = 'OpenAI GPT-4',
   CLAUDE = 'Anthropic Claude',
   GEMINI = 'Google Gemini',
+  NANO_BANANA_PRO = 'Nano Banana Pro',
 }
 
 export type MessageRole = 'user' | 'assistant' | 'system';
@@ -39,7 +40,7 @@ export interface GroundingChunk {
   maps?: { uri: string; title: string };
 }
 
-export type QueryIntent = 'reasoning' | 'coding' | 'math' | 'live' | 'research' | 'general';
+export type QueryIntent = 'reasoning' | 'coding' | 'math' | 'live' | 'research' | 'general' | 'image_generation';
 
 export interface RoutingContext {
   reason: string;
@@ -73,6 +74,7 @@ export interface Message {
   routingContext?: RoutingContext;
   suggestions?: string[];
   feedback?: 'good' | 'bad' | null;
+  generatedImageUrl?: string;
   // Codebase reference — set on user messages when a project is indexed.
   // Displayed as a small reference card below the user bubble.
   codebaseRef?: {
@@ -128,7 +130,7 @@ export interface UserStats {
   billingHistory?: BillingHistoryItem[];
 }
 
-export interface RouterResult {
+export interface SedrexRoute {
   model: AIModel;
   reason: string;
   explanation: string;

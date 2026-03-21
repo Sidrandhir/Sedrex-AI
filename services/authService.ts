@@ -5,7 +5,7 @@ import { supabase } from "./supabaseClient";
 // Returns a list of users known to this client's local registry to support synchronous stats calculation.
 export const getAllUsers = (): User[] => {
   if (typeof window === 'undefined') return [];
-  const stored = localStorage.getItem('nexus_known_users');
+  const stored = localStorage.getItem('sedrex_known_users');
   return stored ? JSON.parse(stored) : [];
 };
 
@@ -15,7 +15,7 @@ const registerUserLocally = (user: User) => {
   const users = getAllUsers();
   if (!users.find(u => u.id === user.id)) {
     users.push(user);
-    localStorage.setItem('nexus_known_users', JSON.stringify(users));
+    localStorage.setItem('sedrex_known_users', JSON.stringify(users));
   }
 };
 

@@ -100,7 +100,7 @@ async function runGeminiVerification(
 }
 
 // ── Main verification function ────────────────────────────────────
-// Call this after primary agent returns content, before returning NexusResponse.
+// Call this after primary agent returns content, before returning SedrexResponse.
 export async function verifyResponse(
   content:        string,
   originalPrompt: string,

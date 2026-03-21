@@ -23,7 +23,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA public;
 -- 2. TABLES (Core App Data)
 -- ════════════════════════════════════════════════════════════════════════════
 
-CREATE TABLE public.profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
   id                    UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   email                 TEXT UNIQUE,
   full_name             TEXT,
@@ -50,7 +50,7 @@ CREATE TABLE public.profiles (
   updated_at            TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
-CREATE TABLE public.user_preferences (
+CREATE TABLE IF NOT EXISTS public.user_preferences (
   user_id                  UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   theme                    TEXT DEFAULT 'dark' CHECK (theme IN ('light', 'dark', 'auto')),
   language                 TEXT DEFAULT 'en',
@@ -67,7 +67,7 @@ CREATE TABLE public.user_preferences (
   updated_at               TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
-CREATE TABLE public.user_stats (
+CREATE TABLE IF NOT EXISTS public.user_stats (
   user_id                  UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   tier                     TEXT DEFAULT 'free',
   total_messages           INTEGER DEFAULT 0,
@@ -98,7 +98,7 @@ CREATE TABLE public.user_stats (
   last_active_at           TIMESTAMPTZ
 );
 
-CREATE TABLE public.conversations (
+CREATE TABLE IF NOT EXISTS public.conversations (
   id                      UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id                 UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   title                   TEXT DEFAULT 'New Chat',
@@ -119,7 +119,7 @@ CREATE TABLE public.conversations (
   last_modified           TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
-CREATE TABLE public.messages (
+CREATE TABLE IF NOT EXISTS public.messages (
   id                  UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   conversation_id     UUID REFERENCES public.conversations(id) ON DELETE CASCADE NOT NULL,
   parent_message_id   UUID REFERENCES public.messages(id),
@@ -150,7 +150,7 @@ CREATE TABLE public.messages (
   timestamp           TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
-CREATE TABLE public.artifacts (
+CREATE TABLE IF NOT EXISTS public.artifacts (
   id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   -- We map session_id to conversations for legacy/flexibility, though the app uses it for chats
   session_id      UUID REFERENCES public.conversations(id) ON DELETE CASCADE,
@@ -158,7 +158,7 @@ CREATE TABLE public.artifacts (
   title           TEXT NOT NULL DEFAULT 'Untitled',
   language        TEXT NOT NULL DEFAULT 'text',
   content         TEXT NOT NULL DEFAULT '',
-  artifact_type   TEXT NOT NULL DEFAULT 'code' CHECK (artifact_type IN ('code', 'html', 'document', 'diagram', 'react', 'svg', 'mermaid', 'markdown')),
+  artifact_type   TEXT NOT NULL DEFAULT 'code' CHECK (artifact_type IN ('code', 'html', 'document', 'diagram', 'react', 'svg', 'mermaid', 'markdown', 'image')),
   file_path       TEXT,
   line_count      INTEGER DEFAULT 0,
   created_at      TIMESTAMPTZ DEFAULT now() NOT NULL,
@@ -169,7 +169,7 @@ CREATE TABLE public.artifacts (
 -- 3. TABLES (Analytics & Tracking)
 -- ════════════════════════════════════════════════════════════════════════════
 
-CREATE TABLE public.user_sessions (
+CREATE TABLE IF NOT EXISTS public.user_sessions (
   id                UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id           UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   session_token     TEXT,
@@ -190,7 +190,7 @@ CREATE TABLE public.user_sessions (
   ended_reason      TEXT
 );
 
-CREATE TABLE public.user_events (
+CREATE TABLE IF NOT EXISTS public.user_events (
   id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id         UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   session_id      UUID REFERENCES public.user_sessions(id) ON DELETE SET NULL,
@@ -205,7 +205,7 @@ CREATE TABLE public.user_events (
   created_at      TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
-CREATE TABLE public.user_query_log (
+CREATE TABLE IF NOT EXISTS public.user_query_log (
   id                UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id           UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   session_id        UUID REFERENCES public.user_sessions(id) ON DELETE SET NULL,
@@ -241,7 +241,7 @@ CREATE TABLE public.user_query_log (
   created_at        TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
-CREATE TABLE public.user_daily_metrics (
+CREATE TABLE IF NOT EXISTS public.platform_analytics_daily (
   id                UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id           UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   date              DATE NOT NULL,
@@ -266,7 +266,7 @@ CREATE TABLE public.user_daily_metrics (
   UNIQUE(user_id, date)
 );
 
-CREATE TABLE public.admin_audit_log (
+CREATE TABLE IF NOT EXISTS public.admin_audit_logs (
   id             UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   admin_id       UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   admin_email    TEXT,
@@ -278,7 +278,7 @@ CREATE TABLE public.admin_audit_log (
   created_at     TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
-CREATE TABLE public.file_uploads (
+CREATE TABLE IF NOT EXISTS public.user_storage (
   id                UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id           UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   conversation_id   UUID REFERENCES public.conversations(id) ON DELETE SET NULL,

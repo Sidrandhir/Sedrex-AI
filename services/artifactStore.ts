@@ -16,8 +16,7 @@
 
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 
-// ── Types ──────────────────────────────────────────────────────────
-export type ArtifactType = 'code' | 'html' | 'document' | 'diagram';
+export type ArtifactType = 'code' | 'html' | 'document' | 'diagram' | 'image';
 
 export interface Artifact {
   id:         string;
@@ -59,6 +58,7 @@ export function subscribeToArtifacts(fn: () => void): () => void {
 
 export function getArtifacts():      Artifact[]    { return _artifacts;  }
 export function getDiagrams():       Artifact[]    { return _diagrams;   }
+export function getImages():         Artifact[]    { return [..._artifacts, ..._diagrams].filter(a => a.type === 'image'); }
 export function getActiveId():       string | null { return _activeId;   }
 export function isPanelOpen():       boolean       { return _panelOpen;  }
 
@@ -248,6 +248,70 @@ export async function storeDiagram(input: ArtifactCreateInput): Promise<Artifact
   }
 }
 
+// ── NEW: Store Image Artifact ────────────────────────────────────────
+export async function storeImage(
+  sessionId: string,
+  userId: string,
+  title: string,
+  dataUrl: string
+): Promise<Artifact> {
+  const localId = crypto.randomUUID();
+  const imageArtifact: Artifact = {
+    id:        localId,
+    sessionId: sessionId,
+    userId:    userId,
+    title:     title,
+    language:  'png', // Store as PNG meta
+    content:   dataUrl,
+    type:      'image',
+    lineCount: 0,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  // Add to artifacts store
+  _artifacts = [imageArtifact, ..._artifacts];
+  notify();
+
+  if (!isSupabaseConfigured) return imageArtifact;
+
+  try {
+    const { data, error } = await supabase!
+      .from('artifacts')
+      .insert({
+        session_id:      sessionId,
+        user_id:         userId,
+        title:           title,
+        language:        'png',
+        content:         dataUrl,
+        artifact_type:   'image',
+        file_path:       null,
+        line_count:      0,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.warn('[SEDREX Images] DB save failed:', error.message);
+      return imageArtifact;
+    }
+
+    const saved: Artifact = {
+      ...imageArtifact,
+      id: data.id,
+      sessionId: data.session_id ?? sessionId,
+      createdAt: data.created_at ? new Date(data.created_at).getTime() : Date.now(),
+    };
+
+    _artifacts = _artifacts.map(a => a.id === localId ? saved : a);
+    notify();
+    return saved;
+  } catch (e) {
+    console.warn('[SEDREX Images] DB exception:', e);
+    return imageArtifact;
+  }
+}
+
 // ── CRUD ───────────────────────────────────────────────────────────
 
 export async function createArtifact(input: ArtifactCreateInput): Promise<Artifact> {
@@ -415,8 +479,8 @@ export async function loadAllUserArtifacts(userId: string): Promise<void> {
       updatedAt: row.updated_at ? new Date(row.updated_at).getTime() : Date.now(),
     }));
 
-    _artifacts = all.filter(a => a.type !== 'diagram' && a.language !== 'mermaid');
     _diagrams  = all.filter(a => a.type === 'diagram' || a.language === 'mermaid');
+    _artifacts = all.filter(a => !(a.type === 'diagram' || a.language === 'mermaid'));
     notify();
   } catch { /* silent */ }
 }
@@ -435,6 +499,7 @@ import { useState, useEffect } from 'react';
 export function useArtifacts() {
   const [artifacts, setArtifacts] = useState<Artifact[]>(_artifacts);
   const [diagrams,  setDiagrams]  = useState<Artifact[]>(_diagrams);
+  const [images,    setImages]    = useState<Artifact[]>([]);
   const [activeId,  setActiveId]  = useState<string | null>(_activeId);
   const [panelOpen, setPanelOpen] = useState<boolean>(_panelOpen);
 
@@ -442,6 +507,7 @@ export function useArtifacts() {
     const unsub = subscribeToArtifacts(() => {
       setArtifacts([..._artifacts]);
       setDiagrams([..._diagrams]);
+      setImages([..._artifacts].filter(a => a.type === 'image'));
       setActiveId(_activeId);
       setPanelOpen(_panelOpen);
     });
@@ -449,8 +515,9 @@ export function useArtifacts() {
   }, []);
 
   return {
-    artifacts,
+    artifacts: artifacts.filter(a => a.type !== 'image'), // strictly non-image artifacts
     diagrams,
+    images,
     activeId,
     panelOpen,
     activeArtifact: activeId

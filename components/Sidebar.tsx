@@ -174,10 +174,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [showChats,         setShowChats]         = useState(true);
   const [showArtifacts,     setShowArtifacts]     = useState(true);
   const [showDiagrams,      setShowDiagrams]      = useState(true);
+  const [showImages,        setShowImages]        = useState(true);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Artifact store
-  const { artifacts, diagrams } = useArtifacts();
+  const { artifacts, diagrams, images } = useArtifacts();
 
   const handleOpenArtifact = useCallback((id: string) => {
     setActiveArtifact(id);
@@ -584,6 +585,44 @@ const Sidebar: React.FC<SidebarProps> = ({
                 ) : (
                   diagrams.slice(0, 20).map(d => (
                     <ArtifactRow key={d.id} artifact={d} onOpen={handleOpenArtifact} />
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── Images ────────────────────────────────────── */}
+          <div className="mb-1">
+            <SectionHeader
+              label="Images"
+              icon={
+                <svg viewBox="0 0 16 16" style={{ width: 12, height: 12, color: 'var(--accent)' }} fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M2 3h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+                  <circle cx="5" cy="6" r="1.5" />
+                  <path d="M1 12l4-4 4 4" />
+                  <path d="M7 10l3-3 5 5" />
+                </svg>
+              }
+              count={images?.length || 0}
+              countBadgeStyle={{
+                background: 'rgba(16,185,129,0.2)', color: 'var(--accent)',
+                borderRadius: 10, fontSize: 9, fontWeight: 700,
+                padding: '1px 5px', lineHeight: 1.6,
+                border: '1px solid rgba(16,185,129,0.3)',
+              }}
+              isOpen={showImages}
+              onToggle={() => setShowImages(v => !v)}
+            />
+
+            {showImages && (
+              <div className="sidebar-artifact-list">
+                {!images || images.length === 0 ? (
+                  <div className="sidebar-artifact-empty">
+                    Generated images appear here.
+                  </div>
+                ) : (
+                  images.slice(0, 20).map(img => (
+                    <ArtifactRow key={img.id} artifact={img} onOpen={handleOpenArtifact} />
                   ))
                 )}
               </div>

@@ -4,7 +4,7 @@ import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import MessageInput from './components/MessageInput';
 import Toast, { ToastMessage } from './components/Toast';
-import { ChatSession, Message, RouterResult, UserStats, User, AIModel, MessageImage, AttachedDocument } from './types';
+import { ChatSession, Message, SedrexRoute, UserStats, User, AIModel, MessageImage, AttachedDocument } from './types';
 import { getAIResponse, generateChatTitle, routePrompt, generateFollowUpSuggestions } from './services/aiService';
 import { getStats } from './services/storageService';
 import { getCurrentUser, logout } from './services/authService';
@@ -22,6 +22,7 @@ import {
   subscribeToArtifacts,
   storeDiagram,
   extractDiagramsFromResponse,
+  storeImage,
 } from './services/artifactStore';
 import { Routes, Route } from 'react-router-dom';
 import Privacy from './components/Privacy';
@@ -62,7 +63,7 @@ const App: React.FC = () => {
   const [userStats, setUserStats]                     = useState<UserStats | null>(null);
   const [isSidebarOpen, setIsSidebarOpen]             = useState(window.innerWidth >= 1024);
   const [isLoading, setIsLoading]                     = useState(false);
-  const [routingInfo, setRoutingInfo]                 = useState<RouterResult | null>(null);
+  const [routingInfo, setRoutingInfo]                 = useState<SedrexRoute | null>(null);
   const [view, setView]                               = useState<'chat' | 'dashboard' | 'pricing' | 'billing' | 'admin'>('chat');
   const [isSettingsOpen, setIsSettingsOpen]           = useState(false);
   const [toasts, setToasts]                           = useState<ToastMessage[]>([]);
@@ -319,9 +320,19 @@ const App: React.FC = () => {
         });
       }
 
+      // NEW: Store Generated Image contextually
+      if (response.generatedImageUrl && user) {
+        // Build a short, descriptive title based on user prompt
+        const safePrompt = userMsg.content.replace(/[^a-zA-Z0-9\s]/g, '').trim();
+        const shortName  = safePrompt.length > 30 ? safePrompt.slice(0, 30) + '...' : safePrompt;
+        const imgTitle   = `${shortName || 'Generated Image'} - ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.png`;
+
+        storeImage(sessionId, user.id, imgTitle, response.generatedImageUrl).catch(() => {});
+      }
+
       setSessions(prev => prev.map(s => s.id === sessionId ? {
         ...s,
-        messages: s.messages.map(m => m.id === assistantId ? { ...m, content: finalContent } : m),
+        messages: s.messages.map(m => m.id === assistantId ? { ...m, content: finalContent, generatedImageUrl: response.generatedImageUrl } : m),
       } : s));
 
       const suggestionsPromise = generateFollowUpSuggestions(response.content, previewRoute.intent).catch(() => []);
@@ -331,11 +342,12 @@ const App: React.FC = () => {
         inputTokens: response.inputTokens, outputTokens: response.outputTokens,
         groundingChunks: response.groundingChunks,
         routingContext: response.routingContext as any, timestamp: Date.now(),
+        generatedImageUrl: response.generatedImageUrl,
       });
 
       setSessions(prev => prev.map(s => s.id === sessionId ? {
         ...s,
-        messages: s.messages.map(m => m.id === assistantId ? savedMsg : m),
+        messages: s.messages.map(m => m.id === assistantId ? { ...savedMsg, generatedImageUrl: response.generatedImageUrl || savedMsg.generatedImageUrl } : m),
       } : s));
 
       suggestionsPromise.then(suggestions => {

@@ -133,7 +133,8 @@ export const api = {
         inputTokens: row.input_tokens || 0,
         outputTokens: row.output_tokens || 0,
         groundingChunks: row.grounding_chunks,
-        routingContext: row.metadata
+        routingContext: row.metadata,
+        generatedImageUrl: row.metadata?.generatedImageUrl
       };
     });
   },
@@ -147,7 +148,7 @@ export const api = {
       image_data: message.images || (message.image ? [message.image] : null),
       documents: message.documents || [],
       grounding_chunks: message.groundingChunks,
-      metadata: message.routingContext,
+      metadata: { ...message.routingContext, generatedImageUrl: message.generatedImageUrl },
       tokens_used: message.tokensUsed,
       input_tokens: message.inputTokens,
       output_tokens: message.outputTokens
@@ -170,7 +171,8 @@ export const api = {
       inputTokens: data.input_tokens,
       outputTokens: data.output_tokens,
       groundingChunks: data.grounding_chunks,
-      routingContext: data.metadata
+      routingContext: data.metadata,
+      generatedImageUrl: data.metadata?.generatedImageUrl
     };
   },
 

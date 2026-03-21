@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import {
   AIModel,
   Message,
-  RouterResult,
+  SedrexRoute,
   MessageImage,
   GroundingChunk,
   AttachedDocument,
@@ -25,9 +25,12 @@ import { getCodebaseContextForQuery } from "./codebaseContext";
 // ═══════════════════════════════════════════════════════════════════
 
 const MODELS = {
-  FLASH:      "gemini-3-flash-preview",
-  FLASH_LITE: "gemini-3.1-flash-lite-preview",
-  PRO:        "gemini-3.1-pro-preview",
+  FLASH:           "gemini-3-flash-preview",
+  FLASH_LITE:      "gemini-3.1-flash-lite-preview",
+  PRO:             "gemini-3.1-pro-preview",
+  // Image generation models (real, documented names)
+  IMAGEN:          "imagen-4.0-generate-001",
+  GEMINI_IMAGE:    "gemini-2.5-flash-image",
 } as const;
 
 const MAX_RETRIES  = 4;
@@ -87,13 +90,13 @@ class KeyedConcurrentQueue {
 }
 
 const MAX_CONCURRENT_REQUESTS = Number(
-  (typeof import.meta !== "undefined" ? import.meta.env?.VITE_NEXUS_MAX_CONCURRENT ?? undefined : undefined)
-  ?? (typeof process !== "undefined" ? process.env?.NEXUS_MAX_CONCURRENT_REQUESTS : undefined)
+  (typeof import.meta !== "undefined" ? import.meta.env?.VITE_SEDREX_MAX_CONCURRENT ?? undefined : undefined)
+  ?? (typeof process !== "undefined" ? process.env?.SEDREX_MAX_CONCURRENT_REQUESTS : undefined)
   ?? 16
 );
 const MAX_QUEUED_REQUESTS = Number(
-  (typeof import.meta !== "undefined" ? import.meta.env?.VITE_NEXUS_MAX_QUEUED ?? undefined : undefined)
-  ?? (typeof process !== "undefined" ? process.env?.NEXUS_MAX_QUEUED_REQUESTS : undefined)
+  (typeof import.meta !== "undefined" ? import.meta.env?.VITE_SEDREX_MAX_QUEUED ?? undefined : undefined)
+  ?? (typeof process !== "undefined" ? process.env?.SEDREX_MAX_QUEUED_REQUESTS : undefined)
   ?? 1000
 );
 const requestQueue = new KeyedConcurrentQueue(MAX_CONCURRENT_REQUESTS, MAX_QUEUED_REQUESTS);
@@ -184,7 +187,7 @@ const CIRCUIT_FAIL_THRESHOLD = 6;
 const CIRCUIT_FAIL_WINDOW_MS = 30_000;
 const CIRCUIT_OPEN_MS        = 20_000;
 
-type CacheEntry = { value: NexusResponse; expiresAt: number };
+type CacheEntry = { value: SedrexResponse; expiresAt: number };
 const responseCache = new Map<string, CacheEntry>();
 
 setInterval(() => {
@@ -194,7 +197,7 @@ setInterval(() => {
   }
 }, 30_000);
 
-const inFlightByFingerprint = new Map<string, Promise<NexusResponse>>();
+const inFlightByFingerprint = new Map<string, Promise<SedrexResponse>>();
 const clientRequestWindows  = new Map<string, number[]>();
 
 function isClientRateLimited(clientId: string): boolean {
@@ -276,9 +279,9 @@ function buildSafeModeContent(intent: QueryIntent, prompt: string, reason: strin
 
 function buildSafeModeResponse(
   prompt: string,
-  routing: RouterResult,
+  routing: SedrexRoute,
   reason: string,
-): NexusResponse {
+): SedrexResponse {
   return {
     content: buildSafeModeContent(routing.intent, prompt, reason),
     model: routing.model,
@@ -293,7 +296,7 @@ function buildSafeModeResponse(
 
 // ── Observability ─────────────────────────────────────────────────
 
-export interface NexusEvent {
+export interface SedrexEvent {
   event:         "query_processed" | "query_error" | "query_routed";
   intent:        string;
   model:         string;
@@ -308,13 +311,13 @@ export interface NexusEvent {
   timestamp:     string;
 }
 
-let _analyticsHandler: ((event: NexusEvent) => void) | null = null;
+let _analyticsHandler: ((event: SedrexEvent) => void) | null = null;
 
-export function setAnalyticsHandler(fn: (event: NexusEvent) => void): void {
+export function setAnalyticsHandler(fn: (event: SedrexEvent) => void): void {
   _analyticsHandler = fn;
 }
 
-function emit(event: NexusEvent): void {
+function emit(event: SedrexEvent): void {
   if (_analyticsHandler) { try { _analyticsHandler(event); } catch { /* never crash */ } }
   if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production") {
     console.log(`[SEDREX] ${event.event}`, {
@@ -355,24 +358,26 @@ function computeConfidence(
 
 // ── Intent routing ────────────────────────────────────────────────
 
-type NexusIntent = "live" | "technical" | "analytical" | "general";
+type SedrexIntent = "live" | "technical" | "analytical" | "general" | "image_generation";
 
-function mapNexusIntentToQueryIntent(intent: NexusIntent): QueryIntent {
+function mapSedrexIntentToQueryIntent(intent: SedrexIntent): QueryIntent {
   switch (intent) {
     case "live":       return "live";
     case "technical":  return "coding";
     case "analytical": return "reasoning";
     case "general":    return "general";
+    case "image_generation": return "image_generation";
     default:           return "general";
   }
 }
 
-function mapQueryIntentToNexusIntent(qi: QueryIntent): NexusIntent {
+function mapQueryIntentToSedrexIntent(qi: QueryIntent): SedrexIntent {
   switch (qi) {
     case "live":      return "live";
     case "coding":    return "technical";
     case "reasoning": return "analytical";
     case "general":   return "general";
+    case "image_generation": return "image_generation";
     default:          return "general";
   }
 }
@@ -420,7 +425,7 @@ export function classifyIntent(
   prompt: string,
   hasImage: boolean,
   hasDocs: boolean,
-): NexusIntent {
+): SedrexIntent {
   const p = prompt.toLowerCase().trim();
   if (hasImage) return "live";
   if ([...LIVE_SIGNALS].some((k) => p.includes(k))) return "live";
@@ -430,6 +435,10 @@ export function classifyIntent(
   if ([...TECHNICAL_STRONG].some((k) => p.includes(k))) return "technical";
   if ([...ANALYTICAL_SIGNALS].some((k) => p.includes(k))) return "analytical";
   if (prompt.split(/\s+/).length > 50 && hasDocs) return "analytical";
+  const imageTriggers = /\b(generate|create|draw|make|render|depict|paint|illustrate)\b.{0,60}\b(image|picture|photo|graphic|visual|portrait|landscape|illustration|drawing|artwork|logo|icon|avatar|asset|diagram|airplane|car|cat|dog|character|scene)\b/i;
+  const strongGenerate = /^(generate|draw|paint|illustrate) +(a|an|the|some)? +([a-z0-9 ]{2,50})$/i;
+  if (imageTriggers.test(p) || strongGenerate.test(p)) return "image_generation";
+
   return "general";
 }
 
@@ -437,17 +446,18 @@ export function routePrompt(
   prompt: string,
   hasImage = false,
   hasDocs = false,
-): RouterResult {
+): SedrexRoute {
   const intent     = classifyIntent(prompt, hasImage, hasDocs);
   const complexity = estimateComplexity(prompt, intent, hasDocs);
-  const routes: Record<NexusIntent, { model: AIModel; reason: string; explanation: string }> = {
-    live:       { model: AIModel.GEMINI, reason: "Live Intelligence",   explanation: "Real-time web grounding active." },
-    technical:  { model: AIModel.CLAUDE, reason: "Technical Precision", explanation: "Code, math & engineering core." },
-    analytical: { model: AIModel.GPT4,   reason: "Deep Analysis",       explanation: "Structured reasoning engine." },
-    general:    { model: AIModel.GPT4,   reason: "Balanced Intelligence",explanation: "Precision synthesis engine." },
+  const routes: Record<SedrexIntent, { model: AIModel; reason: string; explanation: string }> = {
+    live:             { model: AIModel.GEMINI, reason: "Live Intelligence",   explanation: "Real-time web grounding active." },
+    technical:        { model: AIModel.CLAUDE, reason: "Technical Precision", explanation: "Code, math & engineering core." },
+    analytical:       { model: AIModel.GPT4,   reason: "Deep Analysis",       explanation: "Structured reasoning engine." },
+    general:          { model: AIModel.GPT4,   reason: "Balanced Intelligence",explanation: "Precision synthesis engine." },
+    image_generation: { model: AIModel.NANO_BANANA_PRO, reason: "Visual Synthesis", explanation: "Nano Banana image engine." },
   };
   const route = routes[intent];
-  return { ...route, confidence: 0.95, complexity, intent: mapNexusIntentToQueryIntent(intent) };
+  return { ...route, confidence: 0.95, complexity, intent: mapSedrexIntentToQueryIntent(intent) };
 }
 
 function estimateComplexity(
@@ -569,6 +579,16 @@ GENERAL MODE — Adapt format to the question type every time.
 → How-to → numbered list + code if needed
 → Comparison → table + verdict
 → Casual ("thanks", "ok", "got it") → ONE natural sentence, no formatting
+
+IMAGE GENERATION RULE:
+If the user asks to generate, create, or draw an image/picture/visual, YOU MUST ONLY output a JSON tool call EXACTLY like this:
+\`\`\`json
+{
+  "action": "nano_banana",
+  "action_input": { "prompt": "highly detailed visual prompt" }
+}
+\`\`\`
+DO NOT output any other text or explanation. DO NOT use dalle.text2im. Use nano_banana ONLY.
 `.trim();
 
 const FAIL_FORWARD = `
@@ -604,15 +624,16 @@ ALWAYS include ALL data — never truncate, never use placeholders.
 `.trim();
 
 function buildSystemInstruction(
-  intent: NexusIntent,
+  intent: SedrexIntent,
   personification: string,
   isProductQuery: boolean,
 ): string {
-  const modeMap: Record<NexusIntent, string> = {
-    technical:  MODE_TECHNICAL,
-    analytical: MODE_ANALYTICAL,
-    live:       MODE_LIVE,
-    general:    MODE_GENERAL,
+  const modeMap: Record<SedrexIntent, string> = {
+    technical:        MODE_TECHNICAL,
+    analytical:       MODE_ANALYTICAL,
+    live:             MODE_LIVE,
+    general:          MODE_GENERAL,
+    image_generation: MODE_GENERAL, // Standard base + prompt guidance
   };
 
   const tablePrompt = `
@@ -660,7 +681,7 @@ interface GenConfig {
 }
 
 function getGenerationConfig(
-  intent: NexusIntent,
+  intent: SedrexIntent,
   complexity: number,
   prompt: string,
 ): GenConfig {
@@ -669,21 +690,23 @@ function getGenerationConfig(
     /\b(table|comparison|vs|versus|matrix|grid|breakdown)\b/i.test(prompt) ||
     /^\s*(build|create|make|write)\s*(a\s+)?table\s*$/i.test(prompt.trim());
 
-  const temp: Record<NexusIntent, number> = {
-    technical:  0.1,
-    analytical: 0.35,
-    live:       0.5,
-    general:    0.55,
+  const temp: Record<SedrexIntent, number> = {
+    technical:        0.1,
+    analytical:       0.35,
+    live:             0.5,
+    general:          0.55,
+    image_generation: 0.75, // Higher temp for creative synthesis
   };
 
   // ── FIX 2: All intents can now produce large code outputs ────────
   // technical/analytical: up to 32k (full large files)
   // live/general: up to 16k (can still produce medium code blocks)
-  const budget: Record<NexusIntent, [number, number]> = {
-    technical:  [8192, 32000],
-    analytical: [8192, 32000],
-    live:       [2048, 16000],
-    general:    [2048, 16000],
+  const budget: Record<SedrexIntent, [number, number]> = {
+    technical:        [8192, 32000],
+    analytical:       [8192, 32000],
+    live:             [2048, 16000],
+    general:          [2048, 16000],
+    image_generation: [2048, 8192], // Sufficient for prompt refinement
   };
 
   const [min, max] = budget[intent];
@@ -700,7 +723,7 @@ function getGenerationConfig(
 
 // ── Context builder ───────────────────────────────────────────────
 
-function buildHistory(history: Message[], intent: NexusIntent): any[] {
+function buildHistory(history: Message[], intent: SedrexIntent): any[] {
   const max = MAX_HISTORY[intent] ?? 6;
   const safeHistory = sanitizeConversationHistory(history);
   return safeHistory.slice(-max).map((msg) => ({
@@ -985,15 +1008,16 @@ async function callClaudeProvider(
 // RESPONSE TYPE
 // ═══════════════════════════════════════════════════════════════════
 
-export interface NexusResponse {
+export interface SedrexResponse {
   content:          string;
   model:            AIModel;
   tokens:           number;
   inputTokens:      number;
   outputTokens:     number;
   confidence:       ConfidenceSignal;
+  generatedImageUrl?: string;
   groundingChunks?: GroundingChunk[];
-  routingContext:   RouterResult & {
+  routingContext:   SedrexRoute & {
     engine:          string;
     thinking:        boolean;
     agentType?:      string;
@@ -1009,14 +1033,14 @@ export const getAIResponse = async (
   prompt:           string,
   history:          Message[],
   manualModel?:     AIModel | "auto",
-  onRouting?:       (result: RouterResult) => void,
+  onRouting?:       (result: SedrexRoute) => void,
   images?:          MessageImage[],
   documents:        AttachedDocument[] = [],
   personification = "",
   onStreamChunk?:   (text: string) => void,
   signal?:          AbortSignal,
   queueKey = "global",
-): Promise<NexusResponse> => {
+): Promise<SedrexResponse> => {
   const clientId = (queueKey?.split(":")[0] || "global").trim() || "global";
 
   const isTablePrompt =
@@ -1075,20 +1099,20 @@ async function processRequest(
   prompt:           string,
   history:          Message[],
   manualModel?:     AIModel | "auto",
-  onRouting?:       (result: RouterResult) => void,
+  onRouting?:       (result: SedrexRoute) => void,
   images?:          MessageImage[],
   documents:        AttachedDocument[] = [],
   personification = "",
   onStreamChunk?:   (text: string) => void,
   signal?:          AbortSignal,
-): Promise<NexusResponse> {
+): Promise<SedrexResponse> {
   if (signal?.aborted) throw new DOMException("Request aborted before processing", "AbortError");
 
   const startTime = Date.now();
   const hasImage  = !!(images?.length);
   const hasDocs   = documents.length > 0;
 
-  const routing: RouterResult =
+  const routing: SedrexRoute =
     manualModel && manualModel !== "auto"
       ? {
           model:       manualModel as AIModel,
@@ -1100,17 +1124,17 @@ async function processRequest(
             classifyIntent(prompt, hasImage, hasDocs),
             hasDocs,
           ),
-          intent: mapNexusIntentToQueryIntent(classifyIntent(prompt, hasImage, hasDocs)),
+          intent: mapSedrexIntentToQueryIntent(classifyIntent(prompt, hasImage, hasDocs)),
         }
       : (() => {
           const r = routePrompt(prompt, hasImage, hasDocs);
-          return { ...r, intent: mapNexusIntentToQueryIntent(r.intent as NexusIntent) };
+          return { ...r, intent: mapSedrexIntentToQueryIntent(r.intent as SedrexIntent) };
         })();
 
   onRouting?.(routing);
 
   const intent      = routing.intent as QueryIntent;
-  const nexusIntent = mapQueryIntentToNexusIntent(intent);
+  const sedrexIntent = mapQueryIntentToSedrexIntent(intent);
 
   const isProductQuery    = /\b(buy now|add to cart|where to buy|cheapest price|order online|cod|cash on delivery)\b/i.test(prompt);
   const freshnessSignals  = /(latest|today|current|right now|this week|this month|breaking|newly|updated)/i;
@@ -1118,17 +1142,17 @@ async function processRequest(
     /^\s*(build|create|make|write)\s*(a\s+)?table\s*$/i.test(prompt.trim());
   const isGenuinelyLive   = intent === "live" && !TABLE_PATTERNS.test(prompt) && !isTablePrompt;
   const useSearch         = isGenuinelyLive || freshnessSignals.test(prompt);
-  const useProModel       = (nexusIntent === "technical" || nexusIntent === "analytical") && routing.complexity > 0.65;
+  const useProModel       = (sedrexIntent === "technical" || sedrexIntent === "analytical") && routing.complexity > 0.65;
   const engine            = useProModel ? MODELS.PRO : MODELS.FLASH;
 
   if (isCircuitOpen()) {
     return buildSafeModeResponse(prompt, routing, "High load protection is active. Please retry in a few seconds.");
   }
 
-  const systemInstruction = buildSystemInstruction(nexusIntent, personification, isProductQuery);
-  const genConfig         = getGenerationConfig(nexusIntent, routing.complexity, prompt);
+  const systemInstruction = buildSystemInstruction(sedrexIntent, personification, isProductQuery);
+  const genConfig         = getGenerationConfig(sedrexIntent, routing.complexity, prompt);
 
-  const geminiContents = buildHistory(history, nexusIntent);
+  const geminiContents = buildHistory(history, sedrexIntent);
   const parts: any[]   = [];
   for (const doc of documents) {
     parts.push({ text: `[DOCUMENT: ${doc.title}]\n\`\`\`\n${doc.content}\n\`\`\`\n` });
@@ -1182,7 +1206,7 @@ async function processRequest(
   // ── FIX 2: Broadened code detection + raised ceiling to 32k ─────
   // Now catches: explicit code keywords, file extensions, build/create/write patterns
   const isCodeRequest =
-    nexusIntent === 'technical' ||
+    sedrexIntent === 'technical' ||
     /```|\.tsx?|\.jsx?|\.py|\.rs|\.go|\.java|\.kt|\.css|\.html|\.sql/i.test(prompt) ||
     /\b(function|class|component|service|module|hook|util|helper|controller|route|model|schema|interface|type|enum)\b/i.test(prompt) ||
     /\b(write|build|create|generate|implement|code|refactor|fix|debug|update)\b.{0,30}\b(file|code|script|app|page|component|api|endpoint|function|class)\b/i.test(prompt) ||
@@ -1197,6 +1221,43 @@ async function processRequest(
     ? Math.max(genConfig.maxTokens, 8192)
     : Math.max(genConfig.maxTokens, 4096);
 
+  const fprint = buildFingerprint(prompt, history, manualModel, documents);
+  const key    = getApiKey();
+
+  // ── IMAGE GENERATION BRANCH — Bypass retry loop/agents ──────────
+  if (routing.intent === "image_generation") {
+    try {
+      const imgResult = await generateImage(flatPrompt, key);
+      const usedEngine = imgResult.engine;
+      const response: SedrexResponse = {
+        content:      imgResult.text,
+        model:        routing.model,
+        tokens:       imgResult.tokens.total,
+        inputTokens:  imgResult.tokens.input,
+        outputTokens: imgResult.tokens.output,
+        confidence:   computeConfidence("image_generation", routing.complexity, false),
+        generatedImageUrl: imgResult.url,
+        routingContext: {
+          ...routing,
+          engine: usedEngine,
+          thinking: false,
+        },
+      };
+      if (RESPONSE_CACHE_TTL_MS > 0) responseCache.set(fprint, { value: response, expiresAt: Date.now() + RESPONSE_CACHE_TTL_MS });
+      markSuccess();
+      emit({
+        event: "query_processed", intent: "image_generation", model: routing.model,
+        engine: usedEngine, complexity: routing.complexity, latency_ms: Date.now() - startTime,
+        input_tokens: imgResult.tokens.input, output_tokens: imgResult.tokens.output,
+        total_tokens: imgResult.tokens.total, confidence: "high", timestamp: new Date().toISOString(),
+      });
+      return response;
+    } catch (err) {
+      console.error("[SEDREX] Image generation failed completely:", err);
+      // Fallback to general text generation if image fails
+    }
+  }
+
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
       let fullText       = "";
@@ -1206,6 +1267,7 @@ async function processRequest(
       let usage          = { totalTokenCount: 0, promptTokenCount: 0, candidatesTokenCount: 0 };
       const groundingChunks: GroundingChunk[] = [];
 
+      // ── AGENT DISPATCH ────────────────────────────────────────────────
       const agentResult: AgentDispatchResult = await agentDispatch(
         flatPrompt,
         history,
@@ -1229,6 +1291,47 @@ async function processRequest(
         fullText     = agentResult.text;
         inputTokens  = agentResult.inputTokens;
         outputTokens = agentResult.outputTokens;
+
+        // ── INTERCEPT GPT-4 DALL-E TOOL CALL HALLUCINATION ──
+        try {
+          const cleanText = fullText.replace(/```json/gi, '').replace(/```/g, '').trim();
+          if (cleanText.startsWith('{') && cleanText.endsWith('}')) {
+            const parsed = JSON.parse(cleanText);
+            if (parsed.action === 'dalle.text2im' || parsed.action === 'image_generation' || parsed.action === 'nano_banana') {
+              let dallePrompt = prompt;
+              if (parsed.action_input) {
+                if (typeof parsed.action_input === 'string') {
+                  const inner = cleanText.includes('\\"') ? parsed.action_input : (() => { try { return JSON.parse(parsed.action_input); } catch { return parsed.action_input; } })();
+                  dallePrompt = typeof inner === 'string' ? inner : (inner.prompt || prompt);
+                } else if (parsed.action_input.prompt) {
+                  dallePrompt = parsed.action_input.prompt;
+                }
+              }
+              console.log('[SEDREX] Caught GPT-4 image intent via JSON payload. Redirecting to native Imagen engine.');
+              try {
+                const imgResult = await generateImage(dallePrompt, key);
+                const response: SedrexResponse = {
+                  content:      imgResult.text,
+                  model:        routing.model,
+                  tokens:       imgResult.tokens.total,
+                  inputTokens:  imgResult.tokens.input,
+                  outputTokens: imgResult.tokens.output,
+                  confidence:   computeConfidence("image_generation", routing.complexity, false),
+                  generatedImageUrl: imgResult.url,
+                  routingContext: { ...routing, engine: imgResult.engine, thinking: false },
+                };
+                if (RESPONSE_CACHE_TTL_MS > 0) responseCache.set(fprint, { value: response, expiresAt: Date.now() + RESPONSE_CACHE_TTL_MS });
+                markSuccess();
+                return response;
+              } catch (err) {
+                console.error("[SEDREX] Redirected image generation failed:", err);
+                // Fallthrough to normal text handling if generation fails
+              }
+            }
+          }
+        } catch (e) {
+          // not JSON, carry on silently
+        }
 
       } else {
         const geminiSystemInstruction = agentResult.overrideSystemPrompt
@@ -1447,4 +1550,82 @@ export async function decodeAudioData(
     }
   }
   return buffer;
+}
+/**
+ * Generates an image using a dual-strategy approach:
+ *  1. PRIMARY: Imagen 3 via ai.models.generateImages() — dedicated image model
+ *  2. FALLBACK: Gemini 2.0 Flash Image via ai.models.generateContent() with responseModalities
+ *
+ * Returns a data-URL for the generated image, descriptive text, and token counts.
+ */
+async function generateImage(
+  prompt: string,
+  apiKey: string,
+): Promise<{ url: string; text: string; engine: string; tokens: { input: number; output: number; total: number } }> {
+  const ai = new GoogleGenAI({ apiKey });
+
+  // ── STRATEGY 1: Imagen 3 (dedicated image generation model) ──────
+  try {
+    console.log("[SEDREX] Trying Imagen 3…");
+    const response = await (ai.models as any).generateImages({
+      model: MODELS.IMAGEN,
+      prompt: prompt,
+      config: { numberOfImages: 1, outputMimeType: "image/png" },
+    });
+
+    const img = response?.generatedImages?.[0];
+    if (img?.image?.imageBytes) {
+      const mimeType = img.image.mimeType || "image/png";
+      const url = `data:${mimeType};base64,${img.image.imageBytes}`;
+      console.log("[SEDREX] ✅ Imagen 3 succeeded");
+      return {
+        url,
+        text: "Image generated with Imagen 3.",
+        engine: MODELS.IMAGEN,
+        tokens: { input: 0, output: 0, total: 0 },
+      };
+    }
+    throw new Error("Imagen 3 returned no image data");
+  } catch (imagenError: any) {
+    console.warn("[SEDREX] Imagen 3 failed, trying Gemini Flash Image…", imagenError.message);
+  }
+
+  // ── STRATEGY 2: Gemini 2.0 Flash Image (native multimodal output) ─
+  try {
+    console.log("[SEDREX] Trying Gemini Flash Image…");
+    const result = await ai.models.generateContent({
+      model: MODELS.GEMINI_IMAGE,
+      contents: prompt,
+      config: {
+        // @ts-ignore — responseModalities is a Gemini image generation feature
+        responseModalities: ["TEXT", "IMAGE"],
+      },
+    });
+
+    const parts = result.candidates?.[0]?.content?.parts ?? [];
+    const imagePart = parts.find((p: any) => p.inlineData?.mimeType?.startsWith("image/"));
+    const textPart  = parts.find((p: any) => p.text);
+
+    if (imagePart?.inlineData?.data) {
+      const url = `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
+      console.log("[SEDREX] ✅ Gemini Flash Image succeeded");
+      return {
+        url,
+        text: textPart?.text || "Image generated with Gemini.",
+        engine: MODELS.GEMINI_IMAGE,
+        tokens: {
+          input:  (result.usageMetadata as any)?.promptTokenCount ?? 0,
+          output: (result.usageMetadata as any)?.candidatesTokenCount ?? 0,
+          total:  (result.usageMetadata as any)?.totalTokenCount ?? 0,
+        },
+      };
+    }
+    throw new Error("Gemini Flash Image returned no image data");
+  } catch (geminiError: any) {
+    console.error("[SEDREX] ❌ Both image strategies failed.", geminiError.message);
+    throw new Error(
+      `Image generation failed. Imagen: ${(geminiError as any)?.message}. ` +
+      `Please verify your API key has access to image generation models in Google AI Studio.`
+    );
+  }
 }

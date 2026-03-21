@@ -24,38 +24,38 @@ export default defineConfig(({ mode }) => {
         // ── SEDREX Engine — reads .env first, then sensible fallback ─
         //
         // IMPORTANT: These fallback values are for LOCAL DEV ONLY.
-        // In production, set all NEXUS_* vars in your .env / hosting dashboard.
+        // In production, set all SEDREX_* vars in your .env / hosting dashboard.
         //
-        'process.env.NEXUS_MAX_CONCURRENT_REQUESTS': JSON.stringify(
-          env.NEXUS_MAX_CONCURRENT_REQUESTS || '8'
+        'process.env.SEDREX_MAX_CONCURRENT_REQUESTS': JSON.stringify(
+          env.SEDREX_MAX_CONCURRENT_REQUESTS || '8'
         ),
-        'process.env.NEXUS_MAX_QUEUED_REQUESTS': JSON.stringify(
-          env.NEXUS_MAX_QUEUED_REQUESTS || '1000'
+        'process.env.SEDREX_MAX_QUEUED_REQUESTS': JSON.stringify(
+          env.SEDREX_MAX_QUEUED_REQUESTS || '1000'
         ),
-        'process.env.NEXUS_RATE_WINDOW_MS': JSON.stringify(
-          env.NEXUS_RATE_WINDOW_MS || '60000'
+        'process.env.SEDREX_RATE_WINDOW_MS': JSON.stringify(
+          env.SEDREX_RATE_WINDOW_MS || '60000'
         ),
-        'process.env.NEXUS_RATE_MAX_PER_WINDOW': JSON.stringify(
-          env.NEXUS_RATE_MAX_PER_WINDOW || '60'
+        'process.env.SEDREX_RATE_MAX_PER_WINDOW': JSON.stringify(
+          env.SEDREX_RATE_MAX_PER_WINDOW || '60'
         ),
-        'process.env.NEXUS_API_KEY_COOLDOWN_MS': JSON.stringify(
-          env.NEXUS_API_KEY_COOLDOWN_MS || '30000'
+        'process.env.SEDREX_API_KEY_COOLDOWN_MS': JSON.stringify(
+          env.SEDREX_API_KEY_COOLDOWN_MS || '30000'
         ),
-        'process.env.NEXUS_CIRCUIT_FAIL_THRESHOLD': JSON.stringify(
-          env.NEXUS_CIRCUIT_FAIL_THRESHOLD || '10'
+        'process.env.SEDREX_CIRCUIT_FAIL_THRESHOLD': JSON.stringify(
+          env.SEDREX_CIRCUIT_FAIL_THRESHOLD || '10'
         ),
-        'process.env.NEXUS_CIRCUIT_FAIL_WINDOW_MS': JSON.stringify(
-          env.NEXUS_CIRCUIT_FAIL_WINDOW_MS || '30000'
+        'process.env.SEDREX_CIRCUIT_FAIL_WINDOW_MS': JSON.stringify(
+          env.SEDREX_CIRCUIT_FAIL_WINDOW_MS || '30000'
         ),
-        'process.env.NEXUS_CIRCUIT_OPEN_MS': JSON.stringify(
-          env.NEXUS_CIRCUIT_OPEN_MS || '20000'
+        'process.env.SEDREX_CIRCUIT_OPEN_MS': JSON.stringify(
+          env.SEDREX_CIRCUIT_OPEN_MS || '20000'
         ),
         // ── Cache TTL ─────────────────────────────────────────────
         // Set to 0 in dev (no stale responses).
         // Set to 30000-60000 in production for performance.
         // Your .env controls this — fallback is 0 (safe for dev).
-        'process.env.NEXUS_RESPONSE_CACHE_TTL_MS': JSON.stringify(
-          env.NEXUS_RESPONSE_CACHE_TTL_MS || '0'
+        'process.env.SEDREX_RESPONSE_CACHE_TTL_MS': JSON.stringify(
+          env.SEDREX_RESPONSE_CACHE_TTL_MS || '0'
         ),
 
         // ── API Key Pool (multi-key rotation) ─────────────────────
