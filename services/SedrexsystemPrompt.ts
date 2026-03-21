@@ -603,7 +603,7 @@ const IDENTITY_LEAK_PATTERNS: RegExp[] = [
 
 function _sanitize<T extends { role: string; content: string }>(messages: T[]): T[] {
   return messages.map(msg => {
-    if (msg.role !== 'assistant') return msg;
+    if (msg.role !== 'assistant' || !msg.content) return msg;
     if (!IDENTITY_LEAK_PATTERNS.some(p => p.test(msg.content))) return msg;
 
     let fixed = msg.content;

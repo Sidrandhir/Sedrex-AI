@@ -247,8 +247,8 @@ function buildFingerprint(
   manualModel?: AIModel | "auto",
   docs: AttachedDocument[] = [],
 ): string {
-  const h = history.slice(-4).map((m) => `${m.role}:${m.content.slice(0, 240)}`).join("|");
-  const d = docs.map((x) => `${x.title}:${x.content.length}`).join("|");
+  const h = history.slice(-4).map((m) => `${m.role}:${(m.content ?? '').slice(0, 240)}`).join("|");
+  const d = docs.map((x) => `${x.title}:${(x.content ?? '').length}`).join("|");
   return hashString(`${manualModel ?? "auto"}::${prompt.slice(0, 1500)}::${h}::${d}`);
 }
 
@@ -725,13 +725,14 @@ function getGenerationConfig(
 
 function buildHistory(history: Message[], intent: SedrexIntent): any[] {
   const max = MAX_HISTORY[intent] ?? 6;
-  const safeHistory = sanitizeConversationHistory(history);
+  const safeHistory = sanitizeConversationHistory(history)
+    .filter((msg) => msg.content != null && msg.content !== '');
   return safeHistory.slice(-max).map((msg) => ({
     role:  msg.role === "assistant" ? "model" : "user",
     parts: [{
-      text: msg.content.length > MAX_MSG_LEN
-        ? msg.content.slice(0, MAX_MSG_LEN) + "\n\n[...truncated for context efficiency]"
-        : msg.content,
+      text: (msg.content ?? '').length > MAX_MSG_LEN
+        ? (msg.content ?? '').slice(0, MAX_MSG_LEN) + "\n\n[...truncated for context efficiency]"
+        : (msg.content ?? ''),
     }],
   }));
 }

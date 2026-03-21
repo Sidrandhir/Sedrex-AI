@@ -110,16 +110,20 @@ class AnalyticsService {
         // When you configure the JWT secret in Supabase → Settings → API →
         // JWT Secret, this call will succeed automatically with no code changes.
         const sid = _sessionId;
-        void Promise.resolve().then(() =>
-          supabase!.functions.invoke('enrich-session', {
-            body: { sessionId: sid },
-          })
-        ).then(() => {
-          // Geolocation enriched successfully
-        }).catch(() => {
-          // 401 or network error — silently ignored.
-          // Edge function geolocation is non-critical to app function.
-        });
+        // Skip enrich-session in development — prevents 401 console spam
+        const isDev = typeof import.meta !== 'undefined' && import.meta.env?.VITE_ENV === 'development';
+        if (!isDev) {
+          void Promise.resolve().then(() =>
+            supabase!.functions.invoke('enrich-session', {
+              body: { sessionId: sid },
+            })
+          ).then(() => {
+            // Geolocation enriched successfully
+          }).catch(() => {
+            // 401 or network error — silently ignored.
+            // Edge function geolocation is non-critical to app function.
+          });
+        }
       }
     } catch { /* never crash */ }
   }

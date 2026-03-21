@@ -528,6 +528,7 @@
    ══════════════════════════════════════════════════════════════════ */
 
 .message-user { display: flex; justify-content: flex-end; }
+.message-user-row { display: flex; justify-content: flex-end; }
 
 .message-user-bubble {
   max-width: min(88%, 620px);

@@ -341,7 +341,7 @@ const App: React.FC = () => {
           if (!flushTimer) flushTimer = setTimeout(flushToUI, 80);
         },
         abortControllerRef.current.signal,
-        getArtifactsForSession(sessionId)
+        sessionId
       );
       if (flushTimer) clearTimeout(flushTimer);
 

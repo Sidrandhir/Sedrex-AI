@@ -914,7 +914,7 @@ const MessageItem = memo(
                 </div>
               </div>
             ) : (
-              <div className="message-user">
+              <div className="message-user-row">
                 <div className="message-user-bubble">{msg.content}</div>
               </div>
             )}
