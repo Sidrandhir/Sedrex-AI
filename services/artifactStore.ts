@@ -599,7 +599,3 @@ export function useArtifacts() {
     updateArtifact,
   };
 }
-
-================================================================================
-FILE: services\authService.ts
-MODIFIED: 2026-03-20 17:41  SIZE: 6031 bytes

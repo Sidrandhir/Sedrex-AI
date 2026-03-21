@@ -35,16 +35,16 @@ import { getProjectIndex } from './services/codebaseContext';
 import { analytics } from './services/analyticsService';
 import { storageService } from './services/storageService';
 
-const Dashboard      = lazy(() => import('./components/Dashboard'));
-const Pricing        = lazy(() => import('./components/Pricing'));
-const Billing        = lazy(() => import('./components/Billing'));
-const AuthPage       = lazy(() => import('./components/AuthPage'));
-const LandingPage    = lazy(() => import('./components/LandingPage'));
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const Pricing = lazy(() => import('./components/Pricing'));
+const Billing = lazy(() => import('./components/Billing'));
+const AuthPage = lazy(() => import('./components/AuthPage'));
+const LandingPage = lazy(() => import('./components/LandingPage'));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
-const SettingsModal  = lazy(() => import('./components/SettingsModal'));
-const ArtifactPanel  = lazy(() => import('./components/ArtifactPanel'));
-const MobileOnboarding  = lazy(() => import('./components/MobileOnboarding'));
-const OnboardingSurvey  = lazy(() => import('./components/OnboardingSurvey'));
+const SettingsModal = lazy(() => import('./components/SettingsModal'));
+const ArtifactPanel = lazy(() => import('./components/ArtifactPanel'));
+const MobileOnboarding = lazy(() => import('./components/MobileOnboarding'));
+const OnboardingSurvey = lazy(() => import('./components/OnboardingSurvey'));
 const ResetPasswordPage = lazy(() => import('./components/ResetPasswordPage'));
 
 const LazyFallback = () => (
@@ -54,25 +54,25 @@ const LazyFallback = () => (
 );
 
 const App: React.FC = () => {
-  const [configured]            = useState(initialConfigured);
-  const [user, setUser]         = useState<User | null>(null);
-  const [isAuthChecking, setIsAuthChecking]           = useState(true);
-  const [showAuth, setShowAuth]                       = useState(false);
-  const [showResetPassword, setShowResetPassword]     = useState(false);
-  const [sessions, setSessions]                       = useState<ChatSession[]>([]);
-  const [activeSessionId, setActiveSessionId]         = useState<string>('');
-  const [userStats, setUserStats]                     = useState<UserStats | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen]             = useState(window.innerWidth >= 1024);
-  const [isLoading, setIsLoading]                     = useState(false);
-  const [routingInfo, setRoutingInfo]                 = useState<SedrexRoute | null>(null);
-  const [view, setView]                               = useState<'chat' | 'dashboard' | 'pricing' | 'billing' | 'admin'>('chat');
-  const [isSettingsOpen, setIsSettingsOpen]           = useState(false);
-  const [toasts, setToasts]                           = useState<ToastMessage[]>([]);
-  const [showOnboarding, setShowOnboarding]           = useState(false);
-  const [showSurvey, setShowSurvey]                   = useState(false);
+  const [configured] = useState(initialConfigured);
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [showAuth, setShowAuth] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string>('');
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
+  const [isLoading, setIsLoading] = useState(false);
+  const [routingInfo, setRoutingInfo] = useState<SedrexRoute | null>(null);
+  const [view, setView] = useState<'chat' | 'dashboard' | 'pricing' | 'billing' | 'admin'>('chat');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showSurvey, setShowSurvey] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [artifactPanelOpen, setArtifactPanelOpen]     = useState(false);
-  const [artifactPanelWidth, setArtifactPanelWidth]   = useState(480);
+  const [artifactPanelOpen, setArtifactPanelOpen] = useState(false);
+  const [artifactPanelWidth, setArtifactPanelWidth] = useState(480);
 
   const [theme, setTheme] = useState<'light' | 'dark'>(
     () => (localStorage.getItem('sedrex_theme') as 'light' | 'dark') || 'dark'
@@ -87,7 +87,7 @@ const App: React.FC = () => {
   });
 
   const abortControllerRef = useRef<AbortController | null>(null);
-  const searchInputRef     = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const addToast = useCallback(
     (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -155,7 +155,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!configured) { setIsAuthChecking(false); return; }
     const hash = window.location.hash;
-    const sp   = new URLSearchParams(window.location.search);
+    const sp = new URLSearchParams(window.location.search);
     if (hash.includes('type=recovery') || sp.get('type') === 'recovery') {
       setShowResetPassword(true); setIsAuthChecking(false); return;
     }
@@ -221,7 +221,7 @@ const App: React.FC = () => {
           const firstId = cloudSessions[0].id;
           // OPTIMIZATION: Background sync only needs metadata
           const cloudMessages = await api.getMessages(firstId, 50, true);
-          
+
           if (!isMounted) return;
           startTransition(() => {
             // ── SMART MERGE ──────────────────────────────────────────
@@ -235,22 +235,27 @@ const App: React.FC = () => {
                 }
               });
               // Sort by lastModified to keep UI consistent
-              return merged.sort((a,b) => b.lastModified - a.lastModified);
+              return merged.sort((a, b) => b.lastModified - a.lastModified);
             });
-            
+
             // If we don't have an active session, or it's the first sync, pick the top one
             if (!activeSessionId) {
               setActiveSessionId(firstId);
             }
           });
-          
+
           api.loadSessionPreviews(cloudSessions.slice(0, 5).map(s => s.id));
         }
 
-        // Phase 3: Global Metadata Sync (Ultra-lean)
-        // Strictly metadata-only to prevent 500/timeout during initialization
-        loadAllUserArtifacts(user.id, true).catch(() => {});
-        if (cloudSessions[0]?.id) loadArtifactsForSession(cloudSessions[0].id, true).catch(() => {});
+        // Phase 3: Artifact Sync — load FULL content so panel shows code immediately
+        // metadataOnly=false ensures content is loaded; sidebar artifacts are clickable at once.
+        // loadAllUserArtifacts runs in background after 500ms to not block chat render.
+        setTimeout(() => {
+          loadAllUserArtifacts(user.id, false).catch(() => { });
+        }, 500);
+        if (cloudSessions[0]?.id) {
+          loadArtifactsForSession(cloudSessions[0].id, false).catch(() => { });
+        }
 
       } catch (error) {
         if (!isMounted) return;
@@ -272,7 +277,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!activeSessionId) return;
     const timer = setTimeout(() => {
-      loadArtifactsForSession(activeSessionId).catch(() => {});
+      loadArtifactsForSession(activeSessionId).catch(() => { });
     }, 1500);
     return () => clearTimeout(timer);
   }, [activeSessionId]);
@@ -292,10 +297,10 @@ const App: React.FC = () => {
 
     analytics.exportChat(activeSessionId);
     if (user) {
-      storageService.uploadExport(md, filename, user.id, activeSessionId).catch(() => {});
+      storageService.uploadExport(md, filename, user.id, activeSessionId).catch(() => { });
     }
 
-    const blob  = new Blob([md], { type: 'text/markdown' });
+    const blob = new Blob([md], { type: 'text/markdown' });
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     if (isIOS && navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename)] })) {
@@ -303,7 +308,7 @@ const App: React.FC = () => {
         .catch(() => window.open(URL.createObjectURL(blob), '_blank'));
     } else {
       const url = URL.createObjectURL(blob);
-      const a   = document.createElement('a');
+      const a = document.createElement('a');
       a.href = url; a.download = filename;
       document.body.appendChild(a); a.click();
       document.body.removeChild(a); URL.revokeObjectURL(url);
@@ -314,10 +319,10 @@ const App: React.FC = () => {
     if (!user || isLoading) return;
     setIsLoading(true);
     abortControllerRef.current = new AbortController();
-    const userMsg      = currentHistory[currentHistory.length - 1];
+    const userMsg = currentHistory[currentHistory.length - 1];
     const previewRoute = routePrompt(userMsg.content, !!(userMsg.images?.length || userMsg.image), (userMsg.documents?.length || 0) > 0);
-    const assistantId  = 'assistant-' + Math.random().toString(36).substr(2, 9);
-    const startTime    = Date.now();
+    const assistantId = 'assistant-' + Math.random().toString(36).substr(2, 9);
+    const startTime = Date.now();
 
     setSessions(prev => prev.map(s => s.id === sessionId ? {
       ...s,
@@ -326,7 +331,7 @@ const App: React.FC = () => {
       }],
     } : s));
 
-    let accumulatedText   = '';
+    let accumulatedText = '';
     let flushTimer: ReturnType<typeof setTimeout> | null = null;
     let lastFlushedLength = 0;
 
@@ -356,28 +361,24 @@ const App: React.FC = () => {
           if (!flushTimer) flushTimer = setTimeout(flushToUI, 80);
         },
         abortControllerRef.current.signal,
-<<<<<<< HEAD
-        sessionId
-=======
         getArtifactsForSession(sessionId).map(a => `[ARTIFACT: ${a.title}]`).join('\n')
->>>>>>> c81520e (latency improved of artifacts, diagrams and images generation and sidebar improvement)
       );
       if (flushTimer) clearTimeout(flushTimer);
 
       // Extract artifact from response BEFORE saving
       let finalContent = response.content;
-      const extracted  = extractArtifactFromResponse(response.content);
+      const extracted = extractArtifactFromResponse(response.content);
 
       if (extracted && user) {
         createArtifact({
-          sessionId:  sessionId,
-          userId:     user.id,
-          title:      extracted.title,
-          language:   extracted.language,
-          content:    extracted.content,
-          type:       extracted.type,
-          filePath:   extracted.filePath,
-        }).catch(() => {});
+          sessionId: sessionId,
+          userId: user.id,
+          title: extracted.title,
+          language: extracted.language,
+          content: extracted.content,
+          type: extracted.type,
+          filePath: extracted.filePath,
+        }).catch(() => { });
         finalContent = extracted.reducedResponse;
       }
 
@@ -387,12 +388,12 @@ const App: React.FC = () => {
         diagramCodes.forEach(dg => {
           storeDiagram({
             sessionId: sessionId,
-            userId:    user.id,
-            title:     'Architecture Diagram',
-            language:  'mermaid',
-            content:   dg,
-            type:      'diagram',
-          }).catch(() => {});
+            userId: user.id,
+            title: 'Architecture Diagram',
+            language: 'mermaid',
+            content: dg,
+            type: 'diagram',
+          }).catch(() => { });
         });
       }
 
@@ -400,10 +401,10 @@ const App: React.FC = () => {
       if (response.generatedImageUrl && user) {
         // Build a short, descriptive title based on user prompt
         const safePrompt = userMsg.content.replace(/[^a-zA-Z0-9\s]/g, '').trim();
-        const shortName  = safePrompt.length > 30 ? safePrompt.slice(0, 30) + '...' : safePrompt;
-        const imgTitle   = `${shortName || 'Generated Image'} - ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.png`;
+        const shortName = safePrompt.length > 30 ? safePrompt.slice(0, 30) + '...' : safePrompt;
+        const imgTitle = `${shortName || 'Generated Image'} - ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.png`;
 
-        storeImage(sessionId, user.id, imgTitle, response.generatedImageUrl).catch(() => {});
+        storeImage(sessionId, user.id, imgTitle, response.generatedImageUrl).catch(() => { });
       }
 
       setSessions(prev => prev.map(s => s.id === sessionId ? {
@@ -441,32 +442,32 @@ const App: React.FC = () => {
 
       const responseTimeMs = Date.now() - startTime;
       analytics.logQuery({
-        userId:          user.id,
-        conversationId:  sessionId,
-        messageId:       savedMsg.id,
-        promptText:      userMsg.content,
-        responseText:    finalContent.slice(0, 2000),
-        intent:          previewRoute.intent,
-        modelUsed:       response.routingContext?.engine || String(response.model),
-        engine:          response.routingContext?.engine,
-        agentType:       response.routingContext?.agentType,
-        agentProvider:   response.routingContext?.agentProvider,
-        inputTokens:     response.inputTokens,
-        outputTokens:    response.outputTokens,
-        totalTokens:     response.tokens,
+        userId: user.id,
+        conversationId: sessionId,
+        messageId: savedMsg.id,
+        promptText: userMsg.content,
+        responseText: finalContent.slice(0, 2000),
+        intent: previewRoute.intent,
+        modelUsed: response.routingContext?.engine || String(response.model),
+        engine: response.routingContext?.engine,
+        agentType: response.routingContext?.agentType,
+        agentProvider: response.routingContext?.agentProvider,
+        inputTokens: response.inputTokens,
+        outputTokens: response.outputTokens,
+        totalTokens: response.tokens,
         responseTimeMs,
-        hasImage:        !!userMsg.image,
-        hasDocuments:    (userMsg.documents?.length || 0) > 0,
-        hasCodebaseRef:  !!userMsg.codebaseRef,
+        hasImage: !!userMsg.image,
+        hasDocuments: (userMsg.documents?.length || 0) > 0,
+        hasCodebaseRef: !!userMsg.codebaseRef,
         artifactCreated: !!extracted,
-        slashCommand:    userMsg.content.startsWith('/') ? userMsg.content.split(' ')[0].slice(1) : undefined,
-        hadError:        false,
+        slashCommand: userMsg.content.startsWith('/') ? userMsg.content.split(' ')[0].slice(1) : undefined,
+        hadError: false,
       });
 
       const isUntitled = !activeSession?.title ||
         ['New Chat', 'New Session', ''].includes(activeSession.title.trim());
       if (currentHistory.length === 1 && isUntitled) {
-        generateChatTitle(userMsg.content).then(t => handleRenameSession(sessionId, t)).catch(() => {});
+        generateChatTitle(userMsg.content).then(t => handleRenameSession(sessionId, t)).catch(() => { });
       }
 
     } catch (error: any) {
@@ -480,12 +481,12 @@ const App: React.FC = () => {
           } : m),
         } : s));
         analytics.logQuery({
-          userId:       user.id,
+          userId: user.id,
           conversationId: sessionId,
-          promptText:   userMsg.content,
-          intent:       previewRoute.intent,
-          hadError:     true,
-          errorType:    error.message?.slice(0, 100),
+          promptText: userMsg.content,
+          intent: previewRoute.intent,
+          hadError: true,
+          errorType: error.message?.slice(0, 100),
         });
       }
     } finally {
@@ -500,7 +501,7 @@ const App: React.FC = () => {
       setSessions(prev => prev.map(s => s.id === activeSessionId ? {
         ...s, messages: s.messages.map(m => ({ ...m, suggestions: undefined })),
       } : s));
-      const savedUserMsg    = await api.saveMessage(activeSessionId, {
+      const savedUserMsg = await api.saveMessage(activeSessionId, {
         role: 'user',
         codebaseRef: getProjectIndex() ? { projectName: getProjectIndex()!.projectName, totalFiles: getProjectIndex()!.totalFiles } : undefined,
         content, timestamp: Date.now(), images, documents: docs,
@@ -518,7 +519,7 @@ const App: React.FC = () => {
     try {
       analytics.editMessage(messageId, activeSessionId);
       const savedMsg = await api.saveMessage(activeSessionId, { role: 'user', content: newContent, timestamp: Date.now() });
-      const updated  = [...activeSession.messages.slice(0, idx), savedMsg];
+      const updated = [...activeSession.messages.slice(0, idx), savedMsg];
       setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: updated } : s));
       await requestAIResponse(activeSessionId, updated);
     } catch (err: any) { addToast(err.message, 'error'); }
@@ -634,7 +635,7 @@ const App: React.FC = () => {
     return (
       <Routes>
         <Route path="/privacy" element={<Privacy />} />
-        <Route path="/terms"   element={<Terms />} />
+        <Route path="/terms" element={<Terms />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="*" element={
           <Suspense fallback={<LazyFallback />}>
@@ -680,7 +681,7 @@ const App: React.FC = () => {
           onToggle={handleToggleSidebar}
           onOpenCommandPalette={() => { analytics.commandPaletteOpen(); setIsCommandPaletteOpen(true); }}
           user={user}
-          onRefreshArtifacts={() => loadAllUserArtifacts(user.id).catch(() => {})}
+          onRefreshArtifacts={() => loadAllUserArtifacts(user.id).catch(() => { })}
         />
 
         <main style={{
@@ -704,7 +705,7 @@ const App: React.FC = () => {
                       isLoading={isLoading}
                       routingInfo={routingInfo}
                       onExport={handleExportChat}
-                      onShare={() => {}}
+                      onShare={() => { }}
                       onModelChange={handleModelChange}
                       onToggleSidebar={handleToggleSidebar}
                       isSidebarOpen={isSidebarOpen}
@@ -725,7 +726,7 @@ const App: React.FC = () => {
                     </Suspense>
                   ) : view === 'billing' ? (
                     <Suspense fallback={<LazyFallback />}>
-                      <Billing stats={userStats!} onCancel={() => {}} onUpgrade={() => handleSetView('pricing')} onClose={() => handleSetView('chat')} />
+                      <Billing stats={userStats!} onCancel={() => { }} onUpgrade={() => handleSetView('pricing')} onClose={() => handleSetView('chat')} />
                     </Suspense>
                   ) : view === 'admin' ? (
                     <Suspense fallback={<LazyFallback />}>
@@ -742,7 +743,7 @@ const App: React.FC = () => {
                   )
                 } />
                 <Route path="/privacy" element={<Privacy />} />
-                <Route path="/terms"   element={<Terms />} />
+                <Route path="/terms" element={<Terms />} />
                 <Route path="/contact" element={<Contact />} />
               </Routes>
             </div>
