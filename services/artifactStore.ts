@@ -15,6 +15,7 @@
 // ══════════════════════════════════════════════════════════════════
 
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { getArtifactsBySessionId, getAllUserArtifactsByUserId } from './queryOptimizer';
 
 export type ArtifactType = 'code' | 'html' | 'document' | 'diagram' | 'image';
 
@@ -210,13 +211,13 @@ export async function storeDiagram(input: ArtifactCreateInput): Promise<Artifact
 
   try {
     const { data, error } = await supabase!
-      .from('artifacts')
+      .from('generated_diagrams')
       .insert({
         session_id: input.sessionId,
         user_id:         input.userId,
         title:           input.title,
         language:        'mermaid',
-        content:         input.content,
+        mermaid_code:    input.content,
         artifact_type:   'diagram',
         file_path:       null,
         line_count:      lineCount,
@@ -232,7 +233,7 @@ export async function storeDiagram(input: ArtifactCreateInput): Promise<Artifact
       userId:    data.user_id,
       title:     data.title,
       language:  'mermaid',
-      content:   data.content ?? input.content,
+      content:   data.mermaid_code ?? input.content, // Mapped from mermaid_code
       type:      'diagram',
       lineCount: data.line_count ?? lineCount,
       createdAt: data.created_at ? new Date(data.created_at).getTime() : Date.now(),
@@ -277,13 +278,13 @@ export async function storeImage(
 
   try {
     const { data, error } = await supabase!
-      .from('artifacts')
+      .from('generated_images')
       .insert({
         session_id:      sessionId,
         user_id:         userId,
         title:           title,
         language:        'png',
-        content:         dataUrl,
+        base64_data:     dataUrl,
         artifact_type:   'image',
         file_path:       null,
         line_count:      0,
@@ -341,13 +342,13 @@ export async function createArtifact(input: ArtifactCreateInput): Promise<Artifa
 
   try {
     const { data, error } = await supabase!
-      .from('artifacts')
+      .from('generated_code')
       .insert({
         session_id: input.sessionId,      // DB column name is session_id, not conversation_id!
         user_id:         input.userId,
         title:           input.title,
         language:        input.language,
-        content:         input.content,
+        code_content:    input.content,
         artifact_type:   input.type,           // DB column is artifact_type NOT NULL
         file_path:       input.filePath ?? null,
         line_count:      lineCount,
@@ -367,7 +368,7 @@ export async function createArtifact(input: ArtifactCreateInput): Promise<Artifa
       userId:    data.user_id,
       title:     data.title,
       language:  data.language,
-      content:   data.content,
+      content:   data.code_content ?? data.content ?? input.content,
       type:      (data.artifact_type ?? data.type ?? input.type) as ArtifactType,
       filePath:  data.file_path ?? undefined,
       lineCount: data.line_count ?? lineCount,
@@ -406,20 +407,12 @@ export async function deleteArtifact(id: string): Promise<void> {
 }
 
 // Loads code artifacts AND diagrams for a session from DB
+// Now using queryOptimizer for retry logic and timeout protection
 export async function loadArtifactsForSession(sessionId: string): Promise<void> {
   if (!isSupabaseConfigured) return;
   try {
-    const { data, error } = await supabase!
-      .from('artifacts')
-      .select('*')
-      .eq('session_id', sessionId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      if (error.code === '42703' || error.message?.includes('does not exist')) return;
-      console.warn('[SEDREX Artifacts] Load error:', error.message);
-      return;
-    }
+    // Use optimized query with timeout protection and exponential backoff
+    const data = await getArtifactsBySessionId(sessionId);
 
     const all: Artifact[] = (data ?? []).map(row => ({
       id:        row.id,
@@ -427,8 +420,8 @@ export async function loadArtifactsForSession(sessionId: string): Promise<void> 
       userId:    row.user_id,
       title:     row.title,
       language:  row.language ?? 'text',
-      content:   row.content ?? '',
-      type:      (row.artifact_type ?? row.type ?? 'code') as ArtifactType,
+      content:   (row as any).content ?? '', // Restored so visual panel works!
+      type:      (row.artifact_type ?? 'code') as ArtifactType,
       filePath:  row.file_path ?? undefined,
       lineCount: row.line_count ?? 0,
       createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
@@ -446,24 +439,24 @@ export async function loadArtifactsForSession(sessionId: string): Promise<void> 
     _artifacts = [...memOnlyArtifacts, ...dbArtifacts];
     _diagrams  = [...memOnlyDiagrams,  ...dbDiagrams];
     notify();
-  } catch { /* never crash */ }
+  } catch (error: any) {
+    // Graceful degradation on timeout errors
+    if (error?.code === '57014' || error?.message?.includes('timeout')) {
+      console.warn('[SEDREX Artifacts] Load timeout - using cached artifacts');
+      return;
+    }
+    console.error('[SEDREX Artifacts] Exception during load:', error);
+  }
 }
 
 // Loads ALL artifacts for a user across ALL sessions (for sidebar panel)
+// Now using queryOptimizer for retry logic, timeout protection, and chunking
 export async function loadAllUserArtifacts(userId: string): Promise<void> {
   if (!isSupabaseConfigured) return;
+  
   try {
-    const { data, error } = await supabase!
-      .from('artifacts')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(200);
-
-    if (error) {
-      if (error.code === '42703' || error.message?.includes('does not exist')) return;
-      return;
-    }
+    // Use optimized query with timeout protection, exponential backoff, and chunking
+    const data = await getAllUserArtifactsByUserId(userId);
 
     const all: Artifact[] = (data ?? []).map(row => ({
       id:        row.id,
@@ -471,8 +464,8 @@ export async function loadAllUserArtifacts(userId: string): Promise<void> {
       userId:    row.user_id,
       title:     row.title,
       language:  row.language ?? 'text',
-      content:   row.content ?? '',
-      type:      (row.artifact_type ?? row.type ?? 'code') as ArtifactType,
+      content:   (row as any).content ?? '', // Restored so visual panel works!
+      type:      ((row as any).artifact_type ?? (row as any).type ?? 'code') as ArtifactType,
       filePath:  row.file_path ?? undefined,
       lineCount: row.line_count ?? 0,
       createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
@@ -482,7 +475,14 @@ export async function loadAllUserArtifacts(userId: string): Promise<void> {
     _diagrams  = all.filter(a => a.type === 'diagram' || a.language === 'mermaid');
     _artifacts = all.filter(a => !(a.type === 'diagram' || a.language === 'mermaid'));
     notify();
-  } catch { /* silent */ }
+  } catch (error: any) {
+    // Graceful degradation on timeout errors
+    if (error?.code === '57014' || error?.message?.includes('timeout')) {
+      console.warn('[loadAllUserArtifacts] Query timeout, returning empty artifacts');
+      return;
+    }
+    console.error('[loadAllUserArtifacts] Error loading artifacts:', error);
+  }
 }
 
 export function clearArtifacts(): void {

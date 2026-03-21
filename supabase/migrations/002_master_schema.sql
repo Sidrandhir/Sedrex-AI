@@ -165,6 +165,48 @@ CREATE TABLE IF NOT EXISTS public.artifacts (
   updated_at      TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS public.generated_images (
+  id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  session_id      UUID REFERENCES public.conversations(id) ON DELETE CASCADE,
+  user_id         UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  title           TEXT NOT NULL DEFAULT 'Untitled',
+  language        TEXT NOT NULL DEFAULT 'image',
+  base64_data     TEXT NOT NULL,
+  artifact_type   TEXT NOT NULL DEFAULT 'image' CHECK (artifact_type = 'image'),
+  file_path       TEXT,
+  line_count      INTEGER DEFAULT 0,
+  created_at      TIMESTAMPTZ DEFAULT now() NOT NULL,
+  updated_at      TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.generated_diagrams (
+  id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  session_id      UUID REFERENCES public.conversations(id) ON DELETE CASCADE,
+  user_id         UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  title           TEXT NOT NULL DEFAULT 'Untitled',
+  language        TEXT NOT NULL DEFAULT 'mermaid',
+  mermaid_code    TEXT NOT NULL,
+  artifact_type   TEXT NOT NULL DEFAULT 'diagram' CHECK (artifact_type = 'diagram'),
+  file_path       TEXT,
+  line_count      INTEGER DEFAULT 0,
+  created_at      TIMESTAMPTZ DEFAULT now() NOT NULL,
+  updated_at      TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.generated_code (
+  id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  session_id      UUID REFERENCES public.conversations(id) ON DELETE CASCADE,
+  user_id         UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  title           TEXT NOT NULL DEFAULT 'Untitled',
+  language        TEXT NOT NULL DEFAULT 'text',
+  code_content    TEXT NOT NULL,
+  artifact_type   TEXT NOT NULL DEFAULT 'code' CHECK (artifact_type IN ('code', 'html', 'document', 'react', 'svg', 'markdown')),
+  file_path       TEXT,
+  line_count      INTEGER DEFAULT 0,
+  created_at      TIMESTAMPTZ DEFAULT now() NOT NULL,
+  updated_at      TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
 -- ════════════════════════════════════════════════════════════════════════════
 -- 3. TABLES (Analytics & Tracking)
 -- ════════════════════════════════════════════════════════════════════════════
@@ -634,6 +676,17 @@ ORDER BY s.started_at DESC;
 
 CREATE INDEX idx_conversations_user ON public.conversations(user_id);
 CREATE INDEX idx_messages_conversation ON public.messages(conversation_id);
+CREATE INDEX idx_artifacts_user ON public.artifacts(user_id);
+CREATE INDEX idx_artifacts_session ON public.artifacts(session_id);
+CREATE INDEX idx_artifacts_user_created ON public.artifacts(user_id, created_at DESC);
+CREATE INDEX idx_artifacts_session_created ON public.artifacts(session_id, created_at DESC);
+
+CREATE INDEX idx_genimg_user_created ON public.generated_images(user_id, created_at DESC);
+CREATE INDEX idx_gendiag_user_created ON public.generated_diagrams(user_id, created_at DESC);
+CREATE INDEX idx_gencode_user_created ON public.generated_code(user_id, created_at DESC);
+CREATE INDEX idx_genimg_session ON public.generated_images(session_id);
+CREATE INDEX idx_gendiag_session ON public.generated_diagrams(session_id);
+CREATE INDEX idx_gencode_session ON public.generated_code(session_id);
 CREATE INDEX idx_user_sessions_user_active ON public.user_sessions(user_id, is_active) WHERE is_active = true;
 CREATE INDEX idx_user_events_user_created ON public.user_events(user_id, created_at DESC);
 CREATE INDEX idx_query_log_user_created ON public.user_query_log(user_id, created_at DESC);
