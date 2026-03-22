@@ -1,9 +1,3 @@
-// components/ArtifactPanel.tsx
-// SEDREX Artifact Panel v3.3 — Universal Preview Engine
-// Fixes: Python execution, JS/TS execution, CSS live preview,
-// JSON tree, Markdown render, SQL display, Bash terminal,
-// SVG render, image src prefix, preview tab always visible.
-
 import React, {
   useRef, useEffect, useState, useCallback, memo,
 } from 'react';
@@ -83,8 +77,20 @@ function getImageSrc(content: string, title = ''): string {
 
 // ── Universal srcdoc builder ──────────────────────────────────────
 function buildSrcdoc(artifact: Artifact): string {
-  const lang = (artifact.language ?? '').toLowerCase();
+  let lang = (artifact.language ?? '').toLowerCase();
   const content = artifact.content ?? '';
+
+  // ── Auto-detect React/JSX written with wrong fence tag ──────
+  // AI often writes React code with ```javascript instead of ```jsx
+  // Detect: has JSX element syntax AND React import/hooks → promote to jsx
+  if (['javascript', 'js', 'typescript', 'ts'].includes(lang)) {
+    const hasJSXTags = /<[A-Z][A-Za-z0-9]*[\s\/>]|<\/[A-Za-z][A-Za-z0-9]*>/.test(content);
+    const hasReact = /import\s+.*[Rr]eact|from\s+['"]react['"]|useState|useEffect|useRef|React\./.test(content);
+    const hasReturnJSX = /return\s*\(\s*<|=>\s*</.test(content);
+    if ((hasJSXTags && hasReact) || hasReturnJSX) {
+      lang = (lang === 'typescript' || lang === 'ts') ? 'tsx' : 'jsx';
+    }
+  }
 
   const base = `<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui,sans-serif;background:#0b0f1a;color:#e4e8f0;min-height:100vh}.sx-err{color:#f87171;background:rgba(248,113,113,.08);padding:14px;border-radius:8px;border:1px solid rgba(248,113,113,.25);font-family:monospace;font-size:13px;white-space:pre-wrap;margin:12px}.sx-out{font-family:'Fira Code',monospace;font-size:13px;line-height:1.6;padding:16px;white-space:pre-wrap;word-break:break-word}.sx-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(16,185,129,.7);padding:12px 16px 4px;font-family:monospace}pre{margin:0}</style>`;
 
@@ -108,7 +114,7 @@ function buildSrcdoc(artifact: Artifact): string {
       .replace(/^import\s+type\s+.*$/gm, '')
       .replace(/^import\s+.*from\s+['"][^'"]+['"]\s*;?\s*$/gm, '')
       .replace(/^import\s+['"][^'"]+['"]\s*;?\s*$/gm, '');
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank"/><script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script><script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script><script>try{localStorage.setItem('sx','1');localStorage.removeItem('sx');}catch(e){Object.defineProperty(window,'localStorage',{value:{_d:{},setItem(k,v){this._d[k]=v},getItem(k){return this._d[k]??null},removeItem(k){delete this._d[k]},clear(){this._d={}}}});}</script><script src="https://unpkg.com/@babel/standalone/babel.min.js"></script><script src="https://cdn.tailwindcss.com"></script>${base}<style>body{padding:16px}</style></head><body><div id="root"></div><script>window.onerror=function(m){document.body.innerHTML='<div class="sx-err">'+m+'</div>';};</script><script type="text/babel">try{const {useState,useEffect,useRef,useCallback,useMemo,useReducer,useContext,createContext,Fragment,memo}=React;${clean}const Root=typeof App!=='undefined'?App:typeof Component!=='undefined'?Component:typeof Dashboard!=='undefined'?Dashboard:typeof Page!=='undefined'?Page:null;if(Root){ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Root));}else{document.getElementById('root').innerHTML='<div class="sx-err">No root component.\\nName it: App, Component, Dashboard, or Page.</div>';}}catch(e){document.body.innerHTML='<div class="sx-err">'+e.message+'</div>';}</script></body></html>`;
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank"/><script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script><script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script><script>try{localStorage.setItem('sx','1');localStorage.removeItem('sx');}catch(e){Object.defineProperty(window,'localStorage',{value:{_d:{},setItem(k,v){this._d[k]=v},getItem(k){return this._d[k]??null},removeItem(k){delete this._d[k]},clear(){this._d={}}}});}</script><script src="https://unpkg.com/@babel/standalone/babel.min.js"></script><script src="https://cdn.tailwindcss.com"></script>${base}<style>body{padding:16px}</style></head><body><div id="root"></div><script>window.onerror=function(m){document.body.innerHTML='<div class="sx-err">'+m+'</div>';};</script><script type="text/babel">try{const {useState,useEffect,useRef,useCallback,useMemo,useReducer,useContext,createContext,Fragment,memo}=React;${clean}const Root=const _names=Object.keys(window).filter(n=>/^[A-Z]/.test(n)&&typeof window[n]==='function');const _pref=['App','Component','Dashboard','Page','Main','Home','Index','Root','Portfolio','Landing','Layout','Screen','View','Widget','Hero','Profile','Showcase'];const Root=_pref.find(n=>typeof window[n]==='function')&&window[_pref.find(n=>typeof window[n]==='function')]||(_names.length?window[_names[0]]:null);if(Root){ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Root));}else{document.getElementById('root').innerHTML='<div class=\"sx-err\">No root component found.\\nSedrex tried: App, Component, Dashboard, Page, and any exported component.</div>';}}</script></body></html>`;
   }
 
   // JavaScript / TypeScript

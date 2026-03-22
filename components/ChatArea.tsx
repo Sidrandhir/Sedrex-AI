@@ -1319,10 +1319,21 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       <div ref={scrollRef} onScroll={handleScroll} className="chat-scroll">
         <div className="chat-column">
 
-          {messages.length === 0 && (
+          {messages.length === 0 && !isLoading && (
             <EmptyState
               onSuggestionClick={(prompt) => onSuggestionClick?.(prompt)}
             />
+          )}
+          {messages.length === 0 && isLoading && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flex: 1, height: '60vh', flexDirection: 'column', gap: 12,
+            }}>
+              <div className="nx-spinner" />
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)', opacity: 0.6 }}>
+                Loading messages…
+              </span>
+            </div>
           )}
 
           {messages.map((msg, idx) => (
@@ -1350,14 +1361,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({
             />
           ))}
 
-          {/* Global typing dots — only when NO assistant message with content exists */}
-          {isLoading && !messages.some(m => m.role === 'assistant' && m.content) && (
-            <div className="typing-dots">
-              <div className="typing-dot" />
-              <div className="typing-dot" />
-              <div className="typing-dot" />
-            </div>
-          )}
+          {/* NOTE: Global typing dots removed — MessageItem renders its own
+               dots when isStreaming && !msg.content. Showing both caused
+               the double-loading-dot bug on new chats. */}
         </div>
       </div>
 

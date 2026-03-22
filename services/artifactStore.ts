@@ -131,10 +131,24 @@ export function extractArtifactFromResponse(
 
   if (!best) return null;
 
-  const lang   = best.lang;
+  let lang     = best.lang;
   const code   = best.code.trimEnd();
+
+  // ── Promote js/ts to jsx/tsx if content contains React/JSX ──
+  // AI often writes React code with ```javascript instead of ```jsx.
+  // Detect by: JSX element tags + React import/hooks patterns.
+  if (['javascript', 'js', 'typescript', 'ts'].includes(lang)) {
+    const hasJSXTags   = /<[A-Z][A-Za-z0-9]*[\s\/>]|<\/[A-Za-z][A-Za-z0-9]*>/.test(code);
+    const hasReact     = /import\s+.*[Rr]eact|from\s+['"]react['"]|useState|useEffect|useRef/.test(code);
+    const hasReturnJSX = /return\s*\(\s*<|=>\s*<[A-Z]/.test(code);
+    if ((hasJSXTags && hasReact) || hasReturnJSX) {
+      lang = (lang === 'typescript' || lang === 'ts') ? 'tsx' : 'jsx';
+    }
+  }
+
   const isHtml = lang === 'html';
-  const type: ArtifactType = isHtml ? 'html' : 'code';
+  const isReact = lang === 'jsx' || lang === 'tsx';
+  const type: ArtifactType = isHtml ? 'html' : isReact ? 'code' : 'code';
 
   // Try to extract file path from the comment on the first line
   const firstLine = code.split('\n')[0] ?? '';

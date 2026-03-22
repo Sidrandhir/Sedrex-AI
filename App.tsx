@@ -259,8 +259,19 @@ const App: React.FC = () => {
           startTransition(() => {
             // ── SMART MERGE ──────────────────────────────────────────
             // Merge cloud sessions into existing ones to preserve brand-new chats
+            // FIX: cloudSessions have NO messages (just metadata from DB).
+            // Without this fix, Phase 2 overwrites Phase 1's loaded messages
+            // with undefined, causing the chat area to show EmptyState after refresh.
+            // Solution: when merging, copy messages from prev state into each
+            // cloud session if messages were already loaded.
             setSessions(prev => {
-              const merged = [...cloudSessions];
+              const merged = cloudSessions.map(cs => {
+                const existing = prev.find(p => p.id === cs.id);
+                // Preserve already-loaded messages — cloud metadata has none
+                return (existing?.messages?.length)
+                  ? { ...cs, messages: existing.messages }
+                  : cs;
+              });
               prev.forEach(local => {
                 // If a local session isn't in cloud list yet, it's presumably NEW
                 if (!merged.find(c => c.id === local.id)) {
@@ -600,6 +611,14 @@ const App: React.FC = () => {
     );
   }, []);
 
+
+  // Listen for ArtifactCard mobile event — closes sidebar so ArtifactPanel
+  // (z-index 50) is not hidden behind the sidebar (z-index 200-300)
+  useEffect(() => {
+    const handler = () => setIsSidebarOpen(false);
+    window.addEventListener('sedrex:close-sidebar', handler);
+    return () => window.removeEventListener('sedrex:close-sidebar', handler);
+  }, []);
   const handleDeleteSession = useCallback((id: string) =>
     api.deleteConversation(id).then(() => {
       setSessions(p => p.filter(s => s.id !== id));

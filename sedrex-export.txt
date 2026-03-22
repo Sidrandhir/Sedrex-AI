@@ -1,11 +1,11 @@
 ﻿SEDREX AI - FULL SOURCE EXPORT
-Generated: 2026-03-22 14:13:41
+Generated: 2026-03-23 00:13:10
 Total files: 114
 ================================================================================
 
 ================================================================================
 FILE: App.tsx
-MODIFIED: 2026-03-22 13:41  SIZE: 36823 bytes
+MODIFIED: 2026-03-22 23:44  SIZE: 38356 bytes
 ================================================================================
 
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense, startTransition } from 'react';
@@ -229,15 +229,21 @@ const App: React.FC = () => {
 
           // Always fetch fresh messages from DB for the restored session
           // This runs in parallel — UI is already responsive from localMsgs above
+          // FIX: fetch messages from DB for the restored session
+          // If no local messages, use isLoading to prevent empty state flash
+          if (localMsgs.length === 0) setIsLoading(true);
           api.getMessages(restoreId, 100).then(dbMsgs => {
-            if (dbMsgs.length > 0 && isMounted) {
-              startTransition(() =>
-                setSessions(prev =>
-                  prev.map(s => s.id === restoreId ? { ...s, messages: dbMsgs } : s)
-                )
-              );
+            if (isMounted) {
+              if (dbMsgs.length > 0) {
+                startTransition(() =>
+                  setSessions(prev =>
+                    prev.map(s => s.id === restoreId ? { ...s, messages: dbMsgs } : s)
+                  )
+                );
+              }
+              setIsLoading(false);
             }
-          }).catch(() => { });
+          }).catch(() => { setIsLoading(false); });
         }
 
         // Phase 2: Background Sync (Cloud Data)
@@ -263,8 +269,19 @@ const App: React.FC = () => {
           startTransition(() => {
             // ── SMART MERGE ──────────────────────────────────────────
             // Merge cloud sessions into existing ones to preserve brand-new chats
+            // FIX: cloudSessions have NO messages (just metadata from DB).
+            // Without this fix, Phase 2 overwrites Phase 1's loaded messages
+            // with undefined, causing the chat area to show EmptyState after refresh.
+            // Solution: when merging, copy messages from prev state into each
+            // cloud session if messages were already loaded.
             setSessions(prev => {
-              const merged = [...cloudSessions];
+              const merged = cloudSessions.map(cs => {
+                const existing = prev.find(p => p.id === cs.id);
+                // Preserve already-loaded messages — cloud metadata has none
+                return (existing?.messages?.length)
+                  ? { ...cs, messages: existing.messages }
+                  : cs;
+              });
               prev.forEach(local => {
                 // If a local session isn't in cloud list yet, it's presumably NEW
                 if (!merged.find(c => c.id === local.id)) {
@@ -404,7 +421,9 @@ const App: React.FC = () => {
 
       // Extract artifact from response BEFORE saving
       let finalContent = response.content;
-      const extracted = extractArtifactFromResponse(response.content);
+      // FIX: pass user's prompt so artifact gets a descriptive title
+      // e.g. 'Microsoft Landing Page' instead of 'HTML File'
+      const extracted = extractArtifactFromResponse(response.content, userMsg.content);
 
       if (extracted && user) {
         createArtifact({
@@ -602,6 +621,14 @@ const App: React.FC = () => {
     );
   }, []);
 
+
+  // Listen for ArtifactCard mobile event — closes sidebar so ArtifactPanel
+  // (z-index 50) is not hidden behind the sidebar (z-index 200-300)
+  useEffect(() => {
+    const handler = () => setIsSidebarOpen(false);
+    window.addEventListener('sedrex:close-sidebar', handler);
+    return () => window.removeEventListener('sedrex:close-sidebar', handler);
+  }, []);
   const handleDeleteSession = useCallback((id: string) =>
     api.deleteConversation(id).then(() => {
       setSessions(p => p.filter(s => s.id !== id));
@@ -2182,16 +2209,16 @@ export default AgentRoutingTag;
 
 ================================================================================
 FILE: components\ArtifactCard.tsx
-MODIFIED: 2026-03-22 12:58  SIZE: 7597 bytes
+MODIFIED: 2026-03-22 23:21  SIZE: 7405 bytes
 ================================================================================
 
 // components/ArtifactCard.tsx
 // ══════════════════════════════════════════════════════════════════
-// SEDREX — Artifact Card v2.2
+// SEDREX — Artifact Card v2.3
 //
 // FIXES:
-//   ✅ ID-ONLY lookup — title fallback removed (caused duplicate
-//      artifact bug when multiple artifacts share the same title)
+//   ✅ ID-ONLY lookup — title fallback removed (duplicate artifact fix)
+//   ✅ Mobile: dispatches sedrex:close-sidebar so panel is visible
 //   ✅ ArtifactPanel.loadArtifactContent() handles not-yet-loaded case
 //   ✅ Preview badge shows for HTML/JSX/TSX
 // ══════════════════════════════════════════════════════════════════
@@ -2241,22 +2268,20 @@ const ArtifactCard: React.FC<ArtifactCardProps> = memo(({
   const isDiagram = type === 'diagram' || lang === 'mermaid';
 
   const handleClick = () => {
-    // ── FIX v2.2: ID-ONLY lookup — no title fallback ─────────────
-    // Root cause of duplicate artifact bug:
-    //   All 3 HTML responses created artifacts titled "HTML File".
-    //   The old title fallback found whichever "HTML File" was first
-    //   in memory — so clicking any of the 3 cards opened the SAME
-    //   (latest) artifact instead of the one for that specific message.
-    //
-    // Fix: use ONLY the exact artifact id embedded in the message.
-    //   If not in memory yet, set the id directly — ArtifactPanel's
-    //   loadArtifactContent() will fetch the content from DB by id.
-    //   Title fallback is removed entirely.
+    // ── FIX v2.3: ID-ONLY lookup + mobile sidebar close ──────────
+    // v2.2: removed title fallback to fix duplicate artifact bug.
+    // v2.3: on mobile the sidebar z-index (200-300) sits above the
+    //   ArtifactPanel z-index (50), so the panel opened but was hidden
+    //   behind the sidebar. Fix: close the sidebar on mobile before
+    //   opening the panel so the user actually sees the artifact.
     const all = [...getArtifacts(), ...getDiagrams()];
     const artifact = all.find(a => a.id === id);
 
-    // Always use the exact id — found or not.
-    // ArtifactPanel handles the "not yet loaded" case via loadArtifactContent(id).
+    // Close sidebar on mobile so ArtifactPanel is visible (z-index fix)
+    if (window.innerWidth < 1024) {
+      window.dispatchEvent(new CustomEvent('sedrex:close-sidebar'));
+    }
+
     setActiveArtifact(artifact ? artifact.id : id);
     openPanel();
   };
@@ -2398,7 +2423,7 @@ export default ArtifactCard;
 
 ================================================================================
 FILE: components\ArtifactPanel.css
-MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
+MODIFIED: 2026-03-22 23:22  SIZE: 16187 bytes
 ================================================================================
 
 /* ================================================================
@@ -2418,8 +2443,12 @@ MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
   position: relative;
   z-index: 10;
 }
+
 .ap-resize-handle:hover,
-.ap-resize-handle:active { background: rgba(16,185,129,0.5); }
+.ap-resize-handle:active {
+  background: rgba(16, 185, 129, 0.5);
+}
+
 .ap-resize-handle::after {
   content: '';
   position: absolute;
@@ -2433,18 +2462,30 @@ MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
   display: flex;
   flex-direction: column;
   height: 100vh;
-  height: 100dvh;           /* full viewport height */
+  height: 100dvh;
+  /* full viewport height */
   background: var(--bg-secondary, #0a0f1a);
   border-left: 1px solid var(--border);
   flex-shrink: 0;
   overflow: hidden;
-  animation: ap-slide-in 220ms cubic-bezier(0.22,1,0.36,1) both;
+  animation: ap-slide-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
 @keyframes ap-slide-in {
-  from { opacity: 0; transform: translateX(24px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
-[data-theme='light'] .ap-root { background: #f8f6f0; }
+
+[data-theme='light'] .ap-root {
+  background: #f8f6f0;
+}
 
 /* ── Header ────────────────────────────────────────────────────── */
 .ap-header {
@@ -2454,11 +2495,15 @@ MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
   padding: 0 12px;
   height: 48px;
   border-bottom: 1px solid var(--border);
-  flex-shrink: 0;        /* NEVER shrink — fixed height */
+  flex-shrink: 0;
+  /* NEVER shrink — fixed height */
   gap: 12px;
   background: var(--bg-secondary, #0a0f1a);
 }
-[data-theme='light'] .ap-header { background: #f0ede4; }
+
+[data-theme='light'] .ap-header {
+  background: #f0ede4;
+}
 
 .ap-header-left {
   display: flex;
@@ -2468,13 +2513,19 @@ MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
   flex: 1;
   overflow: hidden;
 }
-.ap-header-icon { font-size: 16px; flex-shrink: 0; }
+
+.ap-header-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
 .ap-header-info {
   display: flex;
   flex-direction: column;
   min-width: 0;
   line-height: 1.2;
 }
+
 .ap-header-title {
   font-size: 13px;
   font-weight: 600;
@@ -2483,6 +2534,7 @@ MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .ap-header-path {
   font-size: 11px;
   color: var(--accent, #10B981);
@@ -2492,6 +2544,7 @@ MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
   white-space: nowrap;
   opacity: 0.8;
 }
+
 .ap-header-right {
   display: flex;
   align-items: center;
@@ -2504,11 +2557,14 @@ MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
   display: flex;
   align-items: center;
   gap: 2px;
-  background: rgba(255,255,255,0.04);
+  background: rgba(255, 255, 255, 0.04);
   border-radius: 8px;
   padding: 3px;
 }
-[data-theme='light'] .ap-tabs { background: rgba(0,0,0,0.06); }
+
+[data-theme='light'] .ap-tabs {
+  background: rgba(0, 0, 0, 0.06);
+}
 
 .ap-tab {
   display: flex;
@@ -2526,13 +2582,20 @@ MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
   white-space: nowrap;
   font-family: inherit;
 }
-.ap-tab:hover { color: var(--text-primary); }
+
+.ap-tab:hover {
+  color: var(--text-primary);
+}
+
 .ap-tab--active {
   background: var(--bg-primary, #020408);
   color: var(--text-primary);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
-[data-theme='light'] .ap-tab--active { background: #fff; }
+
+[data-theme='light'] .ap-tab--active {
+  background: #fff;
+}
 
 .ap-tab-badge {
   display: inline-flex;
@@ -2542,21 +2605,40 @@ MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
   height: 16px;
   padding: 0 4px;
   border-radius: 8px;
-  background: rgba(16,185,129,0.2);
+  background: rgba(16, 185, 129, 0.2);
   color: var(--accent, #10B981);
   font-size: 10px;
   font-weight: 700;
 }
+
 .ap-tab-live {
   font-size: 7px;
   color: #4ade80;
   margin-left: 2px;
   animation: ap-live-pulse 2s ease-in-out infinite;
 }
-@keyframes ap-live-pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-.ap-tab--muted { opacity: 0.45; cursor: default; }
-.ap-tab--muted:hover { color: var(--text-secondary) !important; background: transparent !important; }
+@keyframes ap-live-pulse {
+
+  0%,
+  100% {
+    opacity: 1
+  }
+
+  50% {
+    opacity: 0.3
+  }
+}
+
+.ap-tab--muted {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ap-tab--muted:hover {
+  color: var(--text-secondary) !important;
+  background: transparent !important;
+}
 
 /* ── Close button ──────────────────────────────────────────────── */
 .ap-close-btn {
@@ -2573,8 +2655,9 @@ MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
   transition: all 150ms ease;
   flex-shrink: 0;
 }
+
 .ap-close-btn:hover {
-  background: rgba(248,113,113,0.1);
+  background: rgba(248, 113, 113, 0.1);
   color: #f87171;
 }
 
@@ -2585,7 +2668,8 @@ MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
    ─────────────────────────────────────────────────────────────── */
 .ap-content {
   flex: 1;
-  min-height: 0;           /* ← CRITICAL: allows children to fill */
+  min-height: 0;
+  /* ← CRITICAL: allows children to fill */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2603,16 +2687,35 @@ MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
   text-align: center;
   gap: 8px;
 }
-.ap-empty-icon  { font-size: 32px; opacity: 0.5; margin-bottom: 8px; }
-.ap-empty-title { font-size: 14px; font-weight: 600; color: var(--text-primary); opacity: 0.7; }
-.ap-empty-sub   { font-size: 12px; color: var(--text-secondary); opacity: 0.5; line-height: 1.5; max-width: 260px; }
+
+.ap-empty-icon {
+  font-size: 32px;
+  opacity: 0.5;
+  margin-bottom: 8px;
+}
+
+.ap-empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  opacity: 0.7;
+}
+
+.ap-empty-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  line-height: 1.5;
+  max-width: 260px;
+}
 
 /* ── Code viewer ───────────────────────────────────────────────── */
 .ap-code-viewer {
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 0;           /* same fix */
+  min-height: 0;
+  /* same fix */
   overflow: hidden;
 }
 
@@ -2624,9 +2727,10 @@ MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
   height: 40px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
-  background: rgba(16,185,129,0.03);
+  background: rgba(16, 185, 129, 0.03);
   gap: 12px;
 }
+
 .ap-code-meta {
   display: flex;
   align-items: center;
@@ -2634,40 +2738,76 @@ MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
   min-width: 0;
   overflow: hidden;
 }
-.ap-code-icon  { font-size: 14px; flex-shrink: 0; }
-.ap-code-lang  {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px; font-weight: 700;
-  letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--accent, #10B981); flex-shrink: 0;
+
+.ap-code-icon {
+  font-size: 14px;
+  flex-shrink: 0;
 }
-.ap-code-path  {
+
+.ap-code-lang {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px; color: var(--text-secondary); opacity: 0.6;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent, #10B981);
+  flex-shrink: 0;
 }
+
+.ap-code-path {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ap-code-lines {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 10px; color: var(--text-secondary); opacity: 0.4; flex-shrink: 0;
+  font-size: 10px;
+  color: var(--text-secondary);
+  opacity: 0.4;
+  flex-shrink: 0;
 }
-.ap-code-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+.ap-code-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
 
 .ap-action-btn {
-  display: flex; align-items: center; gap: 4px;
-  padding: 4px 10px; border-radius: 6px;
-  border: 1px solid var(--border); background: transparent;
-  font-size: 11px; font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 600;
   font-family: 'IBM Plex Mono', monospace;
-  letter-spacing: 0.04em; text-transform: uppercase;
-  color: var(--text-secondary); cursor: pointer;
-  transition: all 150ms ease; white-space: nowrap;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 150ms ease;
+  white-space: nowrap;
 }
+
 .ap-action-btn:hover {
   color: var(--accent, #10B981);
-  border-color: rgba(16,185,129,0.4);
-  background: rgba(16,185,129,0.05);
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.05);
 }
-.ap-action-btn--success { color: #4ade80; border-color: rgba(74,222,128,0.3); }
+
+.ap-action-btn--success {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.3);
+}
 
 .ap-code-scroll {
   flex: 1;
@@ -2676,14 +2816,25 @@ MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }
-.ap-code-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
-.ap-code-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-.ap-code-scroll::-webkit-scrollbar-thumb:hover { background: rgba(16,185,129,0.3); }
+
+.ap-code-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.ap-code-scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.ap-code-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 185, 129, 0.3);
+}
 
 .ap-code-pre {
   margin: 0;
   padding: 20px 24px;
-  font-family: 'IBM Plex Mono','SFMono-Regular',Consolas,monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
   font-size: 0.875rem;
   line-height: 1.65;
   white-space: pre;
@@ -2691,30 +2842,86 @@ MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
   width: max-content;
   box-sizing: border-box;
 }
+
 .ap-code-pre code {
   display: block;
   white-space: pre;
   font-family: inherit;
   font-size: inherit;
 }
-[data-theme='dark']  .ap-code-pre code { color: #e6edf3; }
-[data-theme='light'] .ap-code-pre code { color: #24292f; }
 
-.ap-code-pre .hljs-keyword   { color: #10B981; font-weight: 600; }
-.ap-code-pre .hljs-string    { color: #98c379; }
-.ap-code-pre .hljs-number    { color: #79c0ff; }
-.ap-code-pre .hljs-comment   { color: #6b7280; font-style: italic; }
-.ap-code-pre .hljs-title     { color: #e8c96a; font-weight: 600; }
-.ap-code-pre .hljs-built_in  { color: #e8c96a; }
-.ap-code-pre .hljs-type      { color: #38bdf8; }
-.ap-code-pre .hljs-literal   { color: #f472b6; }
-.ap-code-pre .hljs-property  { color: #56b6c2; }
-.ap-code-pre .hljs-attr      { color: #56b6c2; }
-.ap-code-pre .hljs-variable  { color: #b0a0f0; }
-.ap-code-pre .hljs-operator  { color: #94a3b8; }
-.ap-code-pre .hljs-params    { color: #b0a0f0; }
-.ap-code-pre .hljs-deletion  { color: #f87171; background: rgba(248,113,113,0.08); }
-.ap-code-pre .hljs-addition  { color: #7ec897; background: rgba(126,200,151,0.08); }
+[data-theme='dark'] .ap-code-pre code {
+  color: #e6edf3;
+}
+
+[data-theme='light'] .ap-code-pre code {
+  color: #24292f;
+}
+
+.ap-code-pre .hljs-keyword {
+  color: #10B981;
+  font-weight: 600;
+}
+
+.ap-code-pre .hljs-string {
+  color: #98c379;
+}
+
+.ap-code-pre .hljs-number {
+  color: #79c0ff;
+}
+
+.ap-code-pre .hljs-comment {
+  color: #6b7280;
+  font-style: italic;
+}
+
+.ap-code-pre .hljs-title {
+  color: #e8c96a;
+  font-weight: 600;
+}
+
+.ap-code-pre .hljs-built_in {
+  color: #e8c96a;
+}
+
+.ap-code-pre .hljs-type {
+  color: #38bdf8;
+}
+
+.ap-code-pre .hljs-literal {
+  color: #f472b6;
+}
+
+.ap-code-pre .hljs-property {
+  color: #56b6c2;
+}
+
+.ap-code-pre .hljs-attr {
+  color: #56b6c2;
+}
+
+.ap-code-pre .hljs-variable {
+  color: #b0a0f0;
+}
+
+.ap-code-pre .hljs-operator {
+  color: #94a3b8;
+}
+
+.ap-code-pre .hljs-params {
+  color: #b0a0f0;
+}
+
+.ap-code-pre .hljs-deletion {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.ap-code-pre .hljs-addition {
+  color: #7ec897;
+  background: rgba(126, 200, 151, 0.08);
+}
 
 /* ── Preview — THE MAIN FIX ────────────────────────────────────
    The full height chain must be:
@@ -2727,7 +2934,8 @@ MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
    ─────────────────────────────────────────────────────────────── */
 .ap-preview-container {
   flex: 1;
-  min-height: 0;           /* ← CRITICAL */
+  min-height: 0;
+  /* ← CRITICAL */
   display: flex;
   flex-direction: column;
   position: relative;
@@ -2750,27 +2958,38 @@ MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
 }
 
 .ap-spinner {
-  width: 20px; height: 20px;
-  border: 2px solid rgba(16,185,129,0.2);
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(16, 185, 129, 0.2);
   border-top-color: var(--accent, #10B981);
   border-radius: 50%;
   animation: ap-spin 700ms linear infinite;
 }
-@keyframes ap-spin { to { transform: rotate(360deg); } }
+
+@keyframes ap-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 /* THE IFRAME FIX: explicit height:100% + flex:1 + min-height:0 */
 .ap-preview-iframe {
   flex: 1;
-  min-height: 0;           /* ← CRITICAL */
+  min-height: 0;
+  /* ← CRITICAL */
   width: 100%;
-  height: 100%;            /* ← belt-and-suspenders */
+  height: 100%;
+  /* ← belt-and-suspenders */
   border: none;
   display: block;
   opacity: 0;
   transition: opacity 300ms ease;
   background: #ffffff;
 }
-.ap-preview-iframe--visible { opacity: 1; }
+
+.ap-preview-iframe--visible {
+  opacity: 1;
+}
 
 .ap-preview-unavailable {
   flex: 1;
@@ -2783,9 +3002,27 @@ MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
   text-align: center;
   gap: 8px;
 }
-.ap-preview-unavailable-icon  { font-size: 32px; opacity: 0.4; margin-bottom: 8px; }
-.ap-preview-unavailable-title { font-size: 14px; font-weight: 600; color: var(--text-primary); opacity: 0.6; }
-.ap-preview-unavailable-sub   { font-size: 12px; color: var(--text-secondary); opacity: 0.5; max-width: 260px; line-height: 1.5; }
+
+.ap-preview-unavailable-icon {
+  font-size: 32px;
+  opacity: 0.4;
+  margin-bottom: 8px;
+}
+
+.ap-preview-unavailable-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  opacity: 0.6;
+}
+
+.ap-preview-unavailable-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  max-width: 260px;
+  line-height: 1.5;
+}
 
 /* ── History ───────────────────────────────────────────────────── */
 .ap-history-list {
@@ -2797,81 +3034,157 @@ MODIFIED: 2026-03-20 12:28  SIZE: 15428 bytes
   flex-direction: column;
   gap: 2px;
 }
+
 .ap-history-empty {
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  flex: 1; min-height: 0;
-  padding: 2rem; text-align: center; gap: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+  padding: 2rem;
+  text-align: center;
+  gap: 8px;
 }
-.ap-history-empty-icon  { font-size: 32px; opacity: 0.4; margin-bottom: 8px; }
-.ap-history-empty-title { font-size: 14px; font-weight: 600; color: var(--text-primary); opacity: 0.6; }
-.ap-history-empty-sub   { font-size: 12px; color: var(--text-secondary); opacity: 0.5; max-width: 220px; line-height: 1.5; }
+
+.ap-history-empty-icon {
+  font-size: 32px;
+  opacity: 0.4;
+  margin-bottom: 8px;
+}
+
+.ap-history-empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  opacity: 0.6;
+}
+
+.ap-history-empty-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  max-width: 220px;
+  line-height: 1.5;
+}
 
 .ap-history-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 12px; border-radius: 8px;
-  cursor: pointer; transition: background 150ms ease; position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 150ms ease;
+  position: relative;
 }
-.ap-history-item:hover { background: rgba(16,185,129,0.06); }
+
+.ap-history-item:hover {
+  background: rgba(16, 185, 129, 0.06);
+}
+
 .ap-history-item--active {
-  background: rgba(16,185,129,0.1);
+  background: rgba(16, 185, 129, 0.1);
   border-left: 2px solid var(--accent, #10B981);
   padding-left: 10px;
 }
-.ap-history-item-icon  { font-size: 16px; flex-shrink: 0; }
-.ap-history-item-info  { flex: 1; min-width: 0; }
+
+.ap-history-item-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.ap-history-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
 .ap-history-item-title {
-  font-size: 13px; font-weight: 500; color: var(--text-primary);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
 .ap-history-item-meta {
-  font-size: 11px; color: var(--text-secondary); opacity: 0.6;
-  font-family: 'IBM Plex Mono', monospace; margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  font-family: 'IBM Plex Mono', monospace;
+  margin-top: 2px;
 }
+
 .ap-history-item-delete {
-  display: flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px; border-radius: 5px; border: none;
-  background: transparent; color: var(--text-secondary);
-  cursor: pointer; opacity: 0; transition: all 150ms ease; flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  transition: all 150ms ease;
+  flex-shrink: 0;
 }
-.ap-history-item:hover .ap-history-item-delete { opacity: 0.6; }
+
+.ap-history-item:hover .ap-history-item-delete {
+  opacity: 0.6;
+}
+
 .ap-history-item-delete:hover {
   opacity: 1 !important;
-  background: rgba(248,113,113,0.1);
+  background: rgba(248, 113, 113, 0.1);
   color: #f87171;
 }
-@media (hover: none) { .ap-history-item-delete { opacity: 0.5; } }
+
+@media (hover: none) {
+  .ap-history-item-delete {
+    opacity: 0.5;
+  }
+}
 
 /* ── Responsive ────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .ap-root {
     position: fixed;
-    right: 0; top: 0; bottom: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
     width: 100vw !important;
-    z-index: 50;
+    z-index: 400;
+    /* above sidebar (200-300) so artifact panel is always visible */
     border-left: none;
-    animation: ap-slide-in-mobile 250ms cubic-bezier(0.22,1,0.36,1) both;
+    animation: ap-slide-in-mobile 250ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
+
   @keyframes ap-slide-in-mobile {
-    from { transform: translateX(100%); }
-    to   { transform: translateX(0); }
+    from {
+      transform: translateX(100%);
+    }
+
+    to {
+      transform: translateX(0);
+    }
   }
-  .ap-resize-handle { display: none; }
+
+  .ap-resize-handle {
+    display: none;
+  }
 }
+
 .ap-preview-container {
   background: #000 !important;
 }
 
 ================================================================================
 FILE: components\ArtifactPanel.tsx
-MODIFIED: 2026-03-22 04:59  SIZE: 38970 bytes
+MODIFIED: 2026-03-22 23:59  SIZE: 39619 bytes
 ================================================================================
-
-// components/ArtifactPanel.tsx
-// SEDREX Artifact Panel v3.3 — Universal Preview Engine
-// Fixes: Python execution, JS/TS execution, CSS live preview,
-// JSON tree, Markdown render, SQL display, Bash terminal,
-// SVG render, image src prefix, preview tab always visible.
 
 import React, {
   useRef, useEffect, useState, useCallback, memo,
@@ -2952,8 +3265,20 @@ function getImageSrc(content: string, title = ''): string {
 
 // ── Universal srcdoc builder ──────────────────────────────────────
 function buildSrcdoc(artifact: Artifact): string {
-  const lang = (artifact.language ?? '').toLowerCase();
+  let lang = (artifact.language ?? '').toLowerCase();
   const content = artifact.content ?? '';
+
+  // ── Auto-detect React/JSX written with wrong fence tag ──────
+  // AI often writes React code with ```javascript instead of ```jsx
+  // Detect: has JSX element syntax AND React import/hooks → promote to jsx
+  if (['javascript', 'js', 'typescript', 'ts'].includes(lang)) {
+    const hasJSXTags = /<[A-Z][A-Za-z0-9]*[\s\/>]|<\/[A-Za-z][A-Za-z0-9]*>/.test(content);
+    const hasReact = /import\s+.*[Rr]eact|from\s+['"]react['"]|useState|useEffect|useRef|React\./.test(content);
+    const hasReturnJSX = /return\s*\(\s*<|=>\s*</.test(content);
+    if ((hasJSXTags && hasReact) || hasReturnJSX) {
+      lang = (lang === 'typescript' || lang === 'ts') ? 'tsx' : 'jsx';
+    }
+  }
 
   const base = `<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui,sans-serif;background:#0b0f1a;color:#e4e8f0;min-height:100vh}.sx-err{color:#f87171;background:rgba(248,113,113,.08);padding:14px;border-radius:8px;border:1px solid rgba(248,113,113,.25);font-family:monospace;font-size:13px;white-space:pre-wrap;margin:12px}.sx-out{font-family:'Fira Code',monospace;font-size:13px;line-height:1.6;padding:16px;white-space:pre-wrap;word-break:break-word}.sx-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(16,185,129,.7);padding:12px 16px 4px;font-family:monospace}pre{margin:0}</style>`;
 
@@ -2977,7 +3302,7 @@ function buildSrcdoc(artifact: Artifact): string {
       .replace(/^import\s+type\s+.*$/gm, '')
       .replace(/^import\s+.*from\s+['"][^'"]+['"]\s*;?\s*$/gm, '')
       .replace(/^import\s+['"][^'"]+['"]\s*;?\s*$/gm, '');
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank"/><script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script><script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script><script>try{localStorage.setItem('sx','1');localStorage.removeItem('sx');}catch(e){Object.defineProperty(window,'localStorage',{value:{_d:{},setItem(k,v){this._d[k]=v},getItem(k){return this._d[k]??null},removeItem(k){delete this._d[k]},clear(){this._d={}}}});}</script><script src="https://unpkg.com/@babel/standalone/babel.min.js"></script><script src="https://cdn.tailwindcss.com"></script>${base}<style>body{padding:16px}</style></head><body><div id="root"></div><script>window.onerror=function(m){document.body.innerHTML='<div class="sx-err">'+m+'</div>';};</script><script type="text/babel">try{const {useState,useEffect,useRef,useCallback,useMemo,useReducer,useContext,createContext,Fragment,memo}=React;${clean}const Root=typeof App!=='undefined'?App:typeof Component!=='undefined'?Component:typeof Dashboard!=='undefined'?Dashboard:typeof Page!=='undefined'?Page:null;if(Root){ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Root));}else{document.getElementById('root').innerHTML='<div class="sx-err">No root component.\\nName it: App, Component, Dashboard, or Page.</div>';}}catch(e){document.body.innerHTML='<div class="sx-err">'+e.message+'</div>';}</script></body></html>`;
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank"/><script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script><script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script><script>try{localStorage.setItem('sx','1');localStorage.removeItem('sx');}catch(e){Object.defineProperty(window,'localStorage',{value:{_d:{},setItem(k,v){this._d[k]=v},getItem(k){return this._d[k]??null},removeItem(k){delete this._d[k]},clear(){this._d={}}}});}</script><script src="https://unpkg.com/@babel/standalone/babel.min.js"></script><script src="https://cdn.tailwindcss.com"></script>${base}<style>body{padding:16px}</style></head><body><div id="root"></div><script>window.onerror=function(m){document.body.innerHTML='<div class="sx-err">'+m+'</div>';};</script><script type="text/babel">try{const {useState,useEffect,useRef,useCallback,useMemo,useReducer,useContext,createContext,Fragment,memo}=React;${clean}const Root=const _names=Object.keys(window).filter(n=>/^[A-Z]/.test(n)&&typeof window[n]==='function');const _pref=['App','Component','Dashboard','Page','Main','Home','Index','Root','Portfolio','Landing','Layout','Screen','View','Widget','Hero','Profile','Showcase'];const Root=_pref.find(n=>typeof window[n]==='function')&&window[_pref.find(n=>typeof window[n]==='function')]||(_names.length?window[_names[0]]:null);if(Root){ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Root));}else{document.getElementById('root').innerHTML='<div class=\"sx-err\">No root component found.\\nSedrex tried: App, Component, Dashboard, Page, and any exported component.</div>';}}</script></body></html>`;
   }
 
   // JavaScript / TypeScript
@@ -3385,6 +3710,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({ onWidthChange }) => {
 };
 
 export default ArtifactPanel;
+
 
 ================================================================================
 FILE: components\AuthPage.tsx
@@ -5032,7 +5358,7 @@ MODIFIED: 2026-03-22 04:45  SIZE: 48097 bytes
 
 ================================================================================
 FILE: components\ChatArea.tsx
-MODIFIED: 2026-03-22 13:25  SIZE: 59287 bytes
+MODIFIED: 2026-03-22 23:45  SIZE: 60652 bytes
 ================================================================================
 
 import React, {
@@ -5304,6 +5630,27 @@ function sanitizeMermaid(raw: string): string {
   // Fix: malformed labels with & or : that break parser
   code = code.replace(/\[\s*([^\]"]*&[^\]"]*)\s*\]/g, '["$1"]');
   code = code.replace(/\[\s*([^\]"]*:[^\]"]*)\s*\]/g, '["$1"]');
+
+  // ── FIX: edge label written without arrow ────────────────────
+  // AI sometimes writes: `A |label| B` instead of `A -->|label| B`
+  // Pattern: node_id SPACE |label| SPACE node_id  (no arrow before pipe)
+  // This regex catches lines where a node is followed directly by |..|
+  // and inserts --> before the pipe
+  code = code.replace(
+    /(^|\n)([ \t]*)(\w+)[ \t]+(\|[^|\n]+\|)[ \t]+(\w+)/gm,
+    (_m, pre, indent, nodeA, label, nodeB) =>
+      `${pre}${indent}${nodeA} -->${label} ${nodeB}`
+  );
+
+  // ── FIX: two node IDs with no arrow between them ─────────────
+  // AI sometimes writes: `VDB  RET` instead of `VDB --> RET`
+  // Pattern: word SPACE SPACE word (double space = missing arrow)
+  // Only on lines that look like connections (inside graph body)
+  code = code.replace(
+    /(^|\n)([ \t]*)(\w+)[ \t]{2,}(\w+)([ \t]*(?:$|\n))/gm,
+    (_m, pre, indent, nodeA, nodeB, tail) =>
+      `${pre}${indent}${nodeA} --> ${nodeB}${tail}`
+  );
 
   return code;
 }
@@ -6335,10 +6682,21 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       <div ref={scrollRef} onScroll={handleScroll} className="chat-scroll">
         <div className="chat-column">
 
-          {messages.length === 0 && (
+          {messages.length === 0 && !isLoading && (
             <EmptyState
               onSuggestionClick={(prompt) => onSuggestionClick?.(prompt)}
             />
+          )}
+          {messages.length === 0 && isLoading && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flex: 1, height: '60vh', flexDirection: 'column', gap: 12,
+            }}>
+              <div className="nx-spinner" />
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)', opacity: 0.6 }}>
+                Loading messages…
+              </span>
+            </div>
           )}
 
           {messages.map((msg, idx) => (
@@ -6366,14 +6724,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({
             />
           ))}
 
-          {/* Global typing dots — only when NO assistant message with content exists */}
-          {isLoading && !messages.some(m => m.role === 'assistant' && m.content) && (
-            <div className="typing-dots">
-              <div className="typing-dot" />
-              <div className="typing-dot" />
-              <div className="typing-dot" />
-            </div>
-          )}
+          {/* NOTE: Global typing dots removed — MessageItem renders its own
+               dots when isStreaming && !msg.content. Showing both caused
+               the double-loading-dot bug on new chats. */}
         </div>
       </div>
 
@@ -30259,7 +30612,7 @@ export const api = {
 
 ================================================================================
 FILE: services\artifactStore.ts
-MODIFIED: 2026-03-22 04:59  SIZE: 22409 bytes
+MODIFIED: 2026-03-23 00:00  SIZE: 24551 bytes
 ================================================================================
 
 import { supabase, isSupabaseConfigured } from './supabaseClient';
@@ -30368,7 +30721,10 @@ export interface ExtractedArtifact {
 // Threshold: extract code blocks >= 20 lines (lowered from 30 to catch Python/CSS/HTML)
 const MIN_LINES_FOR_ARTIFACT = 20;
 
-export function extractArtifactFromResponse(response: string): ExtractedArtifact | null {
+export function extractArtifactFromResponse(
+  response:   string,
+  userPrompt?: string,
+): ExtractedArtifact | null {
   const FENCE_RE = /```(\w*)\n([\s\S]*?)```/g;
   let best: { lang: string; code: string; full: string } | null = null;
   let bestLines = 0;
@@ -30392,10 +30748,24 @@ export function extractArtifactFromResponse(response: string): ExtractedArtifact
 
   if (!best) return null;
 
-  const lang   = best.lang;
+  let lang     = best.lang;
   const code   = best.code.trimEnd();
+
+  // ── Promote js/ts to jsx/tsx if content contains React/JSX ──
+  // AI often writes React code with ```javascript instead of ```jsx.
+  // Detect by: JSX element tags + React import/hooks patterns.
+  if (['javascript', 'js', 'typescript', 'ts'].includes(lang)) {
+    const hasJSXTags   = /<[A-Z][A-Za-z0-9]*[\s\/>]|<\/[A-Za-z][A-Za-z0-9]*>/.test(code);
+    const hasReact     = /import\s+.*[Rr]eact|from\s+['"]react['"]|useState|useEffect|useRef/.test(code);
+    const hasReturnJSX = /return\s*\(\s*<|=>\s*<[A-Z]/.test(code);
+    if ((hasJSXTags && hasReact) || hasReturnJSX) {
+      lang = (lang === 'typescript' || lang === 'ts') ? 'tsx' : 'jsx';
+    }
+  }
+
   const isHtml = lang === 'html';
-  const type: ArtifactType = isHtml ? 'html' : 'code';
+  const isReact = lang === 'jsx' || lang === 'tsx';
+  const type: ArtifactType = isHtml ? 'html' : isReact ? 'code' : 'code';
 
   // Try to extract file path from the comment on the first line
   const firstLine = code.split('\n')[0] ?? '';
@@ -30408,9 +30778,36 @@ export function extractArtifactFromResponse(response: string): ExtractedArtifact
   const filePath    = pathFromCode ?? pathMatch?.[1];
 
   const langLabel = CODE_LANGUAGES[lang] ?? lang.toUpperCase();
-  const title     = filePath
+
+  // ── FIX: Derive unique descriptive title from user prompt ──
+  // Old: all HTML files were titled 'HTML File' → impossible to distinguish
+  // New: extract meaningful words from the user's request
+  // e.g. 'write microsoft landing page' → 'Microsoft Landing Page'
+  //      'build apple page'             → 'Apple Page'
+  //      'rewrite the code'             → 'HTML File (v2)' (fallback)
+  function deriveTitleFromPrompt(prompt: string, lang: string): string {
+    const label = CODE_LANGUAGES[lang] ?? lang.toUpperCase();
+    if (!prompt) return `${label} File`;
+    // Strip common command words
+    const cleaned = prompt
+      .replace(/^(write|build|create|generate|make|code|give me|show me|now write|now build|implement|develop|design)/i, '')
+      .replace(/\b(the|a|an|for|to|with|using|in|on|html|css|code|page|website|site|file|script|component|function|class|style)\b/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!cleaned || cleaned.length < 3) return `${label} File`;
+    // Title-case the cleaned string, cap at 32 chars
+    const titled = cleaned.split(' ')
+      .filter(w => w.length > 0)
+      .map(w => w[0].toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ')
+      .slice(0, 32)
+      .trim();
+    return titled || `${label} File`;
+  }
+
+  const title = filePath
     ? filePath.split('/').pop() ?? filePath
-    : `${langLabel} File`;
+    : deriveTitleFromPrompt(userPrompt ?? '', lang);
 
   const reducedResponse = response.replace(best.full, `\n\n[ARTIFACT:${title}]\n`);
 
@@ -33692,36 +34089,9 @@ console.log('[QUERY] Query optimization service initialized');
 
 ================================================================================
 FILE: services\SedrexsystemPrompt.ts
-MODIFIED: 2026-03-22 05:41  SIZE: 23515 bytes
+MODIFIED: 2026-03-22 23:23  SIZE: 23529 bytes
 ================================================================================
 
-// services/SedrexsystemPrompt.ts
-// ══════════════════════════════════════════════════════════════════
-// SEDREX AI — System Prompt v4.0
-//
-// Built with full understanding of:
-//   WHO uses Sedrex:  developers, researchers, analysts, students,
-//                     and professionals who need verified answers
-//   WHY they use it:  they've been burned by AI hallucinations.
-//                     They want confidence, not performance.
-//   HOW Claude works: understand → evaluate → respond at the exact
-//                     depth the question needs, like a brilliant
-//                     friend who happens to know everything
-//
-// WHAT CHANGED FROM v3.1:
-//   ✅ Audience-aware depth calibration — 5 message types with
-//      explicit format and length rules for each
-//   ✅ Claude-style "brilliant friend" reasoning pattern baked in
-//   ✅ Depth miscalibration fixed — "hey" ≠ 500 words
-//   ✅ Tone engine — warmth that scales from casual to critical
-//   ✅ Context reuse — references what user said, builds on it
-//   ✅ Confident uncertainty — says "I don't know" cleanly
-//   ✅ No structural overkill — headers only when depth needs them
-//   ✅ All exports identical — zero breaking changes
-// ══════════════════════════════════════════════════════════════════
-
-
-// ── Identity lock — stated once, never repeated ───────────────────
 export const GEMINI_IDENTITY_PREAMBLE = `SYSTEM CONFIGURATION — READ ONCE, NEVER REPEAT:
 You are Sedrex. Not Gemini. Not ChatGPT. Not Claude. Sedrex.
 If asked who built you: "I'm Sedrex, built by Siddhesh Randhir and the Sedrex AI team."
@@ -33832,6 +34202,25 @@ Confused user      → patient, clear, start from what they know
 NEVER cold. NEVER robotic. NEVER formal when informal fits better.
 Read the emotional register of the message. Match it.
 
+━━ EMOJI USAGE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Use emojis naturally — like a knowledgeable friend would — to add warmth
+and visual clarity. They are not decoration. Use them when they help:
+
+  ✅ Section headers in structured answers:  ## 🔧 Fix  ## ✅ Result
+  ✅ Status signals:  ✅ working  ❌ broken  ⚠️ watch out  🔍 investigating
+  ✅ Code context:  💻 frontend  🗄️ database  🔐 auth  📦 package
+  ✅ Casual conversation where emoji matches the mood
+  ✅ Lists where a visual icon helps the user scan faster
+
+  ❌ NOT in every sentence (exhausting)
+  ❌ NOT for formal, legal, or medical content
+  ❌ NOT as filler at the start of every bullet point
+  ❌ NOT when the user's tone is strictly professional
+
+Rule: if removing the emoji loses meaning or warmth → keep it.
+If removing it loses nothing → remove it.
+
 ━━ STEP 4: HONESTY — SIGNAL CONFIDENCE NATURALLY ━━━━━━━━━━━━━━━━
 
 "This is certain: ..."        → proven, verified, established
@@ -33887,6 +34276,18 @@ If the user asks to generate/create/draw any image or picture, output ONLY:
 }
 \`\`\`
 No other text. No explanation. Just that JSON block.
+
+MERMAID DIAGRAM RULES — ALWAYS APPLY WHEN WRITING DIAGRAMS:
+Every connection MUST use an explicit arrow: -->, ---, -.->, ==>, -->>.
+NEVER write two node names next to each other without an arrow between them.
+  WRONG: \`VDB  RET\` (no arrow — parser crashes)
+  WRONG: \`VA  RET\` (missing arrow)
+  RIGHT: \`VDB --> RET\` or \`VA --> RET\`
+Edge labels go inside pipes: \`A -->|label| B\` — never outside.
+Subgraph names with spaces MUST be quoted: \`subgraph "My Group"\`
+Node labels with spaces MUST use square brackets: \`A[My Node]\`
+Never use parentheses for node labels in flowcharts — use \`A[text]\`, \`A((circle))\`, \`A{diamond}\`.
+Always verify: every node referenced in connections is defined in the diagram.
 `.trim();
 
 
@@ -34231,6 +34632,7 @@ function _sanitize<T extends { role: string; content: string }>(messages: T[]): 
 
 export const sanitizeConversationHistory = _sanitize;
 export const sanitizeHistory             = _sanitize;
+
 
 ================================================================================
 FILE: services\sentry-setup-example.ts

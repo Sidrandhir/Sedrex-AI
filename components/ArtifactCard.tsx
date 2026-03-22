@@ -1,10 +1,10 @@
 // components/ArtifactCard.tsx
 // ══════════════════════════════════════════════════════════════════
-// SEDREX — Artifact Card v2.2
+// SEDREX — Artifact Card v2.3
 //
 // FIXES:
-//   ✅ ID-ONLY lookup — title fallback removed (caused duplicate
-//      artifact bug when multiple artifacts share the same title)
+//   ✅ ID-ONLY lookup — title fallback removed (duplicate artifact fix)
+//   ✅ Mobile: dispatches sedrex:close-sidebar so panel is visible
 //   ✅ ArtifactPanel.loadArtifactContent() handles not-yet-loaded case
 //   ✅ Preview badge shows for HTML/JSX/TSX
 // ══════════════════════════════════════════════════════════════════
@@ -54,22 +54,20 @@ const ArtifactCard: React.FC<ArtifactCardProps> = memo(({
   const isDiagram = type === 'diagram' || lang === 'mermaid';
 
   const handleClick = () => {
-    // ── FIX v2.2: ID-ONLY lookup — no title fallback ─────────────
-    // Root cause of duplicate artifact bug:
-    //   All 3 HTML responses created artifacts titled "HTML File".
-    //   The old title fallback found whichever "HTML File" was first
-    //   in memory — so clicking any of the 3 cards opened the SAME
-    //   (latest) artifact instead of the one for that specific message.
-    //
-    // Fix: use ONLY the exact artifact id embedded in the message.
-    //   If not in memory yet, set the id directly — ArtifactPanel's
-    //   loadArtifactContent() will fetch the content from DB by id.
-    //   Title fallback is removed entirely.
+    // ── FIX v2.3: ID-ONLY lookup + mobile sidebar close ──────────
+    // v2.2: removed title fallback to fix duplicate artifact bug.
+    // v2.3: on mobile the sidebar z-index (200-300) sits above the
+    //   ArtifactPanel z-index (50), so the panel opened but was hidden
+    //   behind the sidebar. Fix: close the sidebar on mobile before
+    //   opening the panel so the user actually sees the artifact.
     const all = [...getArtifacts(), ...getDiagrams()];
     const artifact = all.find(a => a.id === id);
 
-    // Always use the exact id — found or not.
-    // ArtifactPanel handles the "not yet loaded" case via loadArtifactContent(id).
+    // Close sidebar on mobile so ArtifactPanel is visible (z-index fix)
+    if (window.innerWidth < 1024) {
+      window.dispatchEvent(new CustomEvent('sedrex:close-sidebar'));
+    }
+
     setActiveArtifact(artifact ? artifact.id : id);
     openPanel();
   };
