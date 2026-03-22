@@ -268,6 +268,27 @@ function sanitizeMermaid(raw: string): string {
   code = code.replace(/\[\s*([^\]"]*&[^\]"]*)\s*\]/g, '["$1"]');
   code = code.replace(/\[\s*([^\]"]*:[^\]"]*)\s*\]/g, '["$1"]');
 
+  // ── FIX: edge label written without arrow ────────────────────
+  // AI sometimes writes: `A |label| B` instead of `A -->|label| B`
+  // Pattern: node_id SPACE |label| SPACE node_id  (no arrow before pipe)
+  // This regex catches lines where a node is followed directly by |..|
+  // and inserts --> before the pipe
+  code = code.replace(
+    /(^|\n)([ \t]*)(\w+)[ \t]+(\|[^|\n]+\|)[ \t]+(\w+)/gm,
+    (_m, pre, indent, nodeA, label, nodeB) =>
+      `${pre}${indent}${nodeA} -->${label} ${nodeB}`
+  );
+
+  // ── FIX: two node IDs with no arrow between them ─────────────
+  // AI sometimes writes: `VDB  RET` instead of `VDB --> RET`
+  // Pattern: word SPACE SPACE word (double space = missing arrow)
+  // Only on lines that look like connections (inside graph body)
+  code = code.replace(
+    /(^|\n)([ \t]*)(\w+)[ \t]{2,}(\w+)([ \t]*(?:$|\n))/gm,
+    (_m, pre, indent, nodeA, nodeB, tail) =>
+      `${pre}${indent}${nodeA} --> ${nodeB}${tail}`
+  );
+
   return code;
 }
 
@@ -1298,21 +1319,10 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       <div ref={scrollRef} onScroll={handleScroll} className="chat-scroll">
         <div className="chat-column">
 
-          {messages.length === 0 && !isLoading && (
+          {messages.length === 0 && (
             <EmptyState
               onSuggestionClick={(prompt) => onSuggestionClick?.(prompt)}
             />
-          )}
-          {messages.length === 0 && isLoading && (
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flex: 1, height: '60vh', flexDirection: 'column', gap: 12,
-            }}>
-              <div className="nx-spinner" />
-              <span style={{ fontSize: 13, color: 'var(--text-secondary)', opacity: 0.6 }}>
-                Loading messages…
-              </span>
-            </div>
           )}
 
           {messages.map((msg, idx) => (
