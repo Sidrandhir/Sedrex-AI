@@ -104,7 +104,10 @@ export interface ExtractedArtifact {
 // Threshold: extract code blocks >= 20 lines (lowered from 30 to catch Python/CSS/HTML)
 const MIN_LINES_FOR_ARTIFACT = 20;
 
-export function extractArtifactFromResponse(response: string): ExtractedArtifact | null {
+export function extractArtifactFromResponse(
+  response:   string,
+  userPrompt?: string,
+): ExtractedArtifact | null {
   const FENCE_RE = /```(\w*)\n([\s\S]*?)```/g;
   let best: { lang: string; code: string; full: string } | null = null;
   let bestLines = 0;
@@ -144,9 +147,36 @@ export function extractArtifactFromResponse(response: string): ExtractedArtifact
   const filePath    = pathFromCode ?? pathMatch?.[1];
 
   const langLabel = CODE_LANGUAGES[lang] ?? lang.toUpperCase();
-  const title     = filePath
+
+  // ── FIX: Derive unique descriptive title from user prompt ──
+  // Old: all HTML files were titled 'HTML File' → impossible to distinguish
+  // New: extract meaningful words from the user's request
+  // e.g. 'write microsoft landing page' → 'Microsoft Landing Page'
+  //      'build apple page'             → 'Apple Page'
+  //      'rewrite the code'             → 'HTML File (v2)' (fallback)
+  function deriveTitleFromPrompt(prompt: string, lang: string): string {
+    const label = CODE_LANGUAGES[lang] ?? lang.toUpperCase();
+    if (!prompt) return `${label} File`;
+    // Strip common command words
+    const cleaned = prompt
+      .replace(/^(write|build|create|generate|make|code|give me|show me|now write|now build|implement|develop|design)/i, '')
+      .replace(/\b(the|a|an|for|to|with|using|in|on|html|css|code|page|website|site|file|script|component|function|class|style)\b/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!cleaned || cleaned.length < 3) return `${label} File`;
+    // Title-case the cleaned string, cap at 32 chars
+    const titled = cleaned.split(' ')
+      .filter(w => w.length > 0)
+      .map(w => w[0].toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ')
+      .slice(0, 32)
+      .trim();
+    return titled || `${label} File`;
+  }
+
+  const title = filePath
     ? filePath.split('/').pop() ?? filePath
-    : `${langLabel} File`;
+    : deriveTitleFromPrompt(userPrompt ?? '', lang);
 
   const reducedResponse = response.replace(best.full, `\n\n[ARTIFACT:${title}]\n`);
 

@@ -10,6 +10,7 @@ import { getStats } from './services/storageService';
 import { getCurrentUser, logout } from './services/authService';
 import { getAdminStats } from './services/analyticsService';
 import { api } from './services/apiService';
+import { persistenceService } from './services/persistenceService';
 import { Icons } from './constants';
 const SedrexLogo = '/sedrex-logo.svg';
 import {
@@ -193,14 +194,46 @@ const App: React.FC = () => {
         if (!isMounted || controller.signal.aborted) return;
 
         if (chatData.sessions.length > 0) {
+          // ── FIX: Restore last-visited session + load its messages ──
+          // persistenceService stores 'sedrex_cache_active_session' whenever
+          // the user clicks a chat. On refresh we restore that session
+          // AND immediately fetch its messages so the chat isn't blank.
+          const lastVisitedId = persistenceService.getLastActiveSessionId();
+          const sessionIds = new Set(chatData.sessions.map((s: any) => s.id));
+          const restoreId = (lastVisitedId && sessionIds.has(lastVisitedId))
+            ? lastVisitedId
+            : chatData.sessions[0].id;
+
+          // Load from local persistence first (instant)
+          const localMsgs = persistenceService.loadMessages(restoreId);
+
           startTransition(() => {
             setSessions(chatData.sessions);
-            const firstId = chatData.sessions[0].id;
-            setActiveSessionId(firstId);
-            if (chatData.firstSessionMessages?.length > 0) {
-              setSessions(prev => prev.map(s => s.id === firstId ? { ...s, messages: chatData.firstSessionMessages } : s));
+            setActiveSessionId(restoreId);
+            if (localMsgs.length > 0) {
+              setSessions(prev =>
+                prev.map(s => s.id === restoreId ? { ...s, messages: localMsgs } : s)
+              );
             }
           });
+
+          // Always fetch fresh messages from DB for the restored session
+          // This runs in parallel — UI is already responsive from localMsgs above
+          // FIX: fetch messages from DB for the restored session
+          // If no local messages, use isLoading to prevent empty state flash
+          if (localMsgs.length === 0) setIsLoading(true);
+          api.getMessages(restoreId, 100).then(dbMsgs => {
+            if (isMounted) {
+              if (dbMsgs.length > 0) {
+                startTransition(() =>
+                  setSessions(prev =>
+                    prev.map(s => s.id === restoreId ? { ...s, messages: dbMsgs } : s)
+                  )
+                );
+              }
+              setIsLoading(false);
+            }
+          }).catch(() => { setIsLoading(false); });
         }
 
         // Phase 2: Background Sync (Cloud Data)
@@ -367,7 +400,9 @@ const App: React.FC = () => {
 
       // Extract artifact from response BEFORE saving
       let finalContent = response.content;
-      const extracted = extractArtifactFromResponse(response.content);
+      // FIX: pass user's prompt so artifact gets a descriptive title
+      // e.g. 'Microsoft Landing Page' instead of 'HTML File'
+      const extracted = extractArtifactFromResponse(response.content, userMsg.content);
 
       if (extracted && user) {
         createArtifact({
@@ -557,6 +592,8 @@ const App: React.FC = () => {
 
   const handleSelectSession = useCallback((id: string) => {
     setActiveSessionId(id);
+    // Save clicked session so page refresh restores it
+    try { localStorage.setItem('sedrex_cache_active_session', id); } catch { }
     if (window.innerWidth < 1024) setIsSidebarOpen(false);
     api.getMessages(id, 100).then(m =>
       startTransition(() => setSessions(p => p.map(s => s.id === id ? { ...s, messages: m } : s)))

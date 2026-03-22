@@ -211,7 +211,7 @@ const EnhancedChart = memo(({ dataStr }: { dataStr: string }) => {
               <AreaChart {...chartProps}>
                 <defs>
                   <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor={accent} stopOpacity={0.12} />
+                    <stop offset="5%" stopColor={accent} stopOpacity={0.12} />
                     <stop offset="95%" stopColor={accent} stopOpacity={0} />
                   </linearGradient>
                 </defs>
@@ -234,9 +234,9 @@ const EnhancedChart = memo(({ dataStr }: { dataStr: string }) => {
 // Full sanitizer for subgraph parentheses, node limit guard,
 // size guard (10k chars), error display with raw fallback
 // ══════════════════════════════════════════════════════════════════
-const MAX_MERMAID_CHARS        = 10_000;
-const MAX_MERMAID_EDGES        = 200;   // raised — Notion/Claude safely render 150-300 edges
-const MERMAID_WARN_EDGES       = 120;   // soft-warn above this, still render
+const MAX_MERMAID_CHARS = 10_000;
+const MAX_MERMAID_EDGES = 200;   // raised — Notion/Claude safely render 150-300 edges
+const MERMAID_WARN_EDGES = 120;   // soft-warn above this, still render
 
 function sanitizeMermaid(raw: string): string {
   let code = raw;
@@ -272,8 +272,8 @@ function sanitizeMermaid(raw: string): string {
 }
 
 const MermaidBlock = memo(({ code }: { code: string }) => {
-  const [svg, setSvg]       = useState('');
-  const [error, setError]   = useState('');
+  const [svg, setSvg] = useState('');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -418,8 +418,8 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
     };
     const onEnd = () => setTimeout(() => { window.__sidebarGestureLock = false; }, 80);
     el.addEventListener('touchstart', onStart, { passive: true });
-    el.addEventListener('touchmove',  onMove,  { passive: true });
-    el.addEventListener('touchend',   onEnd,   { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: true });
+    el.addEventListener('touchend', onEnd, { passive: true });
     return () => {
       el.removeEventListener('touchstart', onStart);
       el.removeEventListener('touchmove', onMove);
@@ -440,7 +440,7 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
     setTimeout(() => setCopied(false), 2000);
   };
   const handleDownload = () => {
-    const ext  = EXT_MAP[language]  || language || 'txt';
+    const ext = EXT_MAP[language] || language || 'txt';
     const mime = MIME_MAP[language] || 'text/plain';
     downloadFile(new Blob([codeString], { type: mime }), `file.${ext}`);
   };
@@ -708,9 +708,10 @@ function injectStreamingCursorStyle() {
 // ══════════════════════════════════════════════════════════════════
 
 function renderWithArtifacts(
-  content:       string,
+  content: string,
   remarkPlugins: any[],
-  mdComponents:  any,
+  mdComponents: any,
+  msgTimestamp?: number,
 ): React.ReactNode {
   const ARTIFACT_RE = /\[ARTIFACT:([^\]]+)\]/g;
   const parts: React.ReactNode[] = [];
@@ -735,10 +736,32 @@ function renderWithArtifacts(
       }
     }
 
-    // Find the artifact by title in the store
-    const title     = match[1];
-    const artifacts = getArtifacts();
-    const artifact  = artifacts.find(a => a.title === title);
+    // ── FIX: Timestamp-aware artifact lookup ────────────────
+    // ROOT CAUSE: find(a => a.title === title) always returns the
+    // FIRST (newest) artifact with that title. When user asks to
+    // "rewrite" code, two artifacts share the title e.g. "HTML File".
+    // Every message card then opens the same (newest) artifact.
+    //
+    // FIX: filter by title, sort by createdAt ASC, then pick the
+    // artifact whose createdAt is closest-before msgTimestamp.
+    // Falls back to artifacts[0] (oldest) if no timestamp.
+    const title = match[1];
+    const byTitle = getArtifacts()
+      .filter(a => a.title === title)
+      .sort((a, b) => a.createdAt - b.createdAt);
+    // If we have a message timestamp, pick the artifact created
+    // at or before that message (within a generous 5-minute window)
+    const artifact = (() => {
+      if (!msgTimestamp || byTitle.length === 0) return byTitle[0] ?? null;
+      // Walk from oldest to newest; last one with createdAt <= msgTimestamp + 5min wins
+      const WINDOW = 5 * 60 * 1000;
+      let best = byTitle[0];
+      for (const a of byTitle) {
+        if (a.createdAt <= msgTimestamp + WINDOW) best = a;
+        else break;
+      }
+      return best;
+    })();
 
     if (artifact) {
       parts.push(
@@ -822,15 +845,15 @@ interface MessageItemProps {
 }
 
 const DOC_META: Record<string, { color: string; bg: string; icon: string; label: string }> = {
-  pdf:  { color: '#f87171', bg: 'rgba(248,113,113,0.08)', icon: '📄', label: 'PDF' },
-  docx: { color: '#60a5fa', bg: 'rgba(96,165,250,0.08)',  icon: '📝', label: 'DOC' },
-  doc:  { color: '#60a5fa', bg: 'rgba(96,165,250,0.08)',  icon: '📝', label: 'DOC' },
-  xlsx: { color: '#34d399', bg: 'rgba(52,211,153,0.08)',  icon: '📊', label: 'XLS' },
-  xls:  { color: '#34d399', bg: 'rgba(52,211,153,0.08)',  icon: '📊', label: 'XLS' },
-  csv:  { color: '#34d399', bg: 'rgba(52,211,153,0.08)',  icon: '📊', label: 'CSV' },
-  json: { color: '#fbbf24', bg: 'rgba(251,191,36,0.08)',  icon: '{ }', label: 'JSON' },
-  zip:  { color: '#fb923c', bg: 'rgba(251,146,60,0.08)',  icon: '📦', label: 'ZIP' },
-  md:   { color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', icon: '📑', label: 'MD' },
+  pdf: { color: '#f87171', bg: 'rgba(248,113,113,0.08)', icon: '📄', label: 'PDF' },
+  docx: { color: '#60a5fa', bg: 'rgba(96,165,250,0.08)', icon: '📝', label: 'DOC' },
+  doc: { color: '#60a5fa', bg: 'rgba(96,165,250,0.08)', icon: '📝', label: 'DOC' },
+  xlsx: { color: '#34d399', bg: 'rgba(52,211,153,0.08)', icon: '📊', label: 'XLS' },
+  xls: { color: '#34d399', bg: 'rgba(52,211,153,0.08)', icon: '📊', label: 'XLS' },
+  csv: { color: '#34d399', bg: 'rgba(52,211,153,0.08)', icon: '📊', label: 'CSV' },
+  json: { color: '#fbbf24', bg: 'rgba(251,191,36,0.08)', icon: '{ }', label: 'JSON' },
+  zip: { color: '#fb923c', bg: 'rgba(251,146,60,0.08)', icon: '📦', label: 'ZIP' },
+  md: { color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', icon: '📑', label: 'MD' },
 };
 
 const MessageItem = memo(
@@ -840,10 +863,10 @@ const MessageItem = memo(
     onRegenerate, onFeedback, onSpeak, onSuggestionClick,
     mdComponents, remarkPlugins,
   }: MessageItemProps) => {
-    const isUser      = msg.role === 'user';
-    const isEditing   = editingId === msg.id;
-    const isCopied    = copiedId === msg.id;
-    const isSpeaking  = speakingMsgId === msg.id;
+    const isUser = msg.role === 'user';
+    const isEditing = editingId === msg.id;
+    const isCopied = copiedId === msg.id;
+    const isSpeaking = speakingMsgId === msg.id;
     const isStreaming = isLoading && isLast && !isUser;
 
     // ── Markdown processing with caching ──────────────────────────
@@ -910,7 +933,7 @@ const MessageItem = memo(
                 />
                 <div className="edit-actions">
                   <button className="edit-btn-primary" onClick={() => onSubmitEdit(msg.id)}>Update</button>
-                  <button className="edit-btn-cancel"  onClick={onCancelEdit}>Cancel</button>
+                  <button className="edit-btn-cancel" onClick={onCancelEdit}>Cancel</button>
                 </div>
               </div>
             ) : (
@@ -936,7 +959,7 @@ const MessageItem = memo(
                 }}>
                   <svg style={{ width: 11, height: 11, flexShrink: 0, color: '#4ade80' }}
                     viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+                    <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
                   </svg>
                   <span style={{ color: '#4ade80', fontWeight: 600 }}>
                     {msg.codebaseRef.projectName}
@@ -1000,7 +1023,7 @@ const MessageItem = memo(
                 })() : (
                   // FIX 1: Use renderWithArtifacts for completed messages —
                   // splits [ARTIFACT:title] markers into ArtifactCard components
-                  <>{renderWithArtifacts(processedMarkdown, remarkPlugins, mdComponents)}</>
+                  <>{renderWithArtifacts(processedMarkdown, remarkPlugins, mdComponents, msg.timestamp)}</>
                 )}
               </div>
             )}
@@ -1016,7 +1039,7 @@ const MessageItem = memo(
             {msg.groundingChunks && msg.groundingChunks.length > 0 && (
               <div className="sources-strip">
                 {msg.groundingChunks.map((chunk: GroundingChunk, i: number) => {
-                  const uri   = chunk.web?.uri || chunk.maps?.uri;
+                  const uri = chunk.web?.uri || chunk.maps?.uri;
                   const title = chunk.web?.title || chunk.maps?.title;
                   if (!uri) return null;
                   return (
@@ -1114,16 +1137,16 @@ const MessageItem = memo(
     );
   },
   (prev, next) => {
-    if (prev.msg.content       !== next.msg.content)       return false;
-    if (prev.msg.feedback      !== next.msg.feedback)      return false;
-    if (prev.msg.suggestions   !== next.msg.suggestions)   return false;
-    if (prev.msg.codebaseRef   !== next.msg.codebaseRef)   return false;
-    if (prev.isLast            !== next.isLast)            return false;
-    if (prev.isLoading         !== next.isLoading)         return false;
+    if (prev.msg.content !== next.msg.content) return false;
+    if (prev.msg.feedback !== next.msg.feedback) return false;
+    if (prev.msg.suggestions !== next.msg.suggestions) return false;
+    if (prev.msg.codebaseRef !== next.msg.codebaseRef) return false;
+    if (prev.isLast !== next.isLast) return false;
+    if (prev.isLoading !== next.isLoading) return false;
     if (prev.confidence?.level !== next.confidence?.level) return false;
-    if ((prev.copiedId    === prev.msg.id) !== (next.copiedId    === next.msg.id)) return false;
-    if ((prev.editingId   === prev.msg.id) !== (next.editingId   === next.msg.id)) return false;
-    if (prev.editingId === prev.msg.id && prev.editContent !== next.editContent)   return false;
+    if ((prev.copiedId === prev.msg.id) !== (next.copiedId === next.msg.id)) return false;
+    if ((prev.editingId === prev.msg.id) !== (next.editingId === next.msg.id)) return false;
+    if (prev.editingId === prev.msg.id && prev.editContent !== next.editContent) return false;
     if ((prev.speakingMsgId === prev.msg.id) !== (next.speakingMsgId === next.msg.id)) return false;
     return true;
   }
@@ -1138,12 +1161,12 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   onRegenerate, onEditMessage, onFeedback, theme, onThemeToggle, onSuggestionClick,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const messages  = session?.messages ?? [];
+  const messages = session?.messages ?? [];
 
-  const [copiedId,      setCopiedId]      = useState<string | null>(null);
-  const [editingId,     setEditingId]     = useState<string | null>(null);
-  const [editContent,   setEditContent]   = useState('');
-  const [autoScroll,    setAutoScroll]    = useState(true);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [autoScroll, setAutoScroll] = useState(true);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
@@ -1195,7 +1218,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           voices.find(v => v.lang.startsWith('en')) ||
           null; // null = let browser pick — always works on all engines
         if (voice) u.voice = voice;
-        u.onend  = () => { setSpeakingMsgId(null); utteranceRef.current = null; };
+        u.onend = () => { setSpeakingMsgId(null); utteranceRef.current = null; };
         u.onerror = () => { setSpeakingMsgId(null); utteranceRef.current = null; };
         utteranceRef.current = u;
         setSpeakingMsgId(msgId);
@@ -1238,7 +1261,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     copyToClipboard(text); setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   }, []);
-  const handleStartEdit  = useCallback((id: string, content: string) => {
+  const handleStartEdit = useCallback((id: string, content: string) => {
     setEditingId(id); setEditContent(content);
   }, []);
   const handleCancelEdit = useCallback(() => setEditingId(null), []);
@@ -1246,7 +1269,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     if (editContent.trim()) { onEditMessage(id, editContent.trim()); setEditingId(null); }
   }, [editContent, onEditMessage]);
 
-  const mdComponents  = markdownComponents;
+  const mdComponents = markdownComponents;
   // FIX 9: remark-breaks preserves single newlines as <br> inside paragraphs.
   // Without it, LLM output with soft line breaks collapses into run-on sentences.
   const remarkPlugins = useMemo(
@@ -1275,10 +1298,21 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       <div ref={scrollRef} onScroll={handleScroll} className="chat-scroll">
         <div className="chat-column">
 
-          {messages.length === 0 && (
+          {messages.length === 0 && !isLoading && (
             <EmptyState
               onSuggestionClick={(prompt) => onSuggestionClick?.(prompt)}
             />
+          )}
+          {messages.length === 0 && isLoading && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flex: 1, height: '60vh', flexDirection: 'column', gap: 12,
+            }}>
+              <div className="nx-spinner" />
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)', opacity: 0.6 }}>
+                Loading messages…
+              </span>
+            </div>
           )}
 
           {messages.map((msg, idx) => (

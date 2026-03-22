@@ -1,11 +1,11 @@
 // components/ArtifactCard.tsx
 // ══════════════════════════════════════════════════════════════════
-// SEDREX — Artifact Card v2.1
+// SEDREX — Artifact Card v2.2
 //
 // FIXES:
-//   ✅ Click always works — searches entire store by id OR title
-//   ✅ If artifact not yet in store (cross-session timing), opens
-//      panel anyway and store will populate when session loads
+//   ✅ ID-ONLY lookup — title fallback removed (caused duplicate
+//      artifact bug when multiple artifacts share the same title)
+//   ✅ ArtifactPanel.loadArtifactContent() handles not-yet-loaded case
 //   ✅ Preview badge shows for HTML/JSX/TSX
 // ══════════════════════════════════════════════════════════════════
 
@@ -36,45 +36,41 @@ const LANG_LABELS: Record<string, string> = {
 };
 
 interface ArtifactCardProps {
-  id:        string;
-  title:     string;
-  language:  string;
+  id: string;
+  title: string;
+  language: string;
   lineCount: number;
-  type:      ArtifactType;
+  type: ArtifactType;
   filePath?: string;
 }
 
 const ArtifactCard: React.FC<ArtifactCardProps> = memo(({
   id, title, language, lineCount, type, filePath,
 }) => {
-  const lang       = language.toLowerCase();
-  const icon       = FILE_ICONS[lang]   ?? '📄';
-  const label      = LANG_LABELS[lang]  ?? language.toUpperCase();
+  const lang = language.toLowerCase();
+  const icon = FILE_ICONS[lang] ?? '📄';
+  const label = LANG_LABELS[lang] ?? language.toUpperCase();
   const canPreview = type === 'html' || lang === 'jsx' || lang === 'tsx' || lang === 'html';
-  const isDiagram  = type === 'diagram' || lang === 'mermaid';
+  const isDiagram = type === 'diagram' || lang === 'mermaid';
 
   const handleClick = () => {
-    // ── FIX: Find artifact by id first, then by title as fallback ──
-    // This handles the case where the artifact was created in a
-    // different session and isn't yet loaded in memory. In that case
-    // we still open the panel — the store will populate it.
+    // ── FIX v2.2: ID-ONLY lookup — no title fallback ─────────────
+    // Root cause of duplicate artifact bug:
+    //   All 3 HTML responses created artifacts titled "HTML File".
+    //   The old title fallback found whichever "HTML File" was first
+    //   in memory — so clicking any of the 3 cards opened the SAME
+    //   (latest) artifact instead of the one for that specific message.
+    //
+    // Fix: use ONLY the exact artifact id embedded in the message.
+    //   If not in memory yet, set the id directly — ArtifactPanel's
+    //   loadArtifactContent() will fetch the content from DB by id.
+    //   Title fallback is removed entirely.
     const all = [...getArtifacts(), ...getDiagrams()];
+    const artifact = all.find(a => a.id === id);
 
-    // Try exact id match first
-    let artifact = all.find(a => a.id === id);
-
-    // Fallback: match by title (handles cross-session artifacts)
-    if (!artifact) {
-      artifact = all.find(a => a.title === title);
-    }
-
-    if (artifact) {
-      setActiveArtifact(artifact.id);
-    } else {
-      // Artifact not yet loaded — set the id directly and open panel
-      // The ArtifactPanel will show a loading state until store populates
-      setActiveArtifact(id);
-    }
+    // Always use the exact id — found or not.
+    // ArtifactPanel handles the "not yet loaded" case via loadArtifactContent(id).
+    setActiveArtifact(artifact ? artifact.id : id);
     openPanel();
   };
 
@@ -85,37 +81,37 @@ const ArtifactCard: React.FC<ArtifactCardProps> = memo(({
       type="button"
       title={`Click to open ${title} in artifact panel`}
       style={{
-        display:        'flex',
-        alignItems:     'center',
-        gap:            10,
-        padding:        '10px 14px',
-        margin:         '6px 0',
-        background:     'var(--bg-secondary, #0d1117)',
-        border:         '1px solid var(--border, rgba(255,255,255,0.1))',
-        borderRadius:   10,
-        cursor:         'pointer',
-        width:          '100%',
-        maxWidth:       360,
-        textAlign:      'left',
-        transition:     'border-color 0.15s, background 0.15s',
-        color:          'var(--text-primary, #e4e8f0)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '10px 14px',
+        margin: '6px 0',
+        background: 'var(--bg-secondary, #0d1117)',
+        border: '1px solid var(--border, rgba(255,255,255,0.1))',
+        borderRadius: 10,
+        cursor: 'pointer',
+        width: '100%',
+        maxWidth: 360,
+        textAlign: 'left',
+        transition: 'border-color 0.15s, background 0.15s',
+        color: 'var(--text-primary, #e4e8f0)',
       }}
       onMouseEnter={e => {
         e.currentTarget.style.borderColor = 'var(--accent, #10B981)';
-        e.currentTarget.style.background  = 'rgba(16,185,129,0.04)';
+        e.currentTarget.style.background = 'rgba(16,185,129,0.04)';
       }}
       onMouseLeave={e => {
         e.currentTarget.style.borderColor = 'var(--border, rgba(255,255,255,0.1))';
-        e.currentTarget.style.background  = 'var(--bg-secondary, #0d1117)';
+        e.currentTarget.style.background = 'var(--bg-secondary, #0d1117)';
       }}
     >
       {/* Left: icon + info */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
         <span style={{
-          fontSize:   18,
+          fontSize: 18,
           flexShrink: 0,
-          width:      24,
-          textAlign:  'center',
+          width: 24,
+          textAlign: 'center',
           lineHeight: 1,
         }}>
           {icon}
@@ -123,40 +119,40 @@ const ArtifactCard: React.FC<ArtifactCardProps> = memo(({
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
           <span style={{
-            fontSize:     13,
-            fontWeight:   600,
-            overflow:     'hidden',
+            fontSize: 13,
+            fontWeight: 600,
+            overflow: 'hidden',
             textOverflow: 'ellipsis',
-            whiteSpace:   'nowrap',
-            color:        'var(--text-primary, #e4e8f0)',
+            whiteSpace: 'nowrap',
+            color: 'var(--text-primary, #e4e8f0)',
           }}>
             {title}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{
-              fontSize:     11,
-              color:        'var(--text-secondary, #8b9ab0)',
-              fontFamily:   'monospace',
+              fontSize: 11,
+              color: 'var(--text-secondary, #8b9ab0)',
+              fontFamily: 'monospace',
             }}>
               {label}
             </span>
             {filePath && (
               <span style={{
-                fontSize:     10,
-                color:        'var(--text-secondary, #8b9ab0)',
-                opacity:      0.6,
-                overflow:     'hidden',
+                fontSize: 10,
+                color: 'var(--text-secondary, #8b9ab0)',
+                opacity: 0.6,
+                overflow: 'hidden',
                 textOverflow: 'ellipsis',
-                whiteSpace:   'nowrap',
-                maxWidth:     120,
+                whiteSpace: 'nowrap',
+                maxWidth: 120,
               }}>
                 {filePath}
               </span>
             )}
             <span style={{
               fontSize: 10,
-              color:    'var(--text-secondary, #8b9ab0)',
-              opacity:  0.6,
+              color: 'var(--text-secondary, #8b9ab0)',
+              opacity: 0.6,
             }}>
               {lineCount} lines
             </span>
@@ -168,30 +164,30 @@ const ArtifactCard: React.FC<ArtifactCardProps> = memo(({
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
         {canPreview && !isDiagram && (
           <span style={{
-            display:      'flex',
-            alignItems:   'center',
-            gap:          3,
-            fontSize:     10,
-            fontWeight:   600,
-            color:        '#818cf8',
-            background:   'rgba(129,140,248,0.12)',
-            padding:      '2px 7px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 3,
+            fontSize: 10,
+            fontWeight: 600,
+            color: '#818cf8',
+            background: 'rgba(129,140,248,0.12)',
+            padding: '2px 7px',
             borderRadius: 6,
           }}>
             <svg style={{ width: 9, height: 9 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <circle cx="8" cy="8" r="3"/>
-              <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/>
+              <circle cx="8" cy="8" r="3" />
+              <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" />
             </svg>
             Preview
           </span>
         )}
         {isDiagram && (
           <span style={{
-            fontSize:     10,
-            fontWeight:   600,
-            color:        '#10B981',
-            background:   'rgba(16,185,129,0.12)',
-            padding:      '2px 7px',
+            fontSize: 10,
+            fontWeight: 600,
+            color: '#10B981',
+            background: 'rgba(16,185,129,0.12)',
+            padding: '2px 7px',
             borderRadius: 6,
           }}>
             Diagram
@@ -204,7 +200,7 @@ const ArtifactCard: React.FC<ArtifactCardProps> = memo(({
           stroke="currentColor"
           strokeWidth="1.5"
         >
-          <path d="M3 8h10M9 4l4 4-4 4"/>
+          <path d="M3 8h10M9 4l4 4-4 4" />
         </svg>
       </div>
     </button>
