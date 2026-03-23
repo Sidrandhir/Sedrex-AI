@@ -727,14 +727,25 @@ function buildHistory(history: Message[], intent: SedrexIntent): any[] {
   const max = MAX_HISTORY[intent] ?? 6;
   const safeHistory = sanitizeConversationHistory(history)
     .filter((msg) => msg.content != null && msg.content !== '');
-  return safeHistory.slice(-max).map((msg) => ({
-    role:  msg.role === "assistant" ? "model" : "user",
-    parts: [{
-      text: (msg.content ?? '').length > MAX_MSG_LEN
-        ? (msg.content ?? '').slice(0, MAX_MSG_LEN) + "\n\n[...truncated for context efficiency]"
-        : (msg.content ?? ''),
-    }],
-  }));
+  return safeHistory.slice(-max).map((msg) => {
+    // ── Strip [ARTIFACT:...] markers from assistant messages ──
+    // These markers are internal UI system tokens. When the AI sees
+    // them in its own previous responses, it learns to output them
+    // directly instead of generating actual code — causing empty cards.
+    // Replace with a neutral note so the AI knows it produced an artifact
+    // but doesn't learn the marker syntax.
+    let text = msg.content ?? '';
+    if (msg.role === 'assistant') {
+      text = text.replace(/\[ARTIFACT:[^\]]+\]/g, '[code artifact generated]');
+    }
+    if (text.length > MAX_MSG_LEN) {
+      text = text.slice(0, MAX_MSG_LEN) + '\n\n[...truncated for context efficiency]';
+    }
+    return {
+      role:  msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text }],
+    };
+  });
 }
 
 // ── Post-processing ───────────────────────────────────────────────
@@ -872,7 +883,9 @@ async function callOpenAIProvider(
     { role: "system" as const, content: systemInstruction },
     ...cleanHistory.slice(-max).map((m) => ({
       role: (m.role === "assistant" ? "assistant" : "user") as "assistant" | "user",
-      content: m.content,
+      content: m.role === 'assistant'
+        ? (m.content ?? '').replace(/\[ARTIFACT:[^\]]+\]/g, '[code artifact generated]')
+        : (m.content ?? ''),
     })),
     { role: "user" as const, content: prompt },
   ];
@@ -944,7 +957,9 @@ async function callClaudeProvider(
   const messages = [
     ...cleanHistory.slice(-max).map((m) => ({
       role: (m.role === "assistant" ? "assistant" : "user") as "assistant" | "user",
-      content: m.content,
+      content: m.role === 'assistant'
+        ? (m.content ?? '').replace(/\[ARTIFACT:[^\]]+\]/g, '[code artifact generated]')
+        : (m.content ?? ''),
     })),
     { role: "user" as const, content: prompt },
   ];

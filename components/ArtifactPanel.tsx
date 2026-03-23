@@ -312,6 +312,81 @@ const CodeViewer = memo(({ artifact }: { artifact: Artifact }) => {
 // ── Preview Pane — universal, always renders ──────────────────────
 // FIX: Detects empty content (metadataOnly load) and fetches full
 // content before rendering. Shows spinner during fetch.
+
+// ── CDN script cache — fetched in parent, injected inline ────────
+// Brave browser blocks CDN scripts inside srcdoc iframes.
+// Fetch in parent page context (allowed), then inject as inline text.
+const _scriptCache = new Map<string, string>();
+async function fetchScript(url: string): Promise<string> {
+  if (_scriptCache.has(url)) return _scriptCache.get(url)!;
+  try {
+    const res = await fetch(url);
+    const text = res.ok ? await res.text() : '';
+    if (text) _scriptCache.set(url, text);
+    return text;
+  } catch { return ''; }
+}
+const CDN = {
+  react: 'https://unpkg.com/react@18/umd/react.development.js',
+  reactDom: 'https://unpkg.com/react-dom@18/umd/react-dom.development.js',
+  babel: 'https://unpkg.com/@babel/standalone/babel.min.js',
+  tailwind: 'https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css',
+};
+
+function buildSrcdocInline(
+  artifact: Artifact,
+  reactTxt: string, reactDomTxt: string, babelTxt: string, tailwindTxt: string,
+): string {
+  let lang = (artifact.language ?? '').toLowerCase();
+  const raw = artifact.content ?? '';
+
+  if (['javascript', 'js', 'typescript', 'ts'].includes(lang)) {
+    const hasJSX = /<[A-Z][A-Za-z0-9]*[\s\/>]|<\/[A-Za-z][A-Za-z0-9]*>/.test(raw);
+    const hasReact = /import\s+.*[Rr]eact|from\s+['"]react['"]|useState|useEffect|useRef/.test(raw);
+    const hasReturnJSX = /return\s*\(\s*<|=>\s*<[A-Z]/.test(raw);
+    if ((hasJSX && hasReact) || hasReturnJSX) lang = lang === 'typescript' || lang === 'ts' ? 'tsx' : 'jsx';
+  }
+
+  const clean = raw
+    .replace(/^export\s+default\s+(\w+)\s*;?\s*$/gm, '/* $1 */')
+    .replace(/^export\s+default\s+/gm, '')
+    .replace(/^export\s+(const|let|var|function|class)\s+/gm, '$1 ')
+    .replace(/^export\s*\{[^}]*\}\s*;?\s*$/gm, '')
+    .replace(/^import\s+type\s+.*$/gm, '')
+    .replace(/^import\s+.*from\s+['"'][^'"]+['"']\s*;?\s*$/gm, '')
+    .replace(/^import\s+['"'][^'"]+['"']\s*;?\s*$/gm, '');
+
+  const base = `<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui,sans-serif;background:#0b0f1a;color:#e4e8f0;min-height:100vh}.sx-err{color:#f87171;background:rgba(248,113,113,.08);padding:14px;border-radius:8px;border:1px solid rgba(248,113,113,.25);font-family:monospace;font-size:13px;white-space:pre-wrap;margin:12px}</style>`;
+
+  const motionStub = `window.motion=new Proxy({},{get:(_,tag)=>React.forwardRef(({children,...p},ref)=>React.createElement(tag||'div',{...p,ref},children))});window.AnimatePresence=({children})=>children;window.useAnimation=()=>({start:()=>{},stop:()=>{}});window.useInView=()=>true;window.useScroll=()=>({scrollY:{get:()=>0}});window.useSpring=v=>v;window.useTransform=v=>v;`;
+
+  const localStorageShim = `try{localStorage.setItem('sx','1');localStorage.removeItem('sx');}catch(e){Object.defineProperty(window,'localStorage',{value:{_d:{},setItem(k,v){this._d[k]=v},getItem(k){return this._d[k]??null},removeItem(k){delete this._d[k]},clear(){this._d={}}}});}`;
+
+  const rootDetect = `const _names=Object.keys(window).filter(n=>/^[A-Z]/.test(n)&&typeof window[n]==='function');const _pref=['App','Component','Dashboard','Page','Main','Home','Index','Root','Portfolio','Landing','Layout','Screen','View','Widget','Hero','Profile','Showcase'];const Root=_pref.find(n=>typeof window[n]==='function')&&window[_pref.find(n=>typeof window[n]==='function')]||(_names.length?window[_names[0]]:null);if(Root){ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Root));}else{document.getElementById('root').innerHTML='<div class=\"sx-err\">No root component found.</div>';}`;
+
+  const hooks = `const {useState,useEffect,useRef,useCallback,useMemo,useReducer,useContext,createContext,Fragment,memo}=React;`;
+
+  const sc = (txt: string) => `<script>${txt}<\/script>`;
+  const head = [
+    '<!DOCTYPE html><html><head>',
+    '<meta charset="UTF-8">',
+    '<meta name="viewport" content="width=device-width,initial-scale=1">',
+    '<base target="_blank"/>',
+    reactTxt ? sc(reactTxt) : '<script src="https://unpkg.com/react@18/umd/react.development.js"><\/script>',
+    reactDomTxt ? sc(reactDomTxt) : '<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"><\/script>',
+    babelTxt ? sc(babelTxt) : '<script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>',
+    tailwindTxt ? `<style>${tailwindTxt}<\/style>` : '',
+    sc(localStorageShim + motionStub),
+    base,
+    '<style>body{padding:16px}<\/style>',
+    '<\/head><body><div id="root"><\/div>',
+  ].join('');
+  const errHandler = `<script>window.onerror=function(m){document.body.innerHTML='<div class=\"sx-err\">'+m+'<\/div>';};<\/script>`;
+  const babelScript = `<script type="text/babel">try{${hooks}${clean}${rootDetect}}catch(e){document.body.innerHTML='<div class=\"sx-err\">'+e.message+'<\/div>';}<\/script>`;
+  return head + errHandler + babelScript + '<\/body><\/html>';
+}
+
+
 const PreviewPane = memo(({ artifact }: { artifact: Artifact }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [loaded, setLoaded] = useState(false);
@@ -340,14 +415,33 @@ const PreviewPane = memo(({ artifact }: { artifact: Artifact }) => {
     }
   }, [artifact.id, artifact.content]);
 
-  // Set srcdoc once we have content
+  // Set srcdoc once we have content — async for React to bypass CDN blocking
   useEffect(() => {
-    if (fetching || !iframeRef.current || fullContent.trim() === '') return;
+    if (fetching || fullContent.trim() === '') return;
+    const lang = (artifact.language ?? '').toLowerCase();
+    const isReact = ['jsx', 'tsx'].includes(lang) ||
+      (['javascript', 'js', 'typescript', 'ts'].includes(lang) &&
+        /import.*[Rr]eact|from\s+['"]react['"]|useState|useEffect/.test(fullContent) &&
+        /<[A-Z][A-Za-z0-9]*[\s\/>]|return\s*\(\s*</.test(fullContent));
     setLoaded(false);
-    try {
-      iframeRef.current.srcdoc = buildSrcdoc({ ...artifact, content: fullContent });
-    } catch (e: any) {
-      setErrMsg(e.message || 'Preview failed');
+    if (isReact) {
+      (async () => {
+        try {
+          const [rTxt, rdTxt, bTxt, twTxt] = await Promise.all([
+            fetchScript(CDN.react), fetchScript(CDN.reactDom),
+            fetchScript(CDN.babel), fetchScript(CDN.tailwind),
+          ]);
+          if (iframeRef.current)
+            iframeRef.current.srcdoc = buildSrcdocInline(
+              { ...artifact, content: fullContent }, rTxt, rdTxt, bTxt, twTxt
+            );
+        } catch (e: any) { setErrMsg(e.message || 'Preview failed'); }
+      })();
+    } else {
+      try {
+        if (iframeRef.current)
+          iframeRef.current.srcdoc = buildSrcdoc({ ...artifact, content: fullContent });
+      } catch (e: any) { setErrMsg(e.message || 'Preview failed'); }
     }
   }, [fullContent, fetching, artifact.language, artifact.type]);
 

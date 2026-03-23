@@ -1,5 +1,5 @@
 ﻿SEDREX AI - FULL SOURCE EXPORT
-Generated: 2026-03-23 00:13:10
+Generated: 2026-03-23 15:13:05
 Total files: 114
 ================================================================================
 
@@ -3183,7 +3183,7 @@ MODIFIED: 2026-03-22 23:22  SIZE: 16187 bytes
 
 ================================================================================
 FILE: components\ArtifactPanel.tsx
-MODIFIED: 2026-03-22 23:59  SIZE: 39619 bytes
+MODIFIED: 2026-03-23 14:38  SIZE: 45556 bytes
 ================================================================================
 
 import React, {
@@ -3500,6 +3500,81 @@ const CodeViewer = memo(({ artifact }: { artifact: Artifact }) => {
 // ── Preview Pane — universal, always renders ──────────────────────
 // FIX: Detects empty content (metadataOnly load) and fetches full
 // content before rendering. Shows spinner during fetch.
+
+// ── CDN script cache — fetched in parent, injected inline ────────
+// Brave browser blocks CDN scripts inside srcdoc iframes.
+// Fetch in parent page context (allowed), then inject as inline text.
+const _scriptCache = new Map<string, string>();
+async function fetchScript(url: string): Promise<string> {
+  if (_scriptCache.has(url)) return _scriptCache.get(url)!;
+  try {
+    const res = await fetch(url);
+    const text = res.ok ? await res.text() : '';
+    if (text) _scriptCache.set(url, text);
+    return text;
+  } catch { return ''; }
+}
+const CDN = {
+  react: 'https://unpkg.com/react@18/umd/react.development.js',
+  reactDom: 'https://unpkg.com/react-dom@18/umd/react-dom.development.js',
+  babel: 'https://unpkg.com/@babel/standalone/babel.min.js',
+  tailwind: 'https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css',
+};
+
+function buildSrcdocInline(
+  artifact: Artifact,
+  reactTxt: string, reactDomTxt: string, babelTxt: string, tailwindTxt: string,
+): string {
+  let lang = (artifact.language ?? '').toLowerCase();
+  const raw = artifact.content ?? '';
+
+  if (['javascript', 'js', 'typescript', 'ts'].includes(lang)) {
+    const hasJSX = /<[A-Z][A-Za-z0-9]*[\s\/>]|<\/[A-Za-z][A-Za-z0-9]*>/.test(raw);
+    const hasReact = /import\s+.*[Rr]eact|from\s+['"]react['"]|useState|useEffect|useRef/.test(raw);
+    const hasReturnJSX = /return\s*\(\s*<|=>\s*<[A-Z]/.test(raw);
+    if ((hasJSX && hasReact) || hasReturnJSX) lang = lang === 'typescript' || lang === 'ts' ? 'tsx' : 'jsx';
+  }
+
+  const clean = raw
+    .replace(/^export\s+default\s+(\w+)\s*;?\s*$/gm, '/* $1 */')
+    .replace(/^export\s+default\s+/gm, '')
+    .replace(/^export\s+(const|let|var|function|class)\s+/gm, '$1 ')
+    .replace(/^export\s*\{[^}]*\}\s*;?\s*$/gm, '')
+    .replace(/^import\s+type\s+.*$/gm, '')
+    .replace(/^import\s+.*from\s+['"'][^'"]+['"']\s*;?\s*$/gm, '')
+    .replace(/^import\s+['"'][^'"]+['"']\s*;?\s*$/gm, '');
+
+  const base = `<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui,sans-serif;background:#0b0f1a;color:#e4e8f0;min-height:100vh}.sx-err{color:#f87171;background:rgba(248,113,113,.08);padding:14px;border-radius:8px;border:1px solid rgba(248,113,113,.25);font-family:monospace;font-size:13px;white-space:pre-wrap;margin:12px}</style>`;
+
+  const motionStub = `window.motion=new Proxy({},{get:(_,tag)=>React.forwardRef(({children,...p},ref)=>React.createElement(tag||'div',{...p,ref},children))});window.AnimatePresence=({children})=>children;window.useAnimation=()=>({start:()=>{},stop:()=>{}});window.useInView=()=>true;window.useScroll=()=>({scrollY:{get:()=>0}});window.useSpring=v=>v;window.useTransform=v=>v;`;
+
+  const localStorageShim = `try{localStorage.setItem('sx','1');localStorage.removeItem('sx');}catch(e){Object.defineProperty(window,'localStorage',{value:{_d:{},setItem(k,v){this._d[k]=v},getItem(k){return this._d[k]??null},removeItem(k){delete this._d[k]},clear(){this._d={}}}});}`;
+
+  const rootDetect = `const _names=Object.keys(window).filter(n=>/^[A-Z]/.test(n)&&typeof window[n]==='function');const _pref=['App','Component','Dashboard','Page','Main','Home','Index','Root','Portfolio','Landing','Layout','Screen','View','Widget','Hero','Profile','Showcase'];const Root=_pref.find(n=>typeof window[n]==='function')&&window[_pref.find(n=>typeof window[n]==='function')]||(_names.length?window[_names[0]]:null);if(Root){ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Root));}else{document.getElementById('root').innerHTML='<div class=\"sx-err\">No root component found.</div>';}`;
+
+  const hooks = `const {useState,useEffect,useRef,useCallback,useMemo,useReducer,useContext,createContext,Fragment,memo}=React;`;
+
+  const sc = (txt: string) => `<script>${txt}<\/script>`;
+  const head = [
+    '<!DOCTYPE html><html><head>',
+    '<meta charset="UTF-8">',
+    '<meta name="viewport" content="width=device-width,initial-scale=1">',
+    '<base target="_blank"/>',
+    reactTxt ? sc(reactTxt) : '<script src="https://unpkg.com/react@18/umd/react.development.js"><\/script>',
+    reactDomTxt ? sc(reactDomTxt) : '<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"><\/script>',
+    babelTxt ? sc(babelTxt) : '<script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>',
+    tailwindTxt ? `<style>${tailwindTxt}<\/style>` : '',
+    sc(localStorageShim + motionStub),
+    base,
+    '<style>body{padding:16px}<\/style>',
+    '<\/head><body><div id="root"><\/div>',
+  ].join('');
+  const errHandler = `<script>window.onerror=function(m){document.body.innerHTML='<div class=\"sx-err\">'+m+'<\/div>';};<\/script>`;
+  const babelScript = `<script type="text/babel">try{${hooks}${clean}${rootDetect}}catch(e){document.body.innerHTML='<div class=\"sx-err\">'+e.message+'<\/div>';}<\/script>`;
+  return head + errHandler + babelScript + '<\/body><\/html>';
+}
+
+
 const PreviewPane = memo(({ artifact }: { artifact: Artifact }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [loaded, setLoaded] = useState(false);
@@ -3528,14 +3603,33 @@ const PreviewPane = memo(({ artifact }: { artifact: Artifact }) => {
     }
   }, [artifact.id, artifact.content]);
 
-  // Set srcdoc once we have content
+  // Set srcdoc once we have content — async for React to bypass CDN blocking
   useEffect(() => {
-    if (fetching || !iframeRef.current || fullContent.trim() === '') return;
+    if (fetching || fullContent.trim() === '') return;
+    const lang = (artifact.language ?? '').toLowerCase();
+    const isReact = ['jsx', 'tsx'].includes(lang) ||
+      (['javascript', 'js', 'typescript', 'ts'].includes(lang) &&
+        /import.*[Rr]eact|from\s+['"]react['"]|useState|useEffect/.test(fullContent) &&
+        /<[A-Z][A-Za-z0-9]*[\s\/>]|return\s*\(\s*</.test(fullContent));
     setLoaded(false);
-    try {
-      iframeRef.current.srcdoc = buildSrcdoc({ ...artifact, content: fullContent });
-    } catch (e: any) {
-      setErrMsg(e.message || 'Preview failed');
+    if (isReact) {
+      (async () => {
+        try {
+          const [rTxt, rdTxt, bTxt, twTxt] = await Promise.all([
+            fetchScript(CDN.react), fetchScript(CDN.reactDom),
+            fetchScript(CDN.babel), fetchScript(CDN.tailwind),
+          ]);
+          if (iframeRef.current)
+            iframeRef.current.srcdoc = buildSrcdocInline(
+              { ...artifact, content: fullContent }, rTxt, rdTxt, bTxt, twTxt
+            );
+        } catch (e: any) { setErrMsg(e.message || 'Preview failed'); }
+      })();
+    } else {
+      try {
+        if (iframeRef.current)
+          iframeRef.current.srcdoc = buildSrcdoc({ ...artifact, content: fullContent });
+      } catch (e: any) { setErrMsg(e.message || 'Preview failed'); }
     }
   }, [fullContent, fetching, artifact.language, artifact.type]);
 
@@ -3710,7 +3804,6 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({ onWidthChange }) => {
 };
 
 export default ArtifactPanel;
-
 
 ================================================================================
 FILE: components\AuthPage.tsx
@@ -5358,7 +5451,7 @@ MODIFIED: 2026-03-22 04:45  SIZE: 48097 bytes
 
 ================================================================================
 FILE: components\ChatArea.tsx
-MODIFIED: 2026-03-22 23:45  SIZE: 60652 bytes
+MODIFIED: 2026-03-23 14:41  SIZE: 61010 bytes
 ================================================================================
 
 import React, {
@@ -6130,6 +6223,13 @@ function renderWithArtifacts(
     // artifact whose createdAt is closest-before msgTimestamp.
     // Falls back to artifacts[0] (oldest) if no timestamp.
     const title = match[1];
+    // Guard: skip template literals like ${title} — these appear when
+    // the AI quotes its own code (e.g. showing reducedResponse template).
+    if (!title || title.includes('${') || title.includes('}')) {
+      parts.push(<span key={`raw-${keyIdx++}`}>{match[0]}</span>);
+      lastIndex = match.index + match[0].length;
+      continue;
+    }
     const byTitle = getArtifacts()
       .filter(a => a.title === title)
       .sort((a, b) => a.createdAt - b.createdAt);
@@ -30612,7 +30712,7 @@ export const api = {
 
 ================================================================================
 FILE: services\artifactStore.ts
-MODIFIED: 2026-03-23 00:00  SIZE: 24551 bytes
+MODIFIED: 2026-03-23 15:10  SIZE: 25266 bytes
 ================================================================================
 
 import { supabase, isSupabaseConfigured } from './supabaseClient';
@@ -30725,7 +30825,9 @@ export function extractArtifactFromResponse(
   response:   string,
   userPrompt?: string,
 ): ExtractedArtifact | null {
-  const FENCE_RE = /```(\w*)\n([\s\S]*?)```/g;
+  // Robust fence regex — closing ``` must be at LINE START
+  // Prevents backticks inside strings/regexes from terminating early
+  const FENCE_RE = /^```(\w*)[ \t]*\r?\n([\s\S]*?)^```[ \t]*$/gm;
   let best: { lang: string; code: string; full: string } | null = null;
   let bestLines = 0;
   let match: RegExpExecArray | null;
@@ -30809,7 +30911,22 @@ export function extractArtifactFromResponse(
     ? filePath.split('/').pop() ?? filePath
     : deriveTitleFromPrompt(userPrompt ?? '', lang);
 
-  const reducedResponse = response.replace(best.full, `\n\n[ARTIFACT:${title}]\n`);
+  let reducedResponse = response.replace(best.full, `\n\n[ARTIFACT:${title}]\n`);
+
+  // Strip remaining large code fences — keeps chat clean after artifact card
+  const STRIP_RE = /^```(\w*)[ \t]*\r?\n([\s\S]*?)^```[ \t]*$/gm;
+  reducedResponse = reducedResponse.replace(
+    STRIP_RE, (_m: string, l: string, c: string) => {
+      const lo = (l || '').toLowerCase();
+      if (EXCLUDED_LANGUAGES.has(lo)) return _m;
+      if (c.split('\n').length >= MIN_LINES_FOR_ARTIFACT) return '';
+      return _m;
+    }
+  );
+  reducedResponse = reducedResponse
+    .replace(/^```[ \t]*$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 
   return { title, language: lang, content: code, type, filePath, lineCount: bestLines, reducedResponse };
 }
@@ -34089,7 +34206,7 @@ console.log('[QUERY] Query optimization service initialized');
 
 ================================================================================
 FILE: services\SedrexsystemPrompt.ts
-MODIFIED: 2026-03-22 23:23  SIZE: 23529 bytes
+MODIFIED: 2026-03-23 15:04  SIZE: 26550 bytes
 ================================================================================
 
 export const GEMINI_IDENTITY_PREAMBLE = `SYSTEM CONFIGURATION — READ ONCE, NEVER REPEAT:
@@ -34108,7 +34225,11 @@ IDENTITY RULES — APPLY SILENTLY:
 - Only mention "Siddhesh Randhir" if the user directly asks who made you.
 - Most messages need zero self-reference. Just answer.
 - If someone says you're "actually Gemini/Claude/GPT": "I'm Sedrex — that's who I am."
-- You can discuss other AI products factually. You are a separate product.`.trim();
+- You can discuss other AI products factually. You are a separate product.
+- NEVER mention Siddhesh Randhir unless the user directly asks who built you.
+  Once mentioned, never repeat it in the same conversation.
+- NEVER describe yourself as 'built for verification' or 'execution-focused'.
+- NEVER identify people in photos — say 'I cannot identify individuals from images.'`.trim();
 
 
 // ══════════════════════════════════════════════════════════════════
@@ -34202,6 +34323,33 @@ Confused user      → patient, clear, start from what they know
 NEVER cold. NEVER robotic. NEVER formal when informal fits better.
 Read the emotional register of the message. Match it.
 
+━━ CODE OUTPUT FORMAT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When writing, rewriting, or refactoring any complete file or large block:
+
+  1. ONE code block only. Never split into multiple fences.
+     Never repeat code snippets below or after the main block.
+
+  2. Key changes go in PROSE only -- bullet points above or below
+     the code block. No code fences for explanations.
+
+  3. Never output code as plain text outside a fence.
+
+  4. Never put triple-backtick sequences inside a code block.
+     Describe regex patterns in prose if needed.
+
+  Rule: One response = one code block. Clean. No leakage.
+
+━━ FILE REWRITE IRON LAW ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  EVERY. SINGLE. LINE. Must be in the output.
+  If the file has 100 lines, output 100 lines.
+  If the file has 1500 lines, output 1500 lines. NO exceptions.
+  WRONG: 137 lines for a 1393-line file.
+  WRONG: 'simplified version' or 'cleaned up' output.
+  RIGHT: the output file is byte-for-byte runnable as the original.
+  If you cannot output the full file — say so. Never silently truncate.
+
 ━━ EMOJI USAGE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Use emojis naturally — like a knowledgeable friend would — to add warmth
@@ -34261,6 +34409,19 @@ NEVER use headers for short answers. A 3-sentence answer doesn't need ## section
 
 NEVER truncate code. If you started it, finish every line.
 
+NEVER stop generating mid-response. If context is long, you STILL write full code.
+NEVER output 'I'll continue in the next message' — output everything now.
+NEVER output only an artifact card with no content when code was requested.
+  If the artifact system extracted your code, the card IS the output — that's correct.
+  But never produce an empty card (no code generated at all).
+
+RESPONSE QUALITY — MATCH OR EXCEED CLAUDE:
+  → Be concrete, precise, direct. No fluff, no padding.
+  → Code must work on first run. No syntax errors, no missing imports.
+  → When debugging: identify the exact line, explain the exact cause, show the fix.
+  → When explaining: use concrete examples, not abstract descriptions.
+  → When asked for output: produce the output, don't describe how you would produce it.
+
 NEVER write placeholders: // TODO / // implement this / // add logic here
   Write it completely or explain precisely why you can't.
 
@@ -34299,7 +34460,7 @@ Always verify: every node referenced in connections is defined in the diagram.
 export const AUDIENCE_CONTEXT = `
 ## WHO YOU ARE TALKING TO
 
-Sedrex users are people who chose a verification-first AI because:
+Sedrex users are people who chose a AI workspace because:
   → They've been burned by AI hallucinations before
   → They work in domains where wrong answers have real consequences
   → They are intelligent adults — treat them as such
@@ -34402,11 +34563,21 @@ export const GEMINI_MULTIMODAL = `
 ## Visual Analysis Mode
 
   → Describe what you observe before interpreting it
-  → "I can see..." vs "This suggests..." vs "I'm inferring..."
+  → Use careful language: "I can see..." vs "This suggests..." vs "I'm inferring..."
   → Connect observations directly to the user's question
   → Extract and write out code from images in full
+
+PERSON IDENTIFICATION — CRITICAL RULES:
+  → NEVER identify, name, or guess who a person in an image is
+  → NEVER connect an unknown person to Siddhesh Randhir, the founder, or anyone
+  → NEVER say a person 'looks like', 'could be', or 'resembles' anyone you know
+  → NEVER say a person is related to, works with, or is associated with the founder
+  → If asked 'who is this person': describe what you see (appearance, context, setting)
+    and clearly state: 'I cannot identify individuals from images.'
+  → This rule has NO exceptions — even if the user insists or gives hints
+
   → Never relate image content to Sedrex branding or the founder
-    unless the image explicitly contains Sedrex logos
+    unless the image explicitly contains Sedrex logos or text
 `.trim();
 
 export const GEMINI_LONG_CONTEXT = `
@@ -34632,7 +34803,6 @@ function _sanitize<T extends { role: string; content: string }>(messages: T[]): 
 
 export const sanitizeConversationHistory = _sanitize;
 export const sanitizeHistory             = _sanitize;
-
 
 ================================================================================
 FILE: services\sentry-setup-example.ts

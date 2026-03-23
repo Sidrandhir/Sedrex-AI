@@ -767,6 +767,13 @@ function renderWithArtifacts(
     // artifact whose createdAt is closest-before msgTimestamp.
     // Falls back to artifacts[0] (oldest) if no timestamp.
     const title = match[1];
+    // Guard: skip template literals like ${title} — these appear when
+    // the AI quotes its own code (e.g. showing reducedResponse template).
+    if (!title || title.includes('${') || title.includes('}')) {
+      parts.push(<span key={`raw-${keyIdx++}`}>{match[0]}</span>);
+      lastIndex = match.index + match[0].length;
+      continue;
+    }
     const byTitle = getArtifacts()
       .filter(a => a.title === title)
       .sort((a, b) => a.createdAt - b.createdAt);

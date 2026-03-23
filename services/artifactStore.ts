@@ -108,7 +108,9 @@ export function extractArtifactFromResponse(
   response:   string,
   userPrompt?: string,
 ): ExtractedArtifact | null {
-  const FENCE_RE = /```(\w*)\n([\s\S]*?)```/g;
+  // Robust fence regex — closing ``` must be at LINE START
+  // Prevents backticks inside strings/regexes from terminating early
+  const FENCE_RE = /^```(\w*)[ \t]*\r?\n([\s\S]*?)^```[ \t]*$/gm;
   let best: { lang: string; code: string; full: string } | null = null;
   let bestLines = 0;
   let match: RegExpExecArray | null;
@@ -192,7 +194,22 @@ export function extractArtifactFromResponse(
     ? filePath.split('/').pop() ?? filePath
     : deriveTitleFromPrompt(userPrompt ?? '', lang);
 
-  const reducedResponse = response.replace(best.full, `\n\n[ARTIFACT:${title}]\n`);
+  let reducedResponse = response.replace(best.full, `\n\n[ARTIFACT:${title}]\n`);
+
+  // Strip remaining large code fences — keeps chat clean after artifact card
+  const STRIP_RE = /^```(\w*)[ \t]*\r?\n([\s\S]*?)^```[ \t]*$/gm;
+  reducedResponse = reducedResponse.replace(
+    STRIP_RE, (_m: string, l: string, c: string) => {
+      const lo = (l || '').toLowerCase();
+      if (EXCLUDED_LANGUAGES.has(lo)) return _m;
+      if (c.split('\n').length >= MIN_LINES_FOR_ARTIFACT) return '';
+      return _m;
+    }
+  );
+  reducedResponse = reducedResponse
+    .replace(/^```[ \t]*$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 
   return { title, language: lang, content: code, type, filePath, lineCount: bestLines, reducedResponse };
 }
