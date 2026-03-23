@@ -1,11 +1,11 @@
 ﻿SEDREX AI - FULL SOURCE EXPORT
-Generated: 2026-03-23 15:13:05
+Generated: 2026-03-23 16:03:10
 Total files: 114
 ================================================================================
 
 ================================================================================
 FILE: App.tsx
-MODIFIED: 2026-03-22 23:44  SIZE: 38356 bytes
+MODIFIED: 2026-03-23 15:31  SIZE: 38356 bytes
 ================================================================================
 
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense, startTransition } from 'react';
@@ -28133,7 +28133,7 @@ export async function verifyResponse(
 
 ================================================================================
 FILE: services\aiService.ts
-MODIFIED: 2026-03-22 04:45  SIZE: 68336 bytes
+MODIFIED: 2026-03-23 15:33  SIZE: 69141 bytes
 ================================================================================
 
 import { GoogleGenAI } from "@google/genai";
@@ -28865,14 +28865,25 @@ function buildHistory(history: Message[], intent: SedrexIntent): any[] {
   const max = MAX_HISTORY[intent] ?? 6;
   const safeHistory = sanitizeConversationHistory(history)
     .filter((msg) => msg.content != null && msg.content !== '');
-  return safeHistory.slice(-max).map((msg) => ({
-    role:  msg.role === "assistant" ? "model" : "user",
-    parts: [{
-      text: (msg.content ?? '').length > MAX_MSG_LEN
-        ? (msg.content ?? '').slice(0, MAX_MSG_LEN) + "\n\n[...truncated for context efficiency]"
-        : (msg.content ?? ''),
-    }],
-  }));
+  return safeHistory.slice(-max).map((msg) => {
+    // ── Strip [ARTIFACT:...] markers from assistant messages ──
+    // These markers are internal UI system tokens. When the AI sees
+    // them in its own previous responses, it learns to output them
+    // directly instead of generating actual code — causing empty cards.
+    // Replace with a neutral note so the AI knows it produced an artifact
+    // but doesn't learn the marker syntax.
+    let text = msg.content ?? '';
+    if (msg.role === 'assistant') {
+      text = text.replace(/\[ARTIFACT:[^\]]+\]/g, '[code artifact generated]');
+    }
+    if (text.length > MAX_MSG_LEN) {
+      text = text.slice(0, MAX_MSG_LEN) + '\n\n[...truncated for context efficiency]';
+    }
+    return {
+      role:  msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text }],
+    };
+  });
 }
 
 // ── Post-processing ───────────────────────────────────────────────
@@ -29010,7 +29021,9 @@ async function callOpenAIProvider(
     { role: "system" as const, content: systemInstruction },
     ...cleanHistory.slice(-max).map((m) => ({
       role: (m.role === "assistant" ? "assistant" : "user") as "assistant" | "user",
-      content: m.content,
+      content: m.role === 'assistant'
+        ? (m.content ?? '').replace(/\[ARTIFACT:[^\]]+\]/g, '[code artifact generated]')
+        : (m.content ?? ''),
     })),
     { role: "user" as const, content: prompt },
   ];
@@ -29082,7 +29095,9 @@ async function callClaudeProvider(
   const messages = [
     ...cleanHistory.slice(-max).map((m) => ({
       role: (m.role === "assistant" ? "assistant" : "user") as "assistant" | "user",
-      content: m.content,
+      content: m.role === 'assistant'
+        ? (m.content ?? '').replace(/\[ARTIFACT:[^\]]+\]/g, '[code artifact generated]')
+        : (m.content ?? ''),
     })),
     { role: "user" as const, content: prompt },
   ];
@@ -29780,7 +29795,6 @@ async function generateImage(
     );
   }
 }
-
 
 ================================================================================
 FILE: services\analyticsService.ts
@@ -34206,7 +34220,7 @@ console.log('[QUERY] Query optimization service initialized');
 
 ================================================================================
 FILE: services\SedrexsystemPrompt.ts
-MODIFIED: 2026-03-23 15:04  SIZE: 26550 bytes
+MODIFIED: 2026-03-23 15:38  SIZE: 27104 bytes
 ================================================================================
 
 export const GEMINI_IDENTITY_PREAMBLE = `SYSTEM CONFIGURATION — READ ONCE, NEVER REPEAT:
@@ -34406,6 +34420,14 @@ NEVER end with: "Let me know if you need anything else!", "Hope this helps!",
   End with the answer, or the actual next useful step.
 
 NEVER use headers for short answers. A 3-sentence answer doesn't need ## sections.
+
+NEVER write [ARTIFACT:SomeName] or any [ARTIFACT:...] token in your responses.
+  These are INTERNAL SYSTEM TOKENS generated automatically by the platform.
+  If you write them directly, the UI shows an empty card with no code.
+  ALWAYS write your code inside a proper code fence (triple backticks + language).
+    WRONG: [ARTIFACT:Nike Landing]  <- never output this directly
+    RIGHT: write the full code in a fenced code block, e.g. html, jsx, python, etc.
+  The system will automatically extract your code block and create the artifact card.
 
 NEVER truncate code. If you started it, finish every line.
 

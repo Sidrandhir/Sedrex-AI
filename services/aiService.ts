@@ -30,7 +30,7 @@ const MODELS = {
   PRO:             "gemini-3.1-pro-preview",
   // Image generation models (real, documented names)
   IMAGEN:          "imagen-4.0-generate-001",
-  GEMINI_IMAGE:    "gemini-2.5-flash-image",
+  GEMINI_IMAGE:    "gemini-3.1-flash-image",
 } as const;
 
 const MAX_RETRIES  = 4;
@@ -1581,7 +1581,7 @@ export async function decodeAudioData(
 }
 /**
  * Generates an image using a dual-strategy approach:
- *  1. PRIMARY: Imagen 3 via ai.models.generateImages() — dedicated image model
+ *  1. PRIMARY: Imagen 4 via ai.models.generateImages() — dedicated image model
  *  2. FALLBACK: Gemini 2.0 Flash Image via ai.models.generateContent() with responseModalities
  *
  * Returns a data-URL for the generated image, descriptive text, and token counts.
@@ -1592,9 +1592,9 @@ async function generateImage(
 ): Promise<{ url: string; text: string; engine: string; tokens: { input: number; output: number; total: number } }> {
   const ai = new GoogleGenAI({ apiKey });
 
-  // ── STRATEGY 1: Imagen 3 (dedicated image generation model) ──────
+  // ── STRATEGY 1: Imagen 4 (dedicated image generation model) ──────
   try {
-    console.log("[SEDREX] Trying Imagen 3…");
+    console.log("[SEDREX] Trying Imagen 4…");
     const response = await (ai.models as any).generateImages({
       model: MODELS.IMAGEN,
       prompt: prompt,
@@ -1605,17 +1605,17 @@ async function generateImage(
     if (img?.image?.imageBytes) {
       const mimeType = img.image.mimeType || "image/png";
       const url = `data:${mimeType};base64,${img.image.imageBytes}`;
-      console.log("[SEDREX] ✅ Imagen 3 succeeded");
+      console.log("[SEDREX] ✅ Imagen 4 succeeded");
       return {
         url,
-        text: "Image generated with Imagen 3.",
+        text: "Image generated with Imagen 4.",
         engine: MODELS.IMAGEN,
         tokens: { input: 0, output: 0, total: 0 },
       };
     }
-    throw new Error("Imagen 3 returned no image data");
+    throw new Error("Imagen 4 returned no image data");
   } catch (imagenError: any) {
-    console.warn("[SEDREX] Imagen 3 failed, trying Gemini Flash Image…", imagenError.message);
+    console.warn("[SEDREX] Imagen 4 failed, trying Gemini Flash Image…", imagenError.message);
   }
 
   // ── STRATEGY 2: Gemini 2.0 Flash Image (native multimodal output) ─
