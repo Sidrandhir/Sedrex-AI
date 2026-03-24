@@ -6,11 +6,11 @@ import React from 'react';
 // ══════════════════════════════════════════════════════════════════
 
 export const COLORS = {
-  bg:         '#020408',
-  sidebar:    '#060c14',
-  userMsg:    '#0f1828',
+  bg: '#020408',
+  sidebar: '#060c14',
+  userMsg: '#0f1828',
   // SEDREX Emerald — replaces ChatGPT green
-  accent:     '#10B981',
+  accent: '#10B981',
   accentDark: '#059669',
   accentGlow: 'rgba(16,185,129,0.15)',
 };
@@ -18,10 +18,10 @@ export const COLORS = {
 // ── CSS variable injector (call once in index.tsx) ─────────────────
 export const injectSedrexCSSVars = () => {
   const root = document.documentElement;
-  root.style.setProperty('--sedrex-accent',      COLORS.accent);
-  root.style.setProperty('--sedrex-accent-dark',  COLORS.accentDark);
-  root.style.setProperty('--sedrex-accent-glow',  COLORS.accentGlow);
-  root.style.setProperty('--accent',            COLORS.accent);
+  root.style.setProperty('--sedrex-accent', COLORS.accent);
+  root.style.setProperty('--sedrex-accent-dark', COLORS.accentDark);
+  root.style.setProperty('--sedrex-accent-glow', COLORS.accentGlow);
+  root.style.setProperty('--accent', COLORS.accent);
 };
 
 // ══════════════════════════════════════════════════════════════════

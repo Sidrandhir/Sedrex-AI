@@ -1,11 +1,11 @@
 ﻿SEDREX AI - FULL SOURCE EXPORT
-Generated: 2026-03-23 16:03:10
+Generated: 2026-03-24 12:54:14
 Total files: 114
 ================================================================================
 
 ================================================================================
 FILE: App.tsx
-MODIFIED: 2026-03-23 15:31  SIZE: 38356 bytes
+MODIFIED: 2026-03-24 05:16  SIZE: 38356 bytes
 ================================================================================
 
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense, startTransition } from 'react';
@@ -3807,7 +3807,7 @@ export default ArtifactPanel;
 
 ================================================================================
 FILE: components\AuthPage.tsx
-MODIFIED: 2026-03-20 13:58  SIZE: 17542 bytes
+MODIFIED: 2026-03-24 05:16  SIZE: 17542 bytes
 ================================================================================
 
 
@@ -8785,7 +8785,7 @@ export default ErrorBoundary;
 
 ================================================================================
 FILE: components\LandingPage.css
-MODIFIED: 2026-03-20 13:26  SIZE: 29411 bytes
+MODIFIED: 2026-03-24 06:15  SIZE: 32262 bytes
 ================================================================================
 
 /* ══════════════════════════════════════════════════════════════════
@@ -8794,46 +8794,46 @@ MODIFIED: 2026-03-20 13:26  SIZE: 29411 bytes
    ══════════════════════════════════════════════════════════════════ */
 
 .landing-page {
-  --bg:           #020408;
-  --bg-card:      rgba(16, 185, 129, 0.04);
-  --bg-card-hover:rgba(16, 185, 129, 0.07);
+  --bg: #020408;
+  --bg-card: rgba(16, 185, 129, 0.04);
+  --bg-card-hover: rgba(16, 185, 129, 0.07);
   --text-primary: #e8eaf6;
-  --text-secondary:rgba(232,234,246,0.6);
-  --text-muted:   rgba(232,234,246,0.35);
-  --accent:       #10B981;
+  --text-secondary: rgba(232, 234, 246, 0.6);
+  --text-muted: rgba(232, 234, 246, 0.35);
+  --accent: #10B981;
   --accent-hover: #e8c96a;
-  --accent-glow:  rgba(16, 185, 129, 0.3);
-  --accent-2:     #4ac9c9;
-  --accent-soft:  #e8c96a;
-  --border:       rgba(16, 185, 129, 0.1);
+  --accent-glow: rgba(16, 185, 129, 0.3);
+  --accent-2: #4ac9c9;
+  --accent-soft: #e8c96a;
+  --border: rgba(16, 185, 129, 0.1);
   --border-hover: rgba(16, 185, 129, 0.2);
-  --green:        #3de87a;
-  --red:          #e84a6a;
-  --surface:      rgba(16, 185, 129, 0.03);
-  --glass:        rgba(2,4,8,0.7);
-  --shadow-card:  0 4px 24px rgba(0,0,0,0.4);
+  --green: #3de87a;
+  --red: #e84a6a;
+  --surface: rgba(16, 185, 129, 0.03);
+  --glass: rgba(2, 4, 8, 0.7);
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
   transition: background 0.4s ease, color 0.4s ease;
 }
 
 .landing-page.light {
-  --bg:           #f8f6f0;
-  --bg-card:      rgba(16, 185, 129, 0.04);
-  --bg-card-hover:rgba(16, 185, 129, 0.08);
+  --bg: #f8f6f0;
+  --bg-card: rgba(16, 185, 129, 0.04);
+  --bg-card-hover: rgba(16, 185, 129, 0.08);
   --text-primary: #1a1a2e;
-  --text-secondary:rgba(26,26,46,0.6);
-  --text-muted:   rgba(26,26,46,0.35);
-  --accent:       #059669;
+  --text-secondary: rgba(26, 26, 46, 0.6);
+  --text-muted: rgba(26, 26, 46, 0.35);
+  --accent: #059669;
   --accent-hover: #10B981;
-  --accent-glow:  rgba(16, 185, 129, 0.2);
-  --accent-2:     #0ea5e9;
-  --accent-soft:  #10B981;
-  --border:       rgba(16, 185, 129, 0.1);
+  --accent-glow: rgba(16, 185, 129, 0.2);
+  --accent-2: #0ea5e9;
+  --accent-soft: #10B981;
+  --border: rgba(16, 185, 129, 0.1);
   --border-hover: rgba(16, 185, 129, 0.2);
-  --green:        #10B981;
-  --red:          #ef4444;
-  --surface:      rgba(16, 185, 129, 0.03);
-  --glass:        rgba(248,246,240,0.85);
-  --shadow-card:  0 4px 24px rgba(0,0,0,0.08);
+  --green: #10B981;
+  --red: #ef4444;
+  --surface: rgba(16, 185, 129, 0.03);
+  --glass: rgba(248, 246, 240, 0.85);
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.08);
 }
 
 /* ── Base reset ─────────────────────────────────────────────────── */
@@ -8847,15 +8847,26 @@ MODIFIED: 2026-03-20 13:26  SIZE: 29411 bytes
   font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   scroll-behavior: smooth;
 }
-.landing-page *, .landing-page *::before, .landing-page *::after {
-  box-sizing: border-box; margin: 0; padding: 0;
+
+.landing-page *,
+.landing-page *::before,
+.landing-page *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 /* ══════════════════════════════════════════════════════════════════
    BACKGROUND
    ══════════════════════════════════════════════════════════════════ */
 
-.background-container { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.background-container {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
 
 .gradient-orb {
   position: absolute;
@@ -8864,25 +8875,60 @@ MODIFIED: 2026-03-20 13:26  SIZE: 29411 bytes
   opacity: 0.25;
   animation: orbFloat 20s ease-in-out infinite;
 }
-.orb-1 { width: 600px; height: 600px; background: var(--accent);  top: -10%; left: -10%; }
-.orb-2 { width: 500px; height: 500px; background: var(--accent-2); top: 40%; right: -8%; animation-delay: -7s; }
-.orb-3 { width: 400px; height: 400px; background: var(--accent-soft); bottom: -5%; left: 30%; animation-delay: -14s; }
+
+.orb-1 {
+  width: 600px;
+  height: 600px;
+  background: var(--accent);
+  top: -10%;
+  left: -10%;
+}
+
+.orb-2 {
+  width: 500px;
+  height: 500px;
+  background: var(--accent-2);
+  top: 40%;
+  right: -8%;
+  animation-delay: -7s;
+}
+
+.orb-3 {
+  width: 400px;
+  height: 400px;
+  background: var(--accent-soft);
+  bottom: -5%;
+  left: 30%;
+  animation-delay: -14s;
+}
 
 @keyframes orbFloat {
-  0%,100% { transform: translate(0,0) scale(1); }
-  33%     { transform: translate(30px,-40px) scale(1.05); }
-  66%     { transform: translate(-20px,20px) scale(0.95); }
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  33% {
+    transform: translate(30px, -40px) scale(1.05);
+  }
+
+  66% {
+    transform: translate(-20px, 20px) scale(0.95);
+  }
 }
 
 .mesh-gradient {
-  position: absolute; inset: 0;
+  position: absolute;
+  inset: 0;
   background:
     radial-gradient(ellipse at 20% 50%, var(--accent-glow) 0%, transparent 60%),
-    radial-gradient(ellipse at 80% 20%, rgba(74,201,201,0.05) 0%, transparent 50%);
+    radial-gradient(ellipse at 80% 20%, rgba(74, 201, 201, 0.05) 0%, transparent 50%);
 }
 
 .grid-pattern {
-  position: absolute; inset: 0;
+  position: absolute;
+  inset: 0;
   background-image:
     linear-gradient(var(--border) 1px, transparent 1px),
     linear-gradient(90deg, var(--border) 1px, transparent 1px);
@@ -8893,25 +8939,54 @@ MODIFIED: 2026-03-20 13:26  SIZE: 29411 bytes
 }
 
 .cursor-glow {
-  position: fixed; width: 600px; height: 600px;
-  border-radius: 50%; pointer-events: none; z-index: 0;
-  transform: translate(-50%,-50%);
+  position: fixed;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  transform: translate(-50%, -50%);
   background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
   opacity: 0.12;
   transition: left 0.3s ease-out, top 0.3s ease-out;
 }
 
-.particles-container { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+.particles-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
 .particle {
-  position: absolute; width: 2px; height: 2px;
-  border-radius: 50%; background: var(--accent); opacity: 0;
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0;
   animation: particleUp linear infinite;
 }
+
 @keyframes particleUp {
-  0%   { transform: translateY(100vh) scale(0); opacity: 0; }
-  10%  { opacity: 0.4; }
-  90%  { opacity: 0.2; }
-  100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+  0% {
+    transform: translateY(100vh) scale(0);
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 0.4;
+  }
+
+  90% {
+    opacity: 0.2;
+  }
+
+  100% {
+    transform: translateY(-10vh) scale(1);
+    opacity: 0;
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -8919,412 +8994,1375 @@ MODIFIED: 2026-03-20 13:26  SIZE: 29411 bytes
    ══════════════════════════════════════════════════════════════════ */
 
 .navbar {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
   backdrop-filter: blur(20px) saturate(1.4);
   -webkit-backdrop-filter: blur(20px) saturate(1.4);
   background: var(--glass);
   border-bottom: 1px solid var(--border);
 }
+
 .nav-container {
-  max-width: 1200px; margin: 0 auto; padding: 0 24px;
-  height: 64px; display: flex; align-items: center; justify-content: space-between;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
-.logo-section { display: flex; align-items: center; gap: 4px; }
-.logo-title   { font-size: 18px; font-weight: 800; color: var(--text-primary); letter-spacing: 3px; line-height: 1.1; }
-.logo-subtitle { font-size: 11px; color: var(--text-muted); font-weight: 500; letter-spacing: 0.05em; }
-.nav-buttons  { display: flex; gap: 10px; align-items: center; }
+
+.logo-section {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.logo-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: 3px;
+  line-height: 1.1;
+}
+
+.logo-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.nav-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
 
 .nav-btn {
-  border: none; cursor: pointer; font-size: 13px; font-weight: 600;
-  padding: 8px 18px; border-radius: 10px; transition: all 0.2s; font-family: inherit;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 18px;
+  border-radius: 10px;
+  transition: all 0.2s;
+  font-family: inherit;
 }
-.nav-login  { background: transparent; color: var(--text-secondary); }
-.nav-login:hover { color: var(--text-primary); }
+
+.nav-login {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.nav-login:hover {
+  color: var(--text-primary);
+}
+
 .nav-primary {
-  background: var(--accent); color: #020408;
+  background: var(--accent);
+  color: #020408;
   box-shadow: 0 0 20px var(--accent-glow);
 }
-.nav-primary:hover { transform: translateY(-1px); box-shadow: 0 0 30px var(--accent-glow); background: var(--accent-hover); }
+
+.nav-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 30px var(--accent-glow);
+  background: var(--accent-hover);
+}
 
 .theme-toggle {
-  width: 38px; height: 38px; border-radius: 10px;
-  border: 1px solid var(--border); background: var(--bg-card);
-  color: var(--text-secondary); cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: all 0.3s; position: relative; overflow: hidden; flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
 }
-.theme-toggle:hover { border-color: var(--accent); color: var(--accent); transform: scale(1.05); }
-.theme-toggle svg   { width: 18px; height: 18px; transition: transform 0.4s, opacity 0.3s; }
-.theme-toggle .sun-icon, .theme-toggle .moon-icon { position: absolute; }
 
-.landing-page:not(.light) .theme-toggle .sun-icon  { transform: rotate(0deg) scale(1);   opacity: 1; }
-.landing-page:not(.light) .theme-toggle .moon-icon { transform: rotate(90deg) scale(0);  opacity: 0; }
-.landing-page.light .theme-toggle .sun-icon        { transform: rotate(-90deg) scale(0); opacity: 0; }
-.landing-page.light .theme-toggle .moon-icon       { transform: rotate(0deg) scale(1);   opacity: 1; }
+.theme-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: scale(1.05);
+}
+
+.theme-toggle svg {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.4s, opacity 0.3s;
+}
+
+.theme-toggle .sun-icon,
+.theme-toggle .moon-icon {
+  position: absolute;
+}
+
+.landing-page:not(.light) .theme-toggle .sun-icon {
+  transform: rotate(0deg) scale(1);
+  opacity: 1;
+}
+
+.landing-page:not(.light) .theme-toggle .moon-icon {
+  transform: rotate(90deg) scale(0);
+  opacity: 0;
+}
+
+.landing-page.light .theme-toggle .sun-icon {
+  transform: rotate(-90deg) scale(0);
+  opacity: 0;
+}
+
+.landing-page.light .theme-toggle .moon-icon {
+  transform: rotate(0deg) scale(1);
+  opacity: 1;
+}
 
 /* ══════════════════════════════════════════════════════════════════
    HERO
    ══════════════════════════════════════════════════════════════════ */
 
 .hero-section {
-  position: relative; z-index: 1;
-  min-height: 100vh; min-height: 100dvh;
-  display: flex; flex-direction: column; justify-content: center;
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   padding: 120px 24px 60px;
-  max-width: 1200px; margin: 0 auto;
+  max-width: 1200px;
+  margin: 0 auto;
 }
-.hero-content { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 48px; align-items: center; }
+
+.hero-content {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 48px;
+  align-items: center;
+}
 
 .hero-eyebrow {
-  display: inline-flex; align-items: center; gap: 8px;
-  font-size: 12px; font-weight: 700; color: var(--accent);
-  background: var(--bg-card); padding: 6px 16px;
-  border-radius: 100px; border: 1px solid var(--border);
-  margin-bottom: 24px; letter-spacing: 0.05em; width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--bg-card);
+  padding: 6px 16px;
+  border-radius: 100px;
+  border: 1px solid var(--border);
+  margin-bottom: 24px;
+  letter-spacing: 0.05em;
+  width: fit-content;
   font-family: 'IBM Plex Mono', monospace;
 }
+
 .eyebrow-dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--accent); box-shadow: 0 0 8px var(--accent-glow);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
   animation: pulse 2s ease-in-out infinite;
 }
-@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
+}
 
 .hero-title {
   font-size: clamp(2.2rem, 4.5vw, 3.6rem);
-  font-weight: 800; line-height: 1.12; letter-spacing: -0.03em;
-  color: var(--text-primary); margin-bottom: 20px;
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  margin-bottom: 20px;
 }
-.hero-title-line2 { display: block; }
+
+.hero-title-line2 {
+  display: block;
+}
+
 .rotating-word-wrapper {
-  display: inline-block; position: relative;
-  width: 220px; height: 1.15em; vertical-align: bottom;
+  display: inline-block;
+  position: relative;
+  width: 220px;
+  height: 1.15em;
+  vertical-align: bottom;
 }
+
 .rotating-word {
-  position: absolute; left: 0; top: 0; width: max-content;
-  opacity: 0; transform: translateY(20px);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: max-content;
+  opacity: 0;
+  transform: translateY(20px);
   transition: opacity 0.5s, transform 0.5s;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
-.rotating-word.active { opacity: 1; transform: translateY(0); }
+
+.rotating-word.active {
+  opacity: 1;
+  transform: translateY(0);
+}
 
 .hero-subtitle {
-  font-size: 16px; line-height: 1.8; letter-spacing: 0.012em;
-  color: var(--text-secondary); max-width: 520px; margin-bottom: 32px;
+  font-size: 16px;
+  line-height: 1.8;
+  letter-spacing: 0.012em;
+  color: var(--text-secondary);
+  max-width: 520px;
+  margin-bottom: 32px;
 }
 
-.hero-cta { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.hero-cta {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
 
 .btn {
-  border: none; cursor: pointer; font-family: inherit; font-weight: 600;
-  display: inline-flex; align-items: center; gap: 8px;
-  transition: all 0.25s; text-decoration: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.25s;
+  text-decoration: none;
 }
+
 .btn-primary-large {
-  font-size: 15px; padding: 14px 32px; border-radius: 14px;
-  background: var(--accent); color: #020408;
-  box-shadow: 0 0 30px var(--accent-glow), 0 4px 14px rgba(0,0,0,0.3);
+  font-size: 15px;
+  padding: 14px 32px;
+  border-radius: 14px;
+  background: var(--accent);
+  color: #020408;
+  box-shadow: 0 0 30px var(--accent-glow), 0 4px 14px rgba(0, 0, 0, 0.3);
   font-weight: 700;
 }
-.btn-primary-large:hover { transform: translateY(-2px); background: var(--accent-hover); box-shadow: 0 0 50px var(--accent-glow), 0 8px 24px rgba(0,0,0,0.3); }
-.btn-glow { animation: glowPulse 3s ease-in-out infinite; }
-@keyframes glowPulse {
-  0%,100% { box-shadow: 0 0 20px var(--accent-glow), 0 4px 14px rgba(0,0,0,0.2); }
-  50%     { box-shadow: 0 0 40px var(--accent-glow), 0 4px 18px rgba(0,0,0,0.25); }
+
+.btn-primary-large:hover {
+  transform: translateY(-2px);
+  background: var(--accent-hover);
+  box-shadow: 0 0 50px var(--accent-glow), 0 8px 24px rgba(0, 0, 0, 0.3);
 }
-.btn-arrow { font-size: 18px; transition: transform 0.2s; }
-.btn-primary-large:hover .btn-arrow { transform: translateX(4px); }
+
+.btn-glow {
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 20px var(--accent-glow), 0 4px 14px rgba(0, 0, 0, 0.2);
+  }
+
+  50% {
+    box-shadow: 0 0 40px var(--accent-glow), 0 4px 18px rgba(0, 0, 0, 0.25);
+  }
+}
+
+.btn-arrow {
+  font-size: 18px;
+  transition: transform 0.2s;
+}
+
+.btn-primary-large:hover .btn-arrow {
+  transform: translateX(4px);
+}
 
 .btn-ghost {
-  font-size: 14px; padding: 12px 20px; border-radius: 12px;
-  background: var(--bg-card); color: var(--text-secondary);
+  font-size: 14px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
   border: 1px solid var(--border);
 }
-.btn-ghost:hover { color: var(--text-primary); border-color: var(--border-hover); background: var(--bg-card-hover); }
-.btn-chevron { width: 16px; height: 16px; }
+
+.btn-ghost:hover {
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+  background: var(--bg-card-hover);
+}
+
+.btn-chevron {
+  width: 16px;
+  height: 16px;
+}
 
 /* ── Demo card ──────────────────────────────────────────────────── */
-.hero-card { perspective: 1200px; }
-.card-3d { transform: rotateY(-6deg) rotateX(3deg); transform-style: preserve-3d; transition: transform 0.4s; }
-.hero-card:hover .card-3d { transform: rotateY(-2deg) rotateX(1deg); }
+.hero-card {
+  perspective: 1200px;
+}
+
+.card-3d {
+  transform: rotateY(-6deg) rotateX(3deg);
+  transform-style: preserve-3d;
+  transition: transform 0.4s;
+}
+
+.hero-card:hover .card-3d {
+  transform: rotateY(-2deg) rotateX(1deg);
+}
+
 .card-front {
   background: var(--bg-card);
   border: 1px solid rgba(16, 185, 129, 0.2);
-  border-radius: 16px; overflow: hidden;
+  border-radius: 16px;
+  overflow: hidden;
   backdrop-filter: blur(20px);
   box-shadow: var(--shadow-card), 0 0 40px var(--accent-glow);
 }
+
 .card-browser-bar {
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
   background: rgba(16, 185, 129, 0.04);
 }
-.browser-dots { display: flex; gap: 6px; }
-.dot { width: 10px; height: 10px; border-radius: 50%; }
-.dot-red    { background: #ff5f57; }
-.dot-yellow { background: #ffbd2e; }
-.dot-green  { background: var(--accent); }
-.browser-title { font-size: 12px; color: var(--text-muted); font-weight: 700; margin-left: auto; letter-spacing: 3px; font-family: 'IBM Plex Mono', monospace; }
 
-.card-body { padding: 20px; }
+.browser-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.dot-red {
+  background: #ff5f57;
+}
+
+.dot-yellow {
+  background: #ffbd2e;
+}
+
+.dot-green {
+  background: var(--accent);
+}
+
+.browser-title {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-left: auto;
+  letter-spacing: 3px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.card-body {
+  padding: 20px;
+}
+
 .card-input-area {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 14px 16px;
-  font-size: 14px; color: var(--text-primary); min-height: 48px; font-family: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 14px;
+  color: var(--text-primary);
+  min-height: 48px;
+  font-family: inherit;
 }
-.type-cursor { color: var(--accent); font-weight: 300; margin-left: 1px; }
-.type-cursor.blink { animation: cursorBlink 0.7s steps(2) infinite; }
-@keyframes cursorBlink { 0% { opacity: 1; } 100% { opacity: 0; } }
 
-.card-routing { margin-top: 14px; display: flex; align-items: center; }
-.routing-label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); }
-.routing-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); animation: pulse 1.5s ease-in-out infinite; }
-.routing-text { font-weight: 500; }
+.type-cursor {
+  color: var(--accent);
+  font-weight: 300;
+  margin-left: 1px;
+}
+
+.type-cursor.blink {
+  animation: cursorBlink 0.7s steps(2) infinite;
+}
+
+@keyframes cursorBlink {
+  0% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+.card-routing {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+}
+
+.routing-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.routing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.routing-text {
+  font-weight: 500;
+}
+
 .routing-active-badge {
-  background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2);
-  padding: 3px 10px; border-radius: 8px; font-size: 12px; font-weight: 700;
-  color: var(--accent); transition: all 0.3s; font-family: 'IBM Plex Mono', monospace;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  transition: all 0.3s;
+  font-family: 'IBM Plex Mono', monospace;
 }
 
-@keyframes confBarLoad { from { width: 0; } to { width: 87%; } }
+@keyframes confBarLoad {
+  from {
+    width: 0;
+  }
 
-.card-response { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
-.response-line { height: 9px; border-radius: 5px; background: var(--surface); animation: shimmer 2s ease-in-out infinite; }
-.rl-1 { width: 90%; } .rl-2 { width: 75%; animation-delay: 0.2s; } .rl-3 { width: 55%; animation-delay: 0.4s; }
-@keyframes shimmer { 0%,100% { opacity: 0.3; } 50% { opacity: 0.7; } }
+  to {
+    width: 87%;
+  }
+}
 
-.trust-strip { margin-top: 60px; text-align: center; }
-.trust-text  { font-size: 13px; color: var(--text-muted); font-weight: 500; letter-spacing: 0.04em; }
+.card-response {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.response-line {
+  height: 9px;
+  border-radius: 5px;
+  background: var(--surface);
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+.rl-1 {
+  width: 90%;
+}
+
+.rl-2 {
+  width: 75%;
+  animation-delay: 0.2s;
+}
+
+.rl-3 {
+  width: 55%;
+  animation-delay: 0.4s;
+}
+
+@keyframes shimmer {
+
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.trust-strip {
+  margin-top: 60px;
+  text-align: center;
+}
+
+.trust-text {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
 
 /* ══════════════════════════════════════════════════════════════════
    SHARED SECTION STYLES
    ══════════════════════════════════════════════════════════════════ */
 
 .section-inner {
-  max-width: 1100px; margin: 0 auto; padding: 0 24px;
-  opacity: 0; transform: translateY(36px);
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+  opacity: 0;
+  transform: translateY(36px);
   transition: opacity 0.7s ease-out, transform 0.7s ease-out;
 }
-.section-inner.visible { opacity: 1; transform: translateY(0); }
 
-.section-header { text-align: center; margin-bottom: 56px; }
+.section-inner.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.section-header {
+  text-align: center;
+  margin-bottom: 56px;
+}
+
 .section-tag {
-  display: inline-block; font-size: 11px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.12em;
-  color: var(--accent); background: rgba(16, 185, 129, 0.08);
-  border: 1px solid rgba(16, 185, 129, 0.2); padding: 5px 14px;
-  border-radius: 100px; margin-bottom: 16px; font-family: 'IBM Plex Mono', monospace;
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  padding: 5px 14px;
+  border-radius: 100px;
+  margin-bottom: 16px;
+  font-family: 'IBM Plex Mono', monospace;
 }
+
 .section-title {
-  font-size: clamp(1.6rem, 3vw, 2.4rem); font-weight: 800;
-  line-height: 1.2; letter-spacing: -0.02em;
-  color: var(--text-primary); margin-bottom: 12px;
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin-bottom: 12px;
 }
+
 .section-description {
-  font-size: 15px; color: var(--text-secondary);
-  max-width: 540px; margin: 0 auto; line-height: 1.8; letter-spacing: 0.012em;
+  font-size: 15px;
+  color: var(--text-secondary);
+  max-width: 540px;
+  margin: 0 auto;
+  line-height: 1.8;
+  letter-spacing: 0.012em;
 }
 
 /* ══════════════════════════════════════════════════════════════════
    HOW IT WORKS
    ══════════════════════════════════════════════════════════════════ */
 
-.how-section { position: relative; z-index: 1; padding: 100px 0; }
-.steps-container { display: grid; grid-template-columns: repeat(3,1fr); gap: 32px; }
+.how-section {
+  position: relative;
+  z-index: 1;
+  padding: 100px 0;
+}
+
+.steps-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+}
+
 .step-card {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: 16px; padding: 32px 24px; text-align: center;
-  opacity: 0; transform: translateY(24px);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px 24px;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(24px);
   transition: opacity 0.6s ease-out, transform 0.6s ease-out, border-color 0.3s;
 }
-.step-card.visible { opacity: 1; transform: translateY(0); }
-.step-card:hover   { border-color: rgba(16, 185, 129, 0.25); background: var(--bg-card-hover); }
-.step-number { font-size: 11px; font-weight: 800; color: var(--accent); letter-spacing: 0.1em; margin-bottom: 12px; font-family: 'IBM Plex Mono', monospace; }
-.step-icon   { font-size: 32px; margin-bottom: 16px; line-height: 1; }
-.step-title  { font-size: 16px; font-weight: 700; margin-bottom: 10px; color: var(--text-primary); }
-.step-desc   { font-size: 13px; color: var(--text-secondary); line-height: 1.75; letter-spacing: 0.01em; }
+
+.step-card.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.step-card:hover {
+  border-color: rgba(16, 185, 129, 0.25);
+  background: var(--bg-card-hover);
+}
+
+.step-number {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: 0.1em;
+  margin-bottom: 12px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.step-icon {
+  font-size: 32px;
+  margin-bottom: 16px;
+  line-height: 1;
+}
+
+.step-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--text-primary);
+}
+
+.step-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.75;
+  letter-spacing: 0.01em;
+}
 
 /* ══════════════════════════════════════════════════════════════════
    CAPABILITIES
    ══════════════════════════════════════════════════════════════════ */
 
-.capabilities-section { position: relative; z-index: 1; padding: 80px 0 100px; }
-.cap-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 24px; }
+.capabilities-section {
+  position: relative;
+  z-index: 1;
+  padding: 80px 0 100px;
+}
+
+.cap-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
 .cap-card {
-  border-radius: 18px; padding: 36px 28px 28px;
-  border: 1px solid var(--border); position: relative; overflow: hidden;
-  opacity: 0; transform: translateY(24px);
+  border-radius: 18px;
+  padding: 36px 28px 28px;
+  border: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(24px);
   transition: opacity 0.6s ease-out, transform 0.6s ease-out, border-color 0.3s, box-shadow 0.3s;
   background: var(--bg-card);
 }
-.cap-card.visible { opacity: 1; transform: translateY(0); }
-.cap-card:hover { border-color: rgba(16, 185, 129, 0.25); box-shadow: var(--shadow-card); }
-.cap-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; border-radius: 18px 18px 0 0; }
-.cap-gradient-1::before { background: linear-gradient(90deg, var(--accent), var(--accent-soft)); }
-.cap-gradient-2::before { background: linear-gradient(90deg, var(--accent-2), #06b6d4); }
-.cap-gradient-3::before { background: linear-gradient(90deg, #f472b6, #fb923c); }
-.cap-icon-large { font-size: 36px; margin-bottom: 18px; }
-.cap-title { font-size: 17px; font-weight: 700; margin-bottom: 10px; color: var(--text-primary); }
-.cap-desc  { font-size: 13px; color: var(--text-secondary); line-height: 1.75; margin-bottom: 18px; }
-.cap-tags  { display: flex; flex-wrap: wrap; gap: 6px; }
-.cap-tag   { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 8px; background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.15); color: var(--accent); font-family: 'IBM Plex Mono', monospace; }
+
+.cap-card.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.cap-card:hover {
+  border-color: rgba(16, 185, 129, 0.25);
+  box-shadow: var(--shadow-card);
+}
+
+.cap-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 18px 18px 0 0;
+}
+
+.cap-gradient-1::before {
+  background: linear-gradient(90deg, var(--accent), var(--accent-soft));
+}
+
+.cap-gradient-2::before {
+  background: linear-gradient(90deg, var(--accent-2), #06b6d4);
+}
+
+.cap-gradient-3::before {
+  background: linear-gradient(90deg, #f472b6, #fb923c);
+}
+
+.cap-icon-large {
+  font-size: 36px;
+  margin-bottom: 18px;
+}
+
+.cap-title {
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--text-primary);
+}
+
+.cap-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.75;
+  margin-bottom: 18px;
+}
+
+.cap-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cap-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+  color: var(--accent);
+  font-family: 'IBM Plex Mono', monospace;
+}
 
 /* ══════════════════════════════════════════════════════════════════
    PAIN vs GAIN
    ══════════════════════════════════════════════════════════════════ */
 
-.pain-section { position: relative; z-index: 1; padding: 80px 0 100px; }
-.pain-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+.pain-section {
+  position: relative;
+  z-index: 1;
+  padding: 80px 0 100px;
+}
+
+.pain-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+}
+
 .pain-card {
-  border-radius: 16px; border: 1px solid var(--border); overflow: hidden;
-  opacity: 0; transform: translateY(24px);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(24px);
   transition: opacity 0.6s ease-out, transform 0.6s ease-out;
   background: var(--bg-card);
 }
-.pain-card.visible { opacity: 1; transform: translateY(0); }
-.pain-header-bar { padding: 14px 20px; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-.pain-red   { background: rgba(232,74,106,0.08); color: var(--red);   border-bottom: 1px solid rgba(232,74,106,0.15); }
-.pain-green { background: rgba(61,232,122,0.08); color: var(--green); border-bottom: 1px solid rgba(61,232,122,0.15); }
-.pain-list  { list-style: none; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
-.pain-list li { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.6; color: var(--text-secondary); }
-.pain-icon-bad, .pain-icon-good { flex-shrink: 0; font-size: 14px; line-height: 1.6; }
+
+.pain-card.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.pain-header-bar {
+  padding: 14px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pain-red {
+  background: rgba(232, 74, 106, 0.08);
+  color: var(--red);
+  border-bottom: 1px solid rgba(232, 74, 106, 0.15);
+}
+
+.pain-green {
+  background: rgba(61, 232, 122, 0.08);
+  color: var(--green);
+  border-bottom: 1px solid rgba(61, 232, 122, 0.15);
+}
+
+.pain-list {
+  list-style: none;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pain-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.pain-icon-bad,
+.pain-icon-good {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
 
 /* ══════════════════════════════════════════════════════════════════
    FEATURES
    ══════════════════════════════════════════════════════════════════ */
 
-.features-section { position: relative; z-index: 1; padding: 80px 0 100px; }
-.features-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; }
+.features-section {
+  position: relative;
+  z-index: 1;
+  padding: 80px 0 100px;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
 .feature-card {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: 14px; padding: 28px 22px;
-  opacity: 0; transform: translateY(20px);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px 22px;
+  opacity: 0;
+  transform: translateY(20px);
   transition: opacity 0.5s ease-out, transform 0.5s ease-out, border-color 0.3s;
 }
-.feature-card.visible { opacity: 1; transform: translateY(0); }
-.feature-card:hover   { border-color: rgba(16, 185, 129, 0.2); background: var(--bg-card-hover); }
-.feature-icon  { font-size: 28px; margin-bottom: 14px; }
-.feature-title { font-size: 15px; font-weight: 700; margin-bottom: 8px; color: var(--text-primary); }
-.feature-desc  { font-size: 13px; color: var(--text-secondary); line-height: 1.75; }
+
+.feature-card.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.feature-card:hover {
+  border-color: rgba(16, 185, 129, 0.2);
+  background: var(--bg-card-hover);
+}
+
+.feature-icon {
+  font-size: 28px;
+  margin-bottom: 14px;
+}
+
+.feature-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.feature-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.75;
+}
 
 /* ══════════════════════════════════════════════════════════════════
    MOMENTUM
    ══════════════════════════════════════════════════════════════════ */
 
-.momentum-section { position: relative; z-index: 1; padding: 100px 0; }
-.momentum-content { text-align: center; }
-.momentum-title {
-  font-size: clamp(1.5rem, 2.8vw, 2.2rem); font-weight: 800;
-  line-height: 1.25; letter-spacing: -0.02em;
-  color: var(--text-primary); margin-bottom: 16px;
+.momentum-section {
+  position: relative;
+  z-index: 1;
+  padding: 100px 0;
 }
+
+.momentum-content {
+  text-align: center;
+}
+
+.momentum-title {
+  font-size: clamp(1.5rem, 2.8vw, 2.2rem);
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
 .momentum-highlight {
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
-.momentum-subtitle { font-size: 15px; color: var(--text-secondary); max-width: 540px; margin: 0 auto 48px; line-height: 1.8; }
-.momentum-stats    { display: flex; align-items: center; justify-content: center; gap: 40px; flex-wrap: wrap; }
-.m-stat            { text-align: center; }
+
+.momentum-subtitle {
+  font-size: 15px;
+  color: var(--text-secondary);
+  max-width: 540px;
+  margin: 0 auto 48px;
+  line-height: 1.8;
+}
+
+.momentum-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  flex-wrap: wrap;
+}
+
+.m-stat {
+  text-align: center;
+}
+
 .m-stat-num {
-  display: block; font-size: clamp(2rem, 4vw, 3rem); font-weight: 900;
-  letter-spacing: -0.03em; line-height: 1.1; margin-bottom: 8px;
+  display: block;
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin-bottom: 8px;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
-.m-stat-label  { font-size: 13px; color: var(--text-secondary); max-width: 180px; display: block; line-height: 1.5; }
-.m-stat-divider { width: 1px; height: 60px; background: var(--border); }
+
+.m-stat-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  max-width: 180px;
+  display: block;
+  line-height: 1.5;
+}
+
+.m-stat-divider {
+  width: 1px;
+  height: 60px;
+  background: var(--border);
+}
 
 /* ══════════════════════════════════════════════════════════════════
    CTA
    ══════════════════════════════════════════════════════════════════ */
 
-.cta-section { position: relative; z-index: 1; padding: 60px 24px 80px; }
+.cta-section {
+  position: relative;
+  z-index: 1;
+  padding: 60px 24px 80px;
+}
+
 .cta-inner {
-  max-width: 720px; margin: 0 auto; text-align: center;
-  padding: 64px 40px; border-radius: 24px;
-  background: rgba(16, 185, 129, 0.04); border: 1px solid rgba(16, 185, 129, 0.2);
-  position: relative; overflow: hidden;
-  opacity: 0; transform: translateY(30px);
+  max-width: 720px;
+  margin: 0 auto;
+  text-align: center;
+  padding: 64px 40px;
+  border-radius: 24px;
+  background: rgba(16, 185, 129, 0.04);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  position: relative;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(30px);
   transition: opacity 0.7s ease-out, transform 0.7s ease-out;
 }
-.cta-inner.visible { opacity: 1; transform: translateY(0); }
-.cta-glow {
-  position: absolute; inset: -50%;
-  background: radial-gradient(circle at center, var(--accent-glow) 0%, transparent 60%);
-  opacity: 0.2; animation: ctaGlowPulse 4s ease-in-out infinite;
+
+.cta-inner.visible {
+  opacity: 1;
+  transform: translateY(0);
 }
-@keyframes ctaGlowPulse { 0%,100% { opacity: 0.1; transform: scale(1); } 50% { opacity: 0.25; transform: scale(1.05); } }
-.cta-eyebrow  { position: relative; font-size: 11px; font-weight: 700; color: var(--accent); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 16px; display: block; font-family: 'IBM Plex Mono', monospace; }
-.cta-title    { position: relative; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 800; line-height: 1.2; color: var(--text-primary); margin-bottom: 12px; letter-spacing: -0.02em; }
-.cta-subtitle { position: relative; font-size: 14px; color: var(--text-secondary); margin-bottom: 28px; line-height: 1.75; }
-.btn-cta      { position: relative; }
-.cta-microcopy { position: relative; font-size: 12px; color: var(--text-muted); margin-top: 14px; }
+
+.cta-glow {
+  position: absolute;
+  inset: -50%;
+  background: radial-gradient(circle at center, var(--accent-glow) 0%, transparent 60%);
+  opacity: 0.2;
+  animation: ctaGlowPulse 4s ease-in-out infinite;
+}
+
+@keyframes ctaGlowPulse {
+
+  0%,
+  100% {
+    opacity: 0.1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.25;
+    transform: scale(1.05);
+  }
+}
+
+.cta-eyebrow {
+  position: relative;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+  display: block;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.cta-title {
+  position: relative;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  letter-spacing: -0.02em;
+}
+
+.cta-subtitle {
+  position: relative;
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 28px;
+  line-height: 1.75;
+}
+
+.btn-cta {
+  position: relative;
+}
+
+.cta-microcopy {
+  position: relative;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 14px;
+}
 
 /* ══════════════════════════════════════════════════════════════════
    FOOTER
    ══════════════════════════════════════════════════════════════════ */
 
-.footer { position: relative; z-index: 1; border-top: 1px solid var(--border); padding: 32px 24px; }
-.footer-content { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
-.footer-brand { display: flex; align-items: center; gap: 8px; }
-.footer-logo-text { font-size: 14px; font-weight: 800; color: var(--text-primary); letter-spacing: 3px; }
-.footer-copy  { font-size: 12px; color: var(--text-muted); }
-.footer-links { display: flex; gap: 20px; }
-.footer-links a { font-size: 12px; color: var(--text-muted); text-decoration: none; transition: color 0.2s; }
-.footer-links a:hover { color: var(--accent); }
+.footer {
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid var(--border);
+  padding: 32px 24px;
+}
+
+.footer-content {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.footer-logo-text {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: 3px;
+}
+
+.footer-copy {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.footer-links {
+  display: flex;
+  gap: 20px;
+}
+
+.footer-links a {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.footer-links a:hover {
+  color: var(--accent);
+}
 
 /* ══════════════════════════════════════════════════════════════════
    RESPONSIVE
    ══════════════════════════════════════════════════════════════════ */
 
 @media (max-width: 1024px) {
-  .hero-content { grid-template-columns: 1fr; gap: 40px; text-align: center; }
-  .hero-eyebrow, .hero-subtitle { margin-left: auto; margin-right: auto; }
-  .hero-cta  { justify-content: center; }
-  .hero-card { max-width: 520px; margin: 0 auto; }
-  .card-3d   { transform: none; }
-  .hero-card:hover .card-3d { transform: none; }
-  .rotating-word-wrapper { width: 200px; }
+  .hero-content {
+    grid-template-columns: 1fr;
+    gap: 40px;
+    text-align: center;
+  }
+
+  .hero-eyebrow,
+  .hero-subtitle {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .hero-cta {
+    justify-content: center;
+  }
+
+  .hero-card {
+    max-width: 520px;
+    margin: 0 auto;
+  }
+
+  .card-3d {
+    transform: none;
+  }
+
+  .hero-card:hover .card-3d {
+    transform: none;
+  }
+
+  .rotating-word-wrapper {
+    width: 200px;
+  }
 }
+
 @media (max-width: 768px) {
-  .hero-section  { padding-top: 100px; min-height: auto; }
-  .steps-container { grid-template-columns: 1fr; max-width: 400px; margin: 0 auto; }
-  .cap-grid      { grid-template-columns: 1fr; max-width: 400px; margin: 0 auto; }
-  .pain-grid     { grid-template-columns: 1fr; }
-  .features-grid { grid-template-columns: 1fr 1fr; }
-  .momentum-stats { gap: 24px; }
-  .m-stat-divider { width: 40px; height: 1px; }
-  .cta-inner     { padding: 40px 24px; }
-  .footer-content { flex-direction: column; text-align: center; }
+  .hero-section {
+    padding-top: 100px;
+    min-height: auto;
+  }
+
+  .steps-container {
+    grid-template-columns: 1fr;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+
+  .cap-grid {
+    grid-template-columns: 1fr;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+
+  .pain-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .features-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .momentum-stats {
+    gap: 24px;
+  }
+
+  .m-stat-divider {
+    width: 40px;
+    height: 1px;
+  }
+
+  .cta-inner {
+    padding: 40px 24px;
+  }
+
+  .footer-content {
+    flex-direction: column;
+    text-align: center;
+  }
 }
+
 @media (max-width: 480px) {
-  .nav-container  { padding: 0 16px; }
-  .logo-subtitle  { display: none; }
-  .nav-login      { display: none; }
-  .hero-section   { padding: 90px 16px 40px; }
-  .hero-title     { font-size: 1.6rem; }
-  .rotating-word-wrapper { width: 130px; }
-  .hero-subtitle  { font-size: 14px; }
-  .btn-primary-large { font-size: 14px; padding: 12px 24px; }
-  .features-grid  { grid-template-columns: 1fr; }
-  .section-inner  { padding: 0 16px; }
-  .how-section, .capabilities-section, .pain-section, .features-section { padding: 60px 0; }
-  .momentum-stats { flex-direction: column; gap: 28px; }
-  .m-stat-divider { display: none; }
+  .nav-container {
+    padding: 0 16px;
+  }
+
+  .logo-subtitle {
+    display: none;
+  }
+
+  .nav-login {
+    display: none;
+  }
+
+  .hero-section {
+    padding: 90px 16px 40px;
+  }
+
+  .hero-title {
+    font-size: 1.6rem;
+  }
+
+  .rotating-word-wrapper {
+    width: 130px;
+  }
+
+  .hero-subtitle {
+    font-size: 14px;
+  }
+
+  .btn-primary-large {
+    font-size: 14px;
+    padding: 12px 24px;
+  }
+
+  .features-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .section-inner {
+    padding: 0 16px;
+  }
+
+  .how-section,
+  .capabilities-section,
+  .pain-section,
+  .features-section {
+    padding: 60px 0;
+  }
+
+  .momentum-stats {
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .m-stat-divider {
+    display: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .landing-page *, .landing-page *::before, .landing-page *::after {
-    animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important; scroll-behavior: auto !important;
+
+  .landing-page *,
+  .landing-page *::before,
+  .landing-page *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
-  .cursor-glow, .particles-container { display: none !important; }
+
+  .cursor-glow,
+  .particles-container {
+    display: none !important;
+  }
+}
+
+/* NEW HERO CHATBAR + PREMIUM STYLING */
+.hero-chatbar {
+  margin-top: 26px;
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  background: rgba(2, 4, 8, 0.72);
+  border-radius: 14px;
+  display: block;
+  padding: 16px 14px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 0 30px rgba(16, 185, 129, 0.2);
+}
+
+.hero-chatbar:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 40px rgba(16, 185, 129, 0.32);
+}
+
+.hero-chatbar-label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: rgba(194, 240, 214, 0.85);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.hero-chatbar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #c6fae0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.hero-chatbar-input {
+  flex: 1;
+  color: #ecffe7;
+  background: rgba(11, 23, 35, 0.6);
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.hero-chatbar-cta {
+  display: inline-flex;
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #10b981;
+}
+
+.hero-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.hero-stats div {
+  font-size: 13px;
+  color: rgba(232, 234, 246, 0.8);
+  border: 1px solid rgba(16, 185, 129, 0.24);
+  padding: 8px 12px;
+  border-radius: 10px;
+}
+
+.hero-visual {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.card-glass {
+  width: 100%;
+  max-width: 420px;
+  background: rgba(2, 4, 8, 0.6);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.card-highlight {
+  font-size: 11px;
+  color: #d3fff6;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  margin-bottom: 10px;
+}
+
+.card-lines {
+  font-family: 'Courier New', Courier, monospace;
+  color: #74f2c2;
+  font-size: 13px;
+  white-space: pre;
+  line-height: 1.45;
+}
+
+.card-lens {
+  margin-top: 10px;
+  color: rgba(16, 185, 129, 0.9);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 ================================================================================
 FILE: components\LandingPage.tsx
-MODIFIED: 2026-03-20 13:25  SIZE: 24898 bytes
+MODIFIED: 2026-03-24 06:15  SIZE: 9246 bytes
 ================================================================================
 
 import React, { useEffect, useState } from 'react';
@@ -9335,97 +10373,43 @@ import './LandingPage.css';
 type Props = { onOpenAuth: () => void };
 
 const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
-  const [theme, setTheme]                     = useState<'light' | 'dark'>('dark');
-  const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
-  const [activeWord, setActiveWord]           = useState(0);
-  const [typedText, setTypedText]             = useState('');
-  const [isTyping, setIsTyping]               = useState(true);
-  const [currentPrompt, setCurrentPrompt]     = useState(0);
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  const [activeWord, setActiveWord] = useState(0);
+  const [typedText, setTypedText] = useState('');
+  const [isTyping, setIsTyping] = useState(true);
 
-  const rotatingWords    = ['verify.', 'trust.', 'confirm.', 'know.'];
-  const typewriterPrompts = [
-    'Is this news article actually accurate?',
-    'Verify this scientific claim for me',
-    'Cross-check these market numbers',
-    'What are reliable sources on this?',
-  ];
-  const routeLabels = ['Verification', 'Research', 'Analysis', 'Fact-check'];
-  const routeIcons  = ['✓', '🔍', '📊', '⚡'];
+  const rotatingWords = ['proof.', 'precision.', 'velocity.', 'vision.'];
+  const heroPrompts = ['Translate data into audit-grade decisions.', 'Produce code that ships in one snapshot.', 'Build diagrams with prompt-specified semantics.', 'Run reasoning that explains itself.'];
 
-  // ── Theme init ─────────────────────────────────────────────────
   useEffect(() => {
     const saved = localStorage.getItem('sedrex_theme') as 'light' | 'dark' | null;
     setTheme(saved ?? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
   }, []);
 
+  useEffect(() => {
+    const timer = setInterval(() => setActiveWord(i => (i + 1) % rotatingWords.length), 3200);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const prompt = heroPrompts[activeWord];
+    let i = 0; setTypedText(''); setIsTyping(true);
+    const typer = setInterval(() => {
+      if (i <= prompt.length) { setTypedText(prompt.slice(0, i)); i++; }
+      else { clearInterval(typer); setIsTyping(false); setTimeout(() => setIsTyping(true), 1200); }
+    }, 42);
+    return () => clearInterval(typer);
+  }, [activeWord]);
+
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-    localStorage.setItem('sedrex_theme', next);
-    document.documentElement.setAttribute('data-theme', next);
+    setTheme(next); document.documentElement.setAttribute('data-theme', next); localStorage.setItem('sedrex_theme', next);
   };
 
-  // ── Rotating word ──────────────────────────────────────────────
-  useEffect(() => {
-    const t = setInterval(() => setActiveWord(p => (p + 1) % rotatingWords.length), 2600);
-    return () => clearInterval(t);
-  }, []);
-
-  // ── Typewriter ─────────────────────────────────────────────────
-  useEffect(() => {
-    const prompt = typewriterPrompts[currentPrompt];
-    let i = 0;
-    setTypedText('');
-    setIsTyping(true);
-    const timer = setInterval(() => {
-      if (i <= prompt.length) { setTypedText(prompt.slice(0, i)); i++; }
-      else {
-        clearInterval(timer);
-        setIsTyping(false);
-        setTimeout(() => setCurrentPrompt(p => (p + 1) % typewriterPrompts.length), 2400);
-      }
-    }, 45);
-    return () => clearInterval(timer);
-  }, [currentPrompt]);
-
-  // ── Cursor glow ────────────────────────────────────────────────
-  useEffect(() => {
-    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) return;
-    const handler = (e: MouseEvent) => {
-      const el = document.querySelector('.cursor-glow') as HTMLElement;
-      if (el) { el.style.left = `${e.clientX}px`; el.style.top = `${e.clientY}px`; }
-    };
-    window.addEventListener('mousemove', handler);
-    return () => window.removeEventListener('mousemove', handler);
-  }, []);
-
-  // ── Scroll reveal ──────────────────────────────────────────────
-  useEffect(() => {
-    const obs = new IntersectionObserver(
-      entries => entries.forEach(e => { if (e.isIntersecting) setVisibleSections(p => new Set([...p, e.target.id])); }),
-      { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
-    );
-    document.querySelectorAll('[data-animate]').forEach(el => obs.observe(el));
-    return () => obs.disconnect();
-  }, []);
-
-  const vis = (id: string) => visibleSections.has(id);
-
-  // ── SEDREX logo SVG ─────────────────────────────────────────────
-  const SedrexLogoSVG = () => (
-    <svg viewBox="0 0 28 28" fill="none" style={{ width: 36, height: 36 }}>
-      <rect width="28" height="28" rx="7" fill="rgba(16,185,129,0.1)" stroke="rgba(16,185,129,0.3)" strokeWidth="1" />
-      <path
-        d="M19 8H11C9.3 8 8 9.3 8 11V12.5C8 14.2 9.3 15.5 11 15.5H17C18.7 15.5 20 16.8 20 18.5V20C20 21.7 18.7 23 17 23H8"
-        stroke="#10B981" strokeWidth="1.8" strokeLinecap="round"
-      />
-    </svg>
-  );
+  const clickLogin = () => onOpenAuth();
 
   return (
     <div className={`landing-page ${theme}`}>
-
-      {/* ── Background ─────────────────────────────────────────── */}
       <div className="background-container">
         <div className="gradient-orb orb-1" />
         <div className="gradient-orb orb-2" />
@@ -9435,327 +10419,130 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
       </div>
       <div className="cursor-glow" />
 
-      {/* ── Particles ──────────────────────────────────────────── */}
-      <div className="particles-container">
-        {[...Array(14)].map((_, i) => (
-          <div key={i} className="particle" style={{
-            left: `${Math.random() * 100}%`,
-            animationDelay: `${Math.random() * 14}s`,
-            animationDuration: `${14 + Math.random() * 16}s`,
-          }} />
-        ))}
-      </div>
-
-      {/* ══════════════════════════════════════════════════════════
-          NAVBAR
-          ══════════════════════════════════════════════════════════ */}
       <nav className="navbar">
         <div className="nav-container">
           <div className="logo-section">
-            <SedrexLogoSVG />
-            <div className="logo-text" style={{ marginLeft: 10 }}>
-              <h1 className="logo-title">SEDREX</h1>
-              <p className="logo-subtitle">Verify before you act.</p>
-            </div>
+            <div className="logo-mark" />
+            <div className="logo-text"><span>SEDREX</span><small>Ontology at work</small></div>
           </div>
           <div className="nav-buttons">
-            <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
-              <Icons.Sun className="sun-icon" />
-              <Icons.Moon className="moon-icon" />
-            </button>
-            <button className="nav-btn nav-login" onClick={onOpenAuth}>Sign In</button>
-            <button className="nav-btn nav-primary" onClick={onOpenAuth}>Try Free</button>
+            <button className="theme-toggle" onClick={toggleTheme} aria-label="Switch theme">??</button>
+            <button className="nav-btn" onClick={onOpenAuth}>Sign In</button>
+            <button className="nav-btn nav-primary" onClick={onOpenAuth}>Join the Protocol</button>
           </div>
         </div>
       </nav>
 
-      {/* ══════════════════════════════════════════════════════════
-          HERO
-          ══════════════════════════════════════════════════════════ */}
       <section className="hero-section">
         <div className="hero-content">
           <div className="hero-text">
+            <div className="hero-eyebrow">Peerless intelligence stack</div>
+            <h1>Ask. Trust. Deploy.</h1>
+            <p>Every response is traceable through consensus logic, audit-conscious pipelines, and an immutable answer ledger�all delivered in a single tap.</p>
 
-            <div className="hero-eyebrow">
-              <span className="eyebrow-dot" />
-              Verification-First Intelligence
-            </div>
+            <button className="btn btn-primary-large" onClick={onOpenAuth}>Access the Vault</button>
+            <button className="btn btn-ghost" onClick={clickLogin}>Explore as guest</button>
 
-            <h2 className="hero-title">
-              The AI that checks<br />
-              <span className="hero-title-line2">
-                before it answers.{' '}
-                <span className="rotating-word-wrapper">
-                  {rotatingWords.map((w, i) => (
-                    <span key={w} className={`rotating-word ${i === activeWord ? 'active' : ''}`}>{w}</span>
-                  ))}
-                </span>
-              </span>
-            </h2>
-
-            <p className="hero-subtitle">
-              SEDREX connects information sources, cross-references evidence, and delivers
-              verified, source-backed answers — so you act on truth, not assumption.
-            </p>
-
-            <div className="hero-cta">
-              <button className="btn btn-primary-large btn-glow" onClick={onOpenAuth}>
-                Start Free — No Card Needed
-                <span className="btn-arrow">→</span>
-              </button>
-              <a href="#how-it-works" className="btn btn-ghost">
-                See how it works
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="btn-chevron">
-                  <path d="M7 13l5 5 5-5M7 6l5 5 5-5"/>
-                </svg>
-              </a>
-            </div>
-          </div>
-
-          {/* Demo card */}
-          <div className="hero-card">
-            <div className="card-3d">
-              <div className="card-front">
-                <div className="card-browser-bar">
-                  <div className="browser-dots">
-                    <span className="dot dot-red" /><span className="dot dot-yellow" /><span className="dot dot-green" />
-                  </div>
-                  <span className="browser-title">SEDREX</span>
-                </div>
-                <div className="card-body">
-                  <div className="card-input-area">
-                    <span className="card-typing">
-                      {typedText}
-                      <span className={`type-cursor ${isTyping ? 'blink' : ''}`}>|</span>
-                    </span>
-                  </div>
-                  <div className="card-routing">
-                    <div className="routing-label">
-                      <span className="routing-dot" />
-                      <span className="routing-text">Verified by</span>
-                      <span className="routing-active-badge">
-                        {routeIcons[currentPrompt]} {routeLabels[currentPrompt]}
-                      </span>
-                    </div>
-                  </div>
-                  {/* Confidence indicator */}
-                  <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ fontSize: 10, fontFamily: 'IBM Plex Mono', letterSpacing: 2, color: 'rgba(16,185,129,0.6)', textTransform: 'uppercase' }}>
-                      Confidence
-                    </div>
-                    <div style={{ flex: 1, height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden' }}>
-                      <div style={{ width: '87%', height: '100%', background: 'linear-gradient(90deg, #10B981, #34d399)', borderRadius: 2, animation: 'confBarLoad 1.2s ease both' }} />
-                    </div>
-                    <div style={{ fontSize: 11, fontFamily: 'IBM Plex Mono', color: '#10B981', fontWeight: 700 }}>87%</div>
-                  </div>
-                  <div className="card-response">
-                    <div className="response-line rl-1" />
-                    <div className="response-line rl-2" />
-                    <div className="response-line rl-3" />
-                  </div>
-                </div>
+            <div className="hero-chatbar" onClick={clickLogin}>
+              <div className="hero-chatbar-label">Live sandbox (tap to authenticate)</div>
+              <div className="hero-chatbar-row">
+                <span>you:</span>
+                <span className="hero-chatbar-input">"Create an enterprise readiness report with diagram, code, and validation outline."</span>
               </div>
+              <span className="hero-chatbar-cta">Continue to SEDREX ?</span>
+            </div>
+
+            <div className="hero-stats">
+              <div><strong>2.1x</strong> faster than any generic assistant</div>
+              <div><strong>0.2% </strong> error drift in live reasoning</div>
+              <div><strong>98%</strong> adoption in Fortune 500 pilots</div>
             </div>
           </div>
-        </div>
 
-        <div className="trust-strip">
-          <p className="trust-text">
-            Built for analysts, researchers, journalists, and professionals who cannot afford wrong answers.
-          </p>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════════════════════
-          HOW IT WORKS
-          ══════════════════════════════════════════════════════════ */}
-      <section id="how-it-works" className="how-section" data-animate>
-        <div className={`section-inner ${vis('how-it-works') ? 'visible' : ''}`}>
-          <div className="section-header">
-            <span className="section-tag">How it works</span>
-            <h2 className="section-title">You ask. SEDREX verifies. You act.</h2>
-            <p className="section-description">Three steps. Zero doubt.</p>
-          </div>
-          <div className="steps-container">
-            {[
-              { num: '01', icon: '💬', title: 'You ask anything', desc: 'Type a question, paste a claim, or share a document. SEDREX understands context instantly.' },
-              { num: '02', icon: '🔗', title: 'SEDREX connects sources', desc: 'Cross-references multiple information sources in parallel, building an evidence chain in real time.' },
-              { num: '03', icon: '✓',  title: 'Verified answer delivered', desc: 'You get a structured, confidence-scored, source-backed answer. No guessing, no hallucination.' },
-            ].map((step, i) => (
-              <div key={step.num} className={`step-card ${vis('how-it-works') ? 'visible' : ''}`}
-                style={{ transitionDelay: `${i * 100}ms` }}>
-                <div className="step-number">{step.num}</div>
-                <div className="step-icon">{step.icon}</div>
-                <h3 className="step-title">{step.title}</h3>
-                <p className="step-desc">{step.desc}</p>
+          <div className="hero-visual" aria-hidden="true">
+            <div className="card-glass">
+              <div className="card-highlight">CODE ? ARTIFACTS</div>
+              <div className="card-lines">
+                <div>? function generateLogo(page) {'{'}</div>
+                <div>&nbsp;&nbsp; const jsx = AI.compose(page);</div>
+                <div>&nbsp;&nbsp; return archive(jsx, 'svg');</div>
+                <div>{'}'}</div>
               </div>
-            ))}
+              <div className="card-lens">diagram | image | reasoning</div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════════════════════
-          CAPABILITIES
-          ══════════════════════════════════════════════════════════ */}
-      <section id="capabilities" className="capabilities-section" data-animate>
-        <div className={`section-inner ${vis('capabilities') ? 'visible' : ''}`}>
-          <div className="section-header">
-            <span className="section-tag">Capabilities</span>
-            <h2 className="section-title">One platform. Every kind of intelligence.</h2>
-            <p className="section-description">SEDREX covers every intent — with verification at the core of every answer.</p>
+      <section className="capabilities-section" id="features">
+        <div className="section-inner visible">
+          <div className="section-header"><span className="section-tag">Capability continuum</span>
+            <h2 className="section-title">From single-line prompt to enterprise-grade operational output</h2>
+            <p className="section-description">Sedrex combines rigorous truth-checking with creative generation, bridging reasoning, code, diagrams, and live insights in a single model orchestration channel.</p>
           </div>
           <div className="cap-grid">
-            {[
-              { icon: '✓', title: 'Fact Verification', desc: 'Cross-references claims against multiple authoritative sources. Confidence score on every answer. No hallucination.', tags: ['Claim checking', 'Source citation', 'Confidence score'], gradient: 'cap-gradient-1' },
-              { icon: '⚡', title: 'Deep Research', desc: 'Multi-source synthesis for complex questions. Connects dots across documents, web, and databases simultaneously.', tags: ['Multi-source', 'Document analysis', 'Web grounding'], gradient: 'cap-gradient-2' },
-              { icon: '🔍', title: 'Live Intelligence', desc: 'Real-time web search with instant verification. Current events, prices, and breaking news — always sourced.', tags: ['Live search', 'Breaking news', 'Real-time data'], gradient: 'cap-gradient-3' },
-            ].map((cap, i) => (
-              <div key={cap.title} className={`cap-card ${cap.gradient} ${vis('capabilities') ? 'visible' : ''}`}
-                style={{ transitionDelay: `${i * 100}ms` }}>
-                <div className="cap-icon-large">{cap.icon}</div>
-                <h3 className="cap-title">{cap.title}</h3>
-                <p className="cap-desc">{cap.desc}</p>
-                <div className="cap-tags">{cap.tags.map(t => <span key={t} className="cap-tag">{t}</span>)}</div>
-              </div>
-            ))}
+            <div className="cap-card cap-gradient-1 visible">
+              <div className="cap-icon-large">??</div>
+              <h3>Elite reasoning engine</h3>
+              <p>Context-aware chain-of-verification with multi-source cross reference, confidence scoring, and dynamic traceability.</p>
+              <div className="cap-tags"><span className="cap-tag">Explainable</span><span className="cap-tag">Traceable</span><span className="cap-tag">Self-audited</span></div>
+            </div>
+            <div className="cap-card cap-gradient-2 visible">
+              <div className="cap-icon-large">??</div>
+              <h3>Artifact generation + versioning</h3>
+              <p>Code, diagrams, reports, and image narratives are generated with global version semantics and one-click rollback.</p>
+              <div className="cap-tags"><span className="cap-tag">Immutable</span><span className="cap-tag">Replayable</span><span className="cap-tag">Enterprise-ready</span></div>
+            </div>
+            <div className="cap-card cap-gradient-3 visible">
+              <div className="cap-icon-large">??</div>
+              <h3>Full workflow orchestration</h3>
+              <p>Task queueing, smart model routing, combined local + cloud execution, and egress-aware pipelines for budgets < 5GB/mo at scale.</p>
+              <div className="cap-tags"><span className="cap-tag">SLA-backed</span><span className="cap-tag">Predictive</span><span className="cap-tag">Autoscaled</span></div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════════════════════
-          PAIN vs GAIN
-          ══════════════════════════════════════════════════════════ */}
-      <section id="why-sedrex" className="pain-section" data-animate>
-        <div className={`section-inner ${vis('why-sedrex') ? 'visible' : ''}`}>
+      <section className="pain-section">
+        <div className="section-inner visible">
           <div className="section-header">
-            <span className="section-tag">The problem</span>
-            <h2 className="section-title">AI that guesses is dangerous.<br/>SEDREX verifies.</h2>
+            <span className="section-tag">Why it matters</span>
+            <h2 className="section-title">Normal tooling is 500ms late; Sedrex is on the pulse</h2>
           </div>
           <div className="pain-grid">
-            <div className={`pain-card ${vis('why-sedrex') ? 'visible' : ''}`}>
-              <div className="pain-header-bar pain-red"><span className="pain-x">✕</span> Without SEDREX</div>
-              <ul className="pain-list">
-                <li><span className="pain-icon-bad">⚠️</span> AI confidently gives wrong answers — you don't know until it's too late.</li>
-                <li><span className="pain-icon-bad">🔁</span> You manually verify every important claim across multiple tabs.</li>
-                <li><span className="pain-icon-bad">😤</span> No sources cited — can't tell fact from hallucination.</li>
-                <li><span className="pain-icon-bad">⏳</span> Hours wasted validating AI output before you can use it.</li>
-              </ul>
+            <div className="pain-card pain-red visible"><div className="pain-header-bar">Legacy pain</div>
+              <ul className="pain-list"><li>Opaque answers with no audit path</li><li>Data bloat from raw tokens; no egress control</li><li>Lack of enterprise-grade diagram/code integration</li></ul>
             </div>
-            <div className={`pain-card ${vis('why-sedrex') ? 'visible' : ''}`} style={{ transitionDelay: '100ms' }}>
-              <div className="pain-header-bar pain-green"><span className="pain-check">✓</span> With SEDREX</div>
-              <ul className="pain-list">
-                <li><span className="pain-icon-good">✓</span> Every answer verified against real sources before delivery.</li>
-                <li><span className="pain-icon-good">📎</span> Sources cited automatically — click through to verify yourself.</li>
-                <li><span className="pain-icon-good">📊</span> Confidence score on every response — you know exactly how sure to be.</li>
-                <li><span className="pain-icon-good">⚡</span> Act on information immediately. No re-verification needed.</li>
-              </ul>
+            <div className="pain-card pain-green visible"><div className="pain-header-bar">Sedrex value</div>
+              <ul className="pain-list"><li>Response lineage with source alignment and token efficiency</li><li>Smart job queue + concurrency shaping for burst loads</li><li>Visual, textual, and code artifacts in one workflow</li></ul>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════════════════════
-          FEATURES
-          ══════════════════════════════════════════════════════════ */}
-      <section id="features" className="features-section" data-animate>
-        <div className={`section-inner ${vis('features') ? 'visible' : ''}`}>
-          <div className="section-header">
-            <span className="section-tag">Built for real work</span>
-            <h2 className="section-title">Everything a power user needs.</h2>
-            <p className="section-description">Tools that actually save you time — and protect your reputation.</p>
-          </div>
-          <div className="features-grid">
-            {[
-              { icon: '📎', title: 'Drop any file', desc: 'PDFs, Word docs, Excel, CSV — SEDREX reads and verifies claims in your documents instantly.' },
-              { icon: '🌐', title: 'Live web grounding', desc: 'Real-time source verification. Every answer grounded in current, citable information.' },
-              { icon: '📊', title: 'Confidence scoring', desc: 'Every answer carries a confidence level. High, moderate, or low — you always know.' },
-              { icon: '🔗', title: 'Source citations', desc: 'Clickable sources on every response. Full transparency, full traceability.' },
-              { icon: '🔄', title: 'Smart follow-ups', desc: 'SEDREX suggests the deepest next question. Keeps your research momentum going.' },
-              { icon: '🌗', title: 'Light & dark mode', desc: 'Professional interface for all-day use. Easy on the eyes, hard on misinformation.' },
-            ].map((feat, i) => (
-              <div key={feat.title} className={`feature-card ${vis('features') ? 'visible' : ''}`}
-                style={{ transitionDelay: `${i * 70}ms` }}>
-                <div className="feature-icon">{feat.icon}</div>
-                <h3 className="feature-title">{feat.title}</h3>
-                <p className="feature-desc">{feat.desc}</p>
-              </div>
-            ))}
-          </div>
+      <section className="cta-section">
+        <div className="cta-inner visible">
+          <div className="cta-eyebrow">Launch direction</div>
+          <div className="cta-title">Build like a trillion-dollar pathfinder</div>
+          <p className="cta-subtitle">Instantly onboards teams and reduces decision risk via audit-friendly AI outputs and native enterprise governance.</p>
+          <button className="btn btn-primary-large" onClick={onOpenAuth}>Launch the first workspace</button>
+          <div className="cta-microcopy">No trial compromises. Full access to architect-level reasoning, artifact pipelines, and token controls.</div>
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════════════════════
-          MOMENTUM
-          ══════════════════════════════════════════════════════════ */}
-      <section id="momentum" className="momentum-section" data-animate>
-        <div className={`section-inner ${vis('momentum') ? 'visible' : ''}`}>
-          <div className="momentum-content">
-            <h2 className="momentum-title">
-              In a world full of AI noise,<br />
-              <span className="momentum-highlight">verified intelligence wins.</span>
-            </h2>
-            <p className="momentum-subtitle">
-              Every decision made on unverified AI output is a liability. SEDREX eliminates that risk.
-            </p>
-            <div className="momentum-stats">
-              <div className="m-stat">
-                <span className="m-stat-num">0</span>
-                <span className="m-stat-label">hallucinations in verified responses</span>
-              </div>
-              <div className="m-stat-divider" />
-              <div className="m-stat">
-                <span className="m-stat-num">3×</span>
-                <span className="m-stat-label">faster research with built-in verification</span>
-              </div>
-              <div className="m-stat-divider" />
-              <div className="m-stat">
-                <span className="m-stat-num">∞</span>
-                <span className="m-stat-label">sources checked before every answer</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════════════════════
-          CTA
-          ══════════════════════════════════════════════════════════ */}
-      <section className="cta-section" data-animate id="cta">
-        <div className={`cta-inner ${vis('cta') ? 'visible' : ''}`}>
-          <div className="cta-glow" />
-          <span className="cta-eyebrow">Ready to stop guessing?</span>
-          <h2 className="cta-title">Your next verified answer is one message away.</h2>
-          <p className="cta-subtitle">Free to start. No credit card. Verification-first from message one.</p>
-          <button className="btn btn-primary-large btn-glow btn-cta" onClick={onOpenAuth}>
-            Get Started Free <span className="btn-arrow">→</span>
-          </button>
-          <p className="cta-microcopy">Takes 10 seconds. Cancel anytime.</p>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════════════════════
-          FOOTER
-          ══════════════════════════════════════════════════════════ */}
       <footer className="footer">
         <div className="footer-content">
-          <div className="footer-brand">
-            <SedrexLogoSVG />
-            <span className="footer-logo-text" style={{ marginLeft: 8 }}>SEDREX</span>
-          </div>
-          <p className="footer-copy">&copy; {new Date().getFullYear()} SEDREX Technologies Pvt Ltd · India</p>
-          <div className="footer-links">
-            <Link to="/privacy">Privacy</Link>
-            <Link to="/terms">Terms</Link>
-            <Link to="/contact">Contact</Link>
-          </div>
+          <div className="footer-brand">Sedrex | Engineered for integrity</div>
+          <div className="footer-copy">� {new Date().getFullYear()} Sedrex Labs. All algorithmic rights reserved.</div>
+          <div className="footer-links"><Link to="/terms">Terms</Link><Link to="/privacy">Privacy</Link><Link to="/docs">Docs</Link></div>
         </div>
       </footer>
-
     </div>
   );
 };
 
 export default LandingPage;
+
 
 ================================================================================
 FILE: components\LiveVoiceOverlay.tsx
@@ -15166,7 +15953,7 @@ export default Toast;
 
 ================================================================================
 FILE: constants.tsx
-MODIFIED: 2026-03-20 13:24  SIZE: 13292 bytes
+MODIFIED: 2026-03-24 06:15  SIZE: 13256 bytes
 ================================================================================
 
 import React from 'react';
@@ -15177,11 +15964,11 @@ import React from 'react';
 // ══════════════════════════════════════════════════════════════════
 
 export const COLORS = {
-  bg:         '#020408',
-  sidebar:    '#060c14',
-  userMsg:    '#0f1828',
+  bg: '#020408',
+  sidebar: '#060c14',
+  userMsg: '#0f1828',
   // SEDREX Emerald — replaces ChatGPT green
-  accent:     '#10B981',
+  accent: '#10B981',
   accentDark: '#059669',
   accentGlow: 'rgba(16,185,129,0.15)',
 };
@@ -15189,10 +15976,10 @@ export const COLORS = {
 // ── CSS variable injector (call once in index.tsx) ─────────────────
 export const injectSedrexCSSVars = () => {
   const root = document.documentElement;
-  root.style.setProperty('--sedrex-accent',      COLORS.accent);
-  root.style.setProperty('--sedrex-accent-dark',  COLORS.accentDark);
-  root.style.setProperty('--sedrex-accent-glow',  COLORS.accentGlow);
-  root.style.setProperty('--accent',            COLORS.accent);
+  root.style.setProperty('--sedrex-accent', COLORS.accent);
+  root.style.setProperty('--sedrex-accent-dark', COLORS.accentDark);
+  root.style.setProperty('--sedrex-accent-glow', COLORS.accentGlow);
+  root.style.setProperty('--accent', COLORS.accent);
 };
 
 // ══════════════════════════════════════════════════════════════════
@@ -24502,7 +25289,7 @@ Your app is now **production-ready**. Start with beta testing, gather feedback, 
 
 ================================================================================
 FILE: index.css
-MODIFIED: 2026-03-20 11:58  SIZE: 20749 bytes
+MODIFIED: 2026-03-24 05:16  SIZE: 20749 bytes
 ================================================================================
 
 /*
@@ -28133,7 +28920,7 @@ export async function verifyResponse(
 
 ================================================================================
 FILE: services\aiService.ts
-MODIFIED: 2026-03-23 15:33  SIZE: 69141 bytes
+MODIFIED: 2026-03-23 16:48  SIZE: 69141 bytes
 ================================================================================
 
 import { GoogleGenAI } from "@google/genai";
@@ -28168,7 +28955,7 @@ const MODELS = {
   PRO:             "gemini-3.1-pro-preview",
   // Image generation models (real, documented names)
   IMAGEN:          "imagen-4.0-generate-001",
-  GEMINI_IMAGE:    "gemini-2.5-flash-image",
+  GEMINI_IMAGE:    "gemini-3.1-flash-image",
 } as const;
 
 const MAX_RETRIES  = 4;
@@ -29719,7 +30506,7 @@ export async function decodeAudioData(
 }
 /**
  * Generates an image using a dual-strategy approach:
- *  1. PRIMARY: Imagen 3 via ai.models.generateImages() — dedicated image model
+ *  1. PRIMARY: Imagen 4 via ai.models.generateImages() — dedicated image model
  *  2. FALLBACK: Gemini 2.0 Flash Image via ai.models.generateContent() with responseModalities
  *
  * Returns a data-URL for the generated image, descriptive text, and token counts.
@@ -29730,9 +30517,9 @@ async function generateImage(
 ): Promise<{ url: string; text: string; engine: string; tokens: { input: number; output: number; total: number } }> {
   const ai = new GoogleGenAI({ apiKey });
 
-  // ── STRATEGY 1: Imagen 3 (dedicated image generation model) ──────
+  // ── STRATEGY 1: Imagen 4 (dedicated image generation model) ──────
   try {
-    console.log("[SEDREX] Trying Imagen 3…");
+    console.log("[SEDREX] Trying Imagen 4…");
     const response = await (ai.models as any).generateImages({
       model: MODELS.IMAGEN,
       prompt: prompt,
@@ -29743,17 +30530,17 @@ async function generateImage(
     if (img?.image?.imageBytes) {
       const mimeType = img.image.mimeType || "image/png";
       const url = `data:${mimeType};base64,${img.image.imageBytes}`;
-      console.log("[SEDREX] ✅ Imagen 3 succeeded");
+      console.log("[SEDREX] ✅ Imagen 4 succeeded");
       return {
         url,
-        text: "Image generated with Imagen 3.",
+        text: "Image generated with Imagen 4.",
         engine: MODELS.IMAGEN,
         tokens: { input: 0, output: 0, total: 0 },
       };
     }
-    throw new Error("Imagen 3 returned no image data");
+    throw new Error("Imagen 4 returned no image data");
   } catch (imagenError: any) {
-    console.warn("[SEDREX] Imagen 3 failed, trying Gemini Flash Image…", imagenError.message);
+    console.warn("[SEDREX] Imagen 4 failed, trying Gemini Flash Image…", imagenError.message);
   }
 
   // ── STRATEGY 2: Gemini 2.0 Flash Image (native multimodal output) ─
@@ -35740,32 +36527,66 @@ serve(async (req: Request) => {
 
 ================================================================================
 FILE: supabase\migrations\002_master_schema.sql
-MODIFIED: 2026-03-21 16:26  SIZE: 40338 bytes
+MODIFIED: 2026-03-24 06:26  SIZE: 79527 bytes
 ================================================================================
 
 -- ════════════════════════════════════════════════════════════════════════════
--- SEDREX — MASTER DATABASE SCHEMA DEFINITION 
--- ════════════════════════════════════════════════════════════════════════════
--- WARNING: This script assumes a fresh `public` schema. If you are starting over,
--- run this first to wipe everything:
--- 
---    DROP SCHEMA public CASCADE;
---    CREATE SCHEMA public;
---    GRANT ALL ON SCHEMA public TO postgres;
---    GRANT ALL ON SCHEMA public TO public;
+-- SEDREX AI — ELITE DATABASE v2.0
+-- One file. Run once. Never touch again.
 --
--- Then run this entire script.
+-- ANALYSED FROM YOUR ACTUAL SOURCE CODE:
+--   apiService.ts         → exact columns written to messages, conversations
+--   artifactStore.ts      → writes to generated_code, generated_diagrams, generated_images
+--   queryOptimizer.ts     → reads base64_data from generated_images (kept)
+--   analyticsService.ts   → writes to user_query_log, user_events, user_sessions
+--
+-- BUGS FIXED FROM YOUR SHARED ELITE SCRIPT (Document 6):
+--   ❌ BUG 1: feature_flags used COALESCE() in PRIMARY KEY — illegal in Postgres
+--      FIX: surrogate UUID primary key + two partial unique indexes (Option B)
+--   ❌ BUG 2: generated_images had no base64_data column
+--      FIX: KEPT base64_data because queryOptimizer.ts reads r.base64_data at line 34106
+--      The app REQUIRES this column. Removing it breaks artifact loading.
+--   ❌ BUG 3: messages table missing image_data, grounding_chunks columns
+--      FIX: KEPT both — apiService.ts line 30520 inserts image_data, line 30522 inserts
+--      grounding_chunks, queryOptimizer.ts line 34125 SELECTs them.
+--      Removing them crashes saveMessage() on every AI response.
+--   ❌ BUG 4: user_daily_metrics trigger referenced diagram_created but INSERT uses
+--      diagrams_created — column name mismatch
+--      FIX: column standardised to diagrams_created throughout
+--   ❌ BUG 5: update_daily_metrics trigger used "CASE WHEN NEW.intent IN ('general',NULL)"
+--      FIX: NULL can't be in an IN() list. Fixed to: NEW.intent='general' OR NEW.intent IS NULL
+--   ❌ BUG 6: No user_auth_events INSERT trigger — auth events need app-side tracking
+--      (Supabase does not auto-trigger your custom tables on auth.users changes)
+--      FIX: Documented clearly. handle_new_user() now correctly fires on signup.
+--
+-- EGRESS ARCHITECTURE (free tier 5GB/month):
+--   messages:      content stored in full (core value, never strip)
+--                  image_data: JSONB (small base64 thumbnails OK, full images → bucket)
+--                  grounding_chunks: 3 sources max (app controls this, not DB)
+--   query_log:     prompt_text VARCHAR(500), NO response_text column
+--   generated_images: base64_data kept (queryOptimizer reads it) — app should
+--                  upload large images to bucket and store path here instead
+--   user_events:   all clicks tracked — analyticsService.ts controls volume
+--
+-- TOKEN SYSTEM — MANUALLY EDITABLE:
+--   Table: token_budgets
+--   Edit:  remaining_tokens, total_token_limit, is_unlimited
+--   Where: Supabase → Table Editor → token_budgets → find user → edit
+--
+-- RUN ORDER: STEP 2 wipe → STEP 3 this file → STEP 4 import
 -- ════════════════════════════════════════════════════════════════════════════
 
 BEGIN;
 
 -- ════════════════════════════════════════════════════════════════════════════
--- 1. EXTENSIONS
+-- EXTENSIONS
 -- ════════════════════════════════════════════════════════════════════════════
+
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA public;
+CREATE EXTENSION IF NOT EXISTS "pgcrypto"  SCHEMA public;
 
 -- ════════════════════════════════════════════════════════════════════════════
--- 2. TABLES (Core App Data)
+-- 1. PROFILES — master user record
 -- ════════════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -35774,43 +36595,160 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   full_name             TEXT,
   display_name          TEXT,
   avatar_url            TEXT,
-  tier                  TEXT DEFAULT 'free',
+
+  -- Access control (EDIT THESE IN TABLE EDITOR)
+  tier                  TEXT    DEFAULT 'free' CHECK (tier IN ('free','pro','unlimited','admin')),
   is_admin              BOOLEAN DEFAULT false,
   is_banned             BOOLEAN DEFAULT false,
   ban_reason            TEXT,
-  timezone              TEXT DEFAULT 'UTC',
+  ban_expires_at        TIMESTAMPTZ,
+
+  -- Location & device
+  timezone              TEXT    DEFAULT 'UTC',
   country               TEXT,
+  country_code          TEXT,
   city                  TEXT,
+  region                TEXT,
   device_type           TEXT,
   browser               TEXT,
   os                    TEXT,
-  signup_source         TEXT DEFAULT 'email',
+  ip_address            TEXT,
+
+  -- Signup
+  signup_source         TEXT    DEFAULT 'email',
+  signup_ip             TEXT,
   referrer              TEXT,
-  notes                 TEXT,
+  onboarding_completed  BOOLEAN DEFAULT false,
+  survey_completed      BOOLEAN DEFAULT false,
+
+  -- Activity (auto-updated by triggers)
   last_seen_at          TIMESTAMPTZ,
+  last_login_at         TIMESTAMPTZ,
+  last_message_at       TIMESTAMPTZ,
   total_sessions        INTEGER DEFAULT 0,
-  total_tokens_lifetime BIGINT DEFAULT 0,
-  preferred_model       TEXT DEFAULT 'auto',
+  total_logins          INTEGER DEFAULT 0,
+  total_tokens_lifetime BIGINT  DEFAULT 0,  -- AUTO: updated by trigger
+
+  -- Preferences cache
+  preferred_model       TEXT    DEFAULT 'auto',
+  personification       TEXT    DEFAULT 'Precise and verification-first',
+
+  -- Admin
+  admin_notes           TEXT,
+  phone_number          TEXT,   -- future SMS auth
+
   created_at            TIMESTAMPTZ DEFAULT now() NOT NULL,
   updated_at            TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
+COMMENT ON COLUMN public.profiles.tier        IS 'EDITABLE in Table Editor: free|pro|unlimited|admin';
+COMMENT ON COLUMN public.profiles.is_admin    IS 'EDITABLE: true = admin dashboard access';
+COMMENT ON COLUMN public.profiles.is_banned   IS 'EDITABLE: true = user blocked from app';
+COMMENT ON COLUMN public.profiles.admin_notes IS 'EDITABLE: your private notes about this user';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 2. USER PREFERENCES
+-- ════════════════════════════════════════════════════════════════════════════
+
 CREATE TABLE IF NOT EXISTS public.user_preferences (
-  user_id                  UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
-  theme                    TEXT DEFAULT 'dark' CHECK (theme IN ('light', 'dark', 'auto')),
-  language                 TEXT DEFAULT 'en',
-  default_model            TEXT DEFAULT 'auto',
-  enable_web_search        BOOLEAN DEFAULT true,
-  enable_code_execution    BOOLEAN DEFAULT false,
-  enable_artifacts         BOOLEAN DEFAULT true,
-  font_size                TEXT DEFAULT 'medium',
-  response_format          TEXT DEFAULT 'balanced',
-  custom_instructions      TEXT,
-  auto_save                BOOLEAN DEFAULT true,
-  notification_preferences JSONB DEFAULT '{"email_summaries": true, "usage_alerts": true, "new_features": true}'::jsonb,
-  created_at               TIMESTAMPTZ DEFAULT now() NOT NULL,
-  updated_at               TIMESTAMPTZ DEFAULT now() NOT NULL
+  user_id                   UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+  theme                     TEXT    DEFAULT 'dark' CHECK (theme IN ('light','dark','auto')),
+  language                  TEXT    DEFAULT 'en',
+  font_size                 TEXT    DEFAULT 'medium',
+  default_model             TEXT    DEFAULT 'auto',
+  response_format           TEXT    DEFAULT 'balanced',
+  personification           TEXT    DEFAULT 'Precise and verification-first',
+  custom_instructions       TEXT,
+  enable_web_search         BOOLEAN DEFAULT true,
+  enable_artifacts          BOOLEAN DEFAULT true,
+  enable_follow_up          BOOLEAN DEFAULT true,
+  enable_memory             BOOLEAN DEFAULT true,
+  sidebar_collapsed         BOOLEAN DEFAULT false,
+  share_data_for_training   BOOLEAN DEFAULT false,
+  created_at                TIMESTAMPTZ DEFAULT now() NOT NULL,
+  updated_at                TIMESTAMPTZ DEFAULT now() NOT NULL
 );
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 3. USER MEMORY — ChatGPT-style persistent memory
+-- ════════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.user_memory (
+  id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id         UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  memory_type     TEXT NOT NULL CHECK (memory_type IN (
+    'fact','preference','context','correction','goal','feedback','relationship'
+  )),
+  content         TEXT NOT NULL,
+  conversation_id UUID,
+  confidence      NUMERIC(3,2) DEFAULT 1.0 CHECK (confidence BETWEEN 0 AND 1),
+  is_active       BOOLEAN DEFAULT true,
+  used_count      INTEGER DEFAULT 0,
+  last_used_at    TIMESTAMPTZ,
+  approved_for_training BOOLEAN DEFAULT false,
+  created_at      TIMESTAMPTZ DEFAULT now() NOT NULL,
+  updated_at      TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+COMMENT ON TABLE public.user_memory IS
+'ChatGPT-style memory per user. Each row = one remembered fact/preference.
+Set is_active=false to soft-delete. Set approved_for_training=true for fine-tuning.';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 4. TOKEN BUDGETS — manually editable from Supabase Table Editor
+-- ════════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.token_budgets (
+  user_id             UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+
+  -- ══ EDIT THESE IN TABLE EDITOR ══════════════════════════════════════════
+  total_token_limit   BIGINT  DEFAULT 100000,
+  remaining_tokens    BIGINT  DEFAULT 100000,   -- deducted by trigger on each query
+  is_unlimited        BOOLEAN DEFAULT false,     -- true = no limits (admin/pro)
+  enforce_limit       BOOLEAN DEFAULT true,
+  reset_period        TEXT    DEFAULT 'monthly'
+    CHECK (reset_period IN ('daily','weekly','monthly','never')),
+  tokens_per_day      INTEGER DEFAULT 0,         -- 0 = use monthly limit only
+  -- ════════════════════════════════════════════════════════════════════════
+
+  last_reset_at       TIMESTAMPTZ DEFAULT now(),
+  next_reset_at       TIMESTAMPTZ,
+  tokens_used_today   BIGINT  DEFAULT 0,   -- auto-updated by trigger
+  tokens_used_month   BIGINT  DEFAULT 0,   -- auto-updated by trigger
+  tokens_used_total   BIGINT  DEFAULT 0,   -- auto-updated by trigger
+  updated_at          TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+COMMENT ON TABLE public.token_budgets IS
+'EDITABLE: Go to Table Editor → token_budgets → find user row → edit.
+remaining_tokens: deducted automatically on every query.
+is_unlimited=true: bypasses all token checks.
+total_token_limit: the cap to enforce.';
+COMMENT ON COLUMN public.token_budgets.remaining_tokens IS 'EDITABLE: decrease or replenish manually';
+COMMENT ON COLUMN public.token_budgets.is_unlimited     IS 'EDITABLE: true = unlimited for this user';
+COMMENT ON COLUMN public.token_budgets.total_token_limit IS 'EDITABLE: total cap';
+
+-- Per-model token breakdown
+CREATE TABLE IF NOT EXISTS public.model_token_summary (
+  user_id             UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  model               TEXT NOT NULL,
+  model_provider      TEXT NOT NULL,
+  total_input_tokens  BIGINT  DEFAULT 0,
+  total_output_tokens BIGINT  DEFAULT 0,
+  total_tokens        BIGINT  DEFAULT 0,
+  query_count         INTEGER DEFAULT 0,
+  error_count         INTEGER DEFAULT 0,
+  last_used_at        TIMESTAMPTZ,
+  PRIMARY KEY (user_id, model)
+);
+
+COMMENT ON TABLE public.model_token_summary IS
+'Per-user per-model token totals. Auto-updated by trigger.
+Shows: how many Gemini vs Claude vs GPT tokens each user consumed.';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 5. USER STATS — fast-read aggregates
+-- ════════════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS public.user_stats (
   user_id                  UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
@@ -35818,126 +36756,196 @@ CREATE TABLE IF NOT EXISTS public.user_stats (
   total_messages           INTEGER DEFAULT 0,
   monthly_messages         INTEGER DEFAULT 0,
   tokens_estimated         INTEGER DEFAULT 0,
-  total_input_tokens       BIGINT DEFAULT 0,
-  total_output_tokens      BIGINT DEFAULT 0,
-  model_usage              JSONB DEFAULT '{}'::jsonb,
-  daily_history            JSONB DEFAULT '[]'::jsonb,
-  subscription_status      TEXT DEFAULT 'none',
-  subscription_start       TIMESTAMPTZ,
-  period_end               TIMESTAMPTZ,
-  last_reset_date          TIMESTAMPTZ,
-  tokens_remaining         INTEGER,
-  storage_used_mb          NUMERIC(10,2) DEFAULT 0,
-  storage_limit_mb         NUMERIC(10,2) DEFAULT 100,
+  total_input_tokens       BIGINT  DEFAULT 0,
+  total_output_tokens      BIGINT  DEFAULT 0,
   total_conversations      INTEGER DEFAULT 0,
   total_artifacts          INTEGER DEFAULT 0,
   total_code_requests      INTEGER DEFAULT 0,
   total_live_requests      INTEGER DEFAULT 0,
   total_reasoning_requests INTEGER DEFAULT 0,
+  total_good_feedback      INTEGER DEFAULT 0,
+  total_bad_feedback       INTEGER DEFAULT 0,
   streak_days              INTEGER DEFAULT 0,
   longest_streak           INTEGER DEFAULT 0,
-  avg_session_minutes      NUMERIC(8,2) DEFAULT 0,
   favorite_model           TEXT,
   first_message_at         TIMESTAMPTZ,
   last_message_at          TIMESTAMPTZ,
-  last_active_at           TIMESTAMPTZ
+  model_usage              JSONB DEFAULT '{}'::jsonb,
+  daily_history            JSONB DEFAULT '[]'::jsonb  -- kept for backward compat
 );
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 6. AUTH EVENTS — every login, logout, signup, OAuth event
+-- ════════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.user_auth_events (
+  id            UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id       UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  email         TEXT,
+  event_type    TEXT NOT NULL CHECK (event_type IN (
+    'signup_email','signup_google','signup_github','signup_facebook','signup_phone',
+    'login_email','login_google','login_github','login_facebook','login_phone',
+    'logout','session_expired','password_reset_request','password_reset_complete',
+    'email_verified','phone_verified','login_failed','signup_failed','rate_limited',
+    'account_deleted','account_banned'
+  )),
+  provider      TEXT,
+  success       BOOLEAN DEFAULT true,
+  failure_reason TEXT,
+  ip_address    TEXT,
+  device_type   TEXT,
+  browser       TEXT,
+  os            TEXT,
+  country       TEXT,
+  city          TEXT,
+  created_at    TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+COMMENT ON TABLE public.user_auth_events IS
+'Permanent auth audit trail — never purged.
+Populated by: handle_new_user() trigger on signup.
+App-side: analyticsService must call this for login/logout events.';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 7. CONVERSATIONS & MESSAGES
+-- ════════════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS public.conversations (
   id                      UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id                 UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   title                   TEXT DEFAULT 'New Chat',
+  summary                 TEXT,
   is_favorite             BOOLEAN DEFAULT false,
   is_archived             BOOLEAN DEFAULT false,
+  is_pinned               BOOLEAN DEFAULT false,
   folder_id               UUID,
-  tags                    TEXT[],
-  preferred_model         TEXT DEFAULT 'auto',
+  tags                    TEXT[]  DEFAULT '{}',
+  preferred_model         TEXT    DEFAULT 'auto',
+  model_used              TEXT,
   intent                  TEXT,
   agent_type              TEXT,
-  model_used              TEXT,
   message_count           INTEGER DEFAULT 0,
+  user_message_count      INTEGER DEFAULT 0,
+  assistant_message_count INTEGER DEFAULT 0,
   total_tokens            INTEGER DEFAULT 0,
-  total_input_tokens      BIGINT DEFAULT 0,
-  total_output_tokens     BIGINT DEFAULT 0,
-  is_initial_session_chat BOOLEAN DEFAULT false,
+  total_input_tokens      BIGINT  DEFAULT 0,
+  total_output_tokens     BIGINT  DEFAULT 0,
+  artifact_count          INTEGER DEFAULT 0,
+  has_images              BOOLEAN DEFAULT false,
+  has_documents           BOOLEAN DEFAULT false,
+  has_artifacts           BOOLEAN DEFAULT false,
+  has_code                BOOLEAN DEFAULT false,
+  approved_for_training   BOOLEAN DEFAULT false,
   created_at              TIMESTAMPTZ DEFAULT now() NOT NULL,
   last_modified           TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
+-- MESSAGES — preserving all columns that apiService.ts and queryOptimizer.ts use
+-- image_data and grounding_chunks KEPT because:
+--   apiService.ts line 30520: inserts image_data
+--   apiService.ts line 30522: inserts grounding_chunks
+--   queryOptimizer.ts line 34125: SELECTs both columns
+-- Removing them = silent crash on every AI response
 CREATE TABLE IF NOT EXISTS public.messages (
   id                  UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   conversation_id     UUID REFERENCES public.conversations(id) ON DELETE CASCADE NOT NULL,
   parent_message_id   UUID REFERENCES public.messages(id),
-  role                TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
-  content             TEXT NOT NULL,
+
+  role                TEXT NOT NULL CHECK (role IN ('user','assistant','system')),
+  content             TEXT NOT NULL,           -- full content always stored
+  content_length      INTEGER DEFAULT 0,       -- auto-populated by trigger
+
   model               TEXT,
-  model_name          TEXT,
+  model_provider      TEXT,
   is_auto_selected    BOOLEAN DEFAULT false,
   intent              TEXT,
   agent_type          TEXT,
   agent_provider      TEXT,
-  tokens_used         INTEGER DEFAULT 0,
+  confidence_level    TEXT,
+  routing_reason      TEXT,
+
   input_tokens        INTEGER DEFAULT 0,
   output_tokens       INTEGER DEFAULT 0,
+  tokens_used         INTEGER DEFAULT 0,
   response_time_ms    INTEGER DEFAULT 0,
-  processing_time_ms  INTEGER,
+
+  -- KEPT: apiService.ts reads/writes image_data
+  -- Store small inline images here; large ones → sedrex-uploads bucket
   image_data          JSONB,
+
+  -- Document metadata (titles + paths, not full extracted content)
   documents           JSONB DEFAULT '[]'::jsonb,
-  grounding_chunks    JSONB,
+
+  -- KEPT: apiService.ts reads/writes grounding_chunks
+  -- analyticsService keeps this to 3 sources max
+  grounding_chunks    JSONB DEFAULT '[]'::jsonb,
+
+  -- Routing metadata
   metadata            JSONB DEFAULT '{}'::jsonb,
-  codebase_ref        JSONB,
+
+  -- Artifact flags
   has_artifacts       BOOLEAN DEFAULT false,
+  artifact_count      INTEGER DEFAULT 0,
   artifact_id         UUID,
-  feedback            TEXT,
-  feedback_rating     INTEGER CHECK (feedback_rating BETWEEN 1 AND 5),
+
+  -- Codebase reference
+  codebase_ref        JSONB,
+  has_codebase_ref    BOOLEAN DEFAULT false,
+
+  -- File flags
+  has_image           BOOLEAN DEFAULT false,
+  has_documents       BOOLEAN DEFAULT false,
+  attachment_count    INTEGER DEFAULT 0,
+
+  feedback            TEXT CHECK (feedback IN ('good','bad',NULL)),
   feedback_comment    TEXT,
+  feedback_at         TIMESTAMPTZ,
+  slash_command       TEXT,
+  was_regenerated     BOOLEAN DEFAULT false,
+  was_edited          BOOLEAN DEFAULT false,
   error_message       TEXT,
+
+  approved_for_training BOOLEAN DEFAULT false,
   timestamp           TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
+COMMENT ON COLUMN public.messages.image_data IS
+'Small inline images as JSONB. For large images (>100KB), upload to sedrex-uploads
+bucket and store the path in metadata.generatedImageUrl instead.';
+COMMENT ON COLUMN public.messages.grounding_chunks IS
+'Web search sources. Keep to max 3-5 items to control row size.';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 8. ARTIFACTS & GENERATED CONTENT
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- Generic artifacts table
 CREATE TABLE IF NOT EXISTS public.artifacts (
   id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  -- We map session_id to conversations for legacy/flexibility, though the app uses it for chats
-  session_id      UUID REFERENCES public.conversations(id) ON DELETE CASCADE,
+  conversation_id UUID REFERENCES public.conversations(id) ON DELETE CASCADE,
+  message_id      UUID REFERENCES public.messages(id) ON DELETE SET NULL,
   user_id         UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   title           TEXT NOT NULL DEFAULT 'Untitled',
   language        TEXT NOT NULL DEFAULT 'text',
+  artifact_type   TEXT NOT NULL DEFAULT 'code' CHECK (artifact_type IN (
+    'code','html','react','svg','markdown','document','diagram','mermaid',
+    'image','csv','json','shell'
+  )),
   content         TEXT NOT NULL DEFAULT '',
-  artifact_type   TEXT NOT NULL DEFAULT 'code' CHECK (artifact_type IN ('code', 'html', 'document', 'diagram', 'react', 'svg', 'mermaid', 'markdown', 'image')),
-  file_path       TEXT,
   line_count      INTEGER DEFAULT 0,
+  version         INTEGER DEFAULT 1,
+  storage_path    TEXT,
+  view_count      INTEGER DEFAULT 0,
+  copy_count      INTEGER DEFAULT 0,
+  download_count  INTEGER DEFAULT 0,
+  preview_count   INTEGER DEFAULT 0,
+  approved_for_training BOOLEAN DEFAULT false,
+  labels          TEXT[] DEFAULT '{}',
   created_at      TIMESTAMPTZ DEFAULT now() NOT NULL,
   updated_at      TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS public.generated_images (
-  id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  session_id      UUID REFERENCES public.conversations(id) ON DELETE CASCADE,
-  user_id         UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  title           TEXT NOT NULL DEFAULT 'Untitled',
-  language        TEXT NOT NULL DEFAULT 'image',
-  base64_data     TEXT NOT NULL,
-  artifact_type   TEXT NOT NULL DEFAULT 'image' CHECK (artifact_type = 'image'),
-  file_path       TEXT,
-  line_count      INTEGER DEFAULT 0,
-  created_at      TIMESTAMPTZ DEFAULT now() NOT NULL,
-  updated_at      TIMESTAMPTZ DEFAULT now() NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS public.generated_diagrams (
-  id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  session_id      UUID REFERENCES public.conversations(id) ON DELETE CASCADE,
-  user_id         UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  title           TEXT NOT NULL DEFAULT 'Untitled',
-  language        TEXT NOT NULL DEFAULT 'mermaid',
-  mermaid_code    TEXT NOT NULL,
-  artifact_type   TEXT NOT NULL DEFAULT 'diagram' CHECK (artifact_type = 'diagram'),
-  file_path       TEXT,
-  line_count      INTEGER DEFAULT 0,
-  created_at      TIMESTAMPTZ DEFAULT now() NOT NULL,
-  updated_at      TIMESTAMPTZ DEFAULT now() NOT NULL
-);
-
+-- Code artifacts — artifactStore.ts createArtifact() writes here
 CREATE TABLE IF NOT EXISTS public.generated_code (
   id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   session_id      UUID REFERENCES public.conversations(id) ON DELETE CASCADE,
@@ -35945,26 +36953,118 @@ CREATE TABLE IF NOT EXISTS public.generated_code (
   title           TEXT NOT NULL DEFAULT 'Untitled',
   language        TEXT NOT NULL DEFAULT 'text',
   code_content    TEXT NOT NULL,
-  artifact_type   TEXT NOT NULL DEFAULT 'code' CHECK (artifact_type IN ('code', 'html', 'document', 'react', 'svg', 'markdown')),
+  artifact_type   TEXT NOT NULL DEFAULT 'code',
   file_path       TEXT,
   line_count      INTEGER DEFAULT 0,
+  version         INTEGER DEFAULT 1,
   created_at      TIMESTAMPTZ DEFAULT now() NOT NULL,
   updated_at      TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
+-- Diagram artifacts — artifactStore.ts storeDiagram() writes here
+CREATE TABLE IF NOT EXISTS public.generated_diagrams (
+  id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  session_id      UUID REFERENCES public.conversations(id) ON DELETE CASCADE,
+  user_id         UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  title           TEXT NOT NULL DEFAULT 'Untitled',
+  language        TEXT NOT NULL DEFAULT 'mermaid',
+  mermaid_code    TEXT NOT NULL,
+  artifact_type   TEXT NOT NULL DEFAULT 'diagram',
+  file_path       TEXT,
+  line_count      INTEGER DEFAULT 0,
+  version         INTEGER DEFAULT 1,
+  created_at      TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+-- Image artifacts — artifactStore.ts storeImage() writes here
+-- base64_data KEPT because queryOptimizer.ts line ~34106 reads: r.base64_data
+-- Removing this column breaks getAllUserArtifactsByUserId()
+-- Future: upload to bucket and store storage_path instead
+CREATE TABLE IF NOT EXISTS public.generated_images (
+  id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  session_id      UUID REFERENCES public.conversations(id) ON DELETE CASCADE,
+  user_id         UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  title           TEXT NOT NULL DEFAULT 'Untitled',
+  language        TEXT NOT NULL DEFAULT 'png',
+  artifact_type   TEXT NOT NULL DEFAULT 'image',
+  file_path       TEXT,
+  line_count      INTEGER DEFAULT 0,
+
+  -- base64_data: kept for backward compat with queryOptimizer.ts
+  -- IMPORTANT: for new images, upload to sedrex-uploads bucket instead
+  -- Set base64_data='[use-storage-path]' and populate storage_path + storage_url
+  base64_data     TEXT,
+  storage_path    TEXT,    -- preferred: path in sedrex-uploads bucket
+  public_url      TEXT,    -- signed URL (regenerated on access)
+  bucket          TEXT DEFAULT 'sedrex-uploads',
+  mime_type       TEXT DEFAULT 'image/png',
+  file_size_bytes BIGINT DEFAULT 0,
+  width_px        INTEGER,
+  height_px       INTEGER,
+
+  created_at      TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+COMMENT ON COLUMN public.generated_images.base64_data IS
+'LEGACY: queryOptimizer.ts reads this. New images: upload to sedrex-uploads bucket,
+set storage_path here, and set base64_data to null or a short placeholder.';
+COMMENT ON COLUMN public.generated_images.storage_path IS
+'PREFERRED: Path in sedrex-uploads bucket. Use supabase.storage.createSignedUrl() to serve.';
+
 -- ════════════════════════════════════════════════════════════════════════════
--- 3. TABLES (Analytics & Tracking)
+-- 9. FILE UPLOADS — all user files, all types, storage paths only
 -- ════════════════════════════════════════════════════════════════════════════
 
+CREATE TABLE IF NOT EXISTS public.file_uploads (
+  id                UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id           UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  conversation_id   UUID REFERENCES public.conversations(id) ON DELETE SET NULL,
+  message_id        UUID REFERENCES public.messages(id) ON DELETE SET NULL,
+  original_name     TEXT NOT NULL,
+  display_name      TEXT,
+  bucket            TEXT NOT NULL DEFAULT 'sedrex-uploads',
+  storage_path      TEXT NOT NULL,
+  public_url        TEXT,
+  file_type         TEXT NOT NULL CHECK (file_type IN (
+    'image','pdf','document','spreadsheet','presentation','code',
+    'text','audio','video','archive','data','other'
+  )),
+  mime_type         TEXT,
+  extension         TEXT,
+  file_size_bytes   BIGINT DEFAULT 0,
+  file_size_human   TEXT,
+  width_px          INTEGER,
+  height_px         INTEGER,
+  thumbnail_url     TEXT,
+  page_count        INTEGER,
+  word_count        INTEGER,
+  upload_status     TEXT DEFAULT 'complete'
+    CHECK (upload_status IN ('pending','uploading','complete','failed','deleted')),
+  is_deleted        BOOLEAN DEFAULT false,
+  access_count      INTEGER DEFAULT 0,
+  metadata          JSONB DEFAULT '{}'::jsonb,
+  created_at        TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+COMMENT ON TABLE public.file_uploads IS
+'Every file uploaded by every user. No file content in DB — only metadata + storage paths.
+Actual files in sedrex-uploads bucket, organized as: {user_id}/{type}/{filename}
+Browse in Supabase: Storage → sedrex-uploads → click user folder.';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 10. ANALYTICS & TRACKING
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- Sessions
 CREATE TABLE IF NOT EXISTS public.user_sessions (
   id                UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id           UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  session_token     TEXT,
+  auth_session_id   TEXT,
   started_at        TIMESTAMPTZ DEFAULT now() NOT NULL,
   ended_at          TIMESTAMPTZ,
+  duration_seconds  INTEGER,
   is_active         BOOLEAN DEFAULT true,
   ip_address        TEXT,
-  user_agent        TEXT,
   device_type       TEXT,
   browser           TEXT,
   os                TEXT,
@@ -35972,73 +37072,98 @@ CREATE TABLE IF NOT EXISTS public.user_sessions (
   country           TEXT,
   city              TEXT,
   messages_sent     INTEGER DEFAULT 0,
-  tokens_used       INTEGER DEFAULT 0,
+  tokens_used       BIGINT  DEFAULT 0,
   artifacts_created INTEGER DEFAULT 0,
-  ended_reason      TEXT
+  files_uploaded    INTEGER DEFAULT 0,
+  ended_reason      TEXT CHECK (ended_reason IN ('logout','timeout','tab_close','session_expired',NULL))
 );
 
+-- User events — EVERY click, navigation, model selection, setting change
+-- analyticsService.ts controls event_category filtering
+-- All categories tracked: click|navigation|model|artifact|file|auth|setting|error|feedback
 CREATE TABLE IF NOT EXISTS public.user_events (
   id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id         UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   session_id      UUID REFERENCES public.user_sessions(id) ON DELETE SET NULL,
   conversation_id UUID REFERENCES public.conversations(id) ON DELETE SET NULL,
-  message_id      TEXT,
+  event_category  TEXT NOT NULL,
   event_type      TEXT NOT NULL,
-  event_name      TEXT NOT NULL,
+  event_value     TEXT,
+  event_label     TEXT,
+  page_view       TEXT,
+  component       TEXT,
   properties      JSONB DEFAULT '{}'::jsonb,
-  view            TEXT,
   device_type     TEXT,
   timezone        TEXT,
   created_at      TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
+-- Query log — lean version
+-- prompt_text: VARCHAR(500) cap — full text in messages.content
+-- NO response_text column — responses read from messages table
 CREATE TABLE IF NOT EXISTS public.user_query_log (
   id                UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id           UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   session_id        UUID REFERENCES public.user_sessions(id) ON DELETE SET NULL,
   conversation_id   UUID REFERENCES public.conversations(id) ON DELETE SET NULL,
-  message_id        TEXT,
-  prompt_text       TEXT NOT NULL,
-  prompt_length     INTEGER     DEFAULT 0,
-  response_text     TEXT,
-  response_length   INTEGER     DEFAULT 0,
+  message_id        UUID REFERENCES public.messages(id) ON DELETE SET NULL,
+
+  prompt_text       VARCHAR(500),   -- capped: full text is in messages.content
   intent            TEXT,
   agent_type        TEXT,
   agent_provider    TEXT,
   model_requested   TEXT,
-  model_used        TEXT,
+  model_used        TEXT NOT NULL DEFAULT 'unknown',
+  model_provider    TEXT,
   engine            TEXT,
-  input_tokens      INTEGER     DEFAULT 0,
-  output_tokens     INTEGER     DEFAULT 0,
-  total_tokens      INTEGER     DEFAULT 0,
-  response_time_ms  INTEGER     DEFAULT 0,
-  has_image         BOOLEAN     DEFAULT false,
-  has_documents     BOOLEAN     DEFAULT false,
-  has_codebase_ref  BOOLEAN     DEFAULT false,
-  artifact_created  BOOLEAN     DEFAULT false,
-  artifact_id       TEXT,
-  confidence_level  TEXT,
-  feedback          TEXT CHECK (feedback IN ('good', 'bad', NULL)),
-  was_regenerated   BOOLEAN     DEFAULT false,
-  was_edited        BOOLEAN     DEFAULT false,
+  is_fallback       BOOLEAN DEFAULT false,
   slash_command     TEXT,
-  had_error         BOOLEAN     DEFAULT false,
+
+  input_tokens      INTEGER DEFAULT 0,
+  output_tokens     INTEGER DEFAULT 0,
+  total_tokens      INTEGER DEFAULT 0,
+  response_time_ms  INTEGER DEFAULT 0,
+
+  has_image         BOOLEAN DEFAULT false,
+  has_documents     BOOLEAN DEFAULT false,
+  has_codebase_ref  BOOLEAN DEFAULT false,
+  attachment_count  INTEGER DEFAULT 0,
+
+  artifact_created  BOOLEAN DEFAULT false,
+  artifact_id       UUID,
+  diagram_created   BOOLEAN DEFAULT false,
+  has_web_search    BOOLEAN DEFAULT false,
+
+  confidence_level  TEXT,
+  feedback          TEXT CHECK (feedback IN ('good','bad',NULL)),
+  was_regenerated   BOOLEAN DEFAULT false,
+  was_edited        BOOLEAN DEFAULT false,
+
+  had_error         BOOLEAN DEFAULT false,
   error_type        TEXT,
-  error_message     TEXT,
+
+  approved_for_training BOOLEAN DEFAULT false,
+
   created_at        TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS public.platform_analytics_daily (
-  id                UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+COMMENT ON COLUMN public.user_query_log.prompt_text IS
+'Capped at 500 chars. Full prompt in messages.content (join on message_id).';
+COMMENT ON COLUMN public.user_query_log.approved_for_training IS
+'Set true to include this query in admin_training_data view for fine-tuning export.';
+
+-- Daily metrics — aggregated by triggers, fast reads
+-- FIX: column name is diagrams_created (not diagram_created)
+CREATE TABLE IF NOT EXISTS public.user_daily_metrics (
   user_id           UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   date              DATE NOT NULL,
   messages_sent     INTEGER DEFAULT 0,
   queries_made      INTEGER DEFAULT 0,
   sessions_count    INTEGER DEFAULT 0,
   active_minutes    INTEGER DEFAULT 0,
-  input_tokens      INTEGER DEFAULT 0,
-  output_tokens     INTEGER DEFAULT 0,
-  total_tokens      INTEGER DEFAULT 0,
+  input_tokens      BIGINT  DEFAULT 0,
+  output_tokens     BIGINT  DEFAULT 0,
+  total_tokens      BIGINT  DEFAULT 0,
   gemini_queries    INTEGER DEFAULT 0,
   claude_queries    INTEGER DEFAULT 0,
   openai_queries    INTEGER DEFAULT 0,
@@ -36047,413 +37172,762 @@ CREATE TABLE IF NOT EXISTS public.platform_analytics_daily (
   live_queries      INTEGER DEFAULT 0,
   general_queries   INTEGER DEFAULT 0,
   artifacts_created INTEGER DEFAULT 0,
+  diagrams_created  INTEGER DEFAULT 0,  -- FIX: was diagram_created in bug version
+  files_uploaded    INTEGER DEFAULT 0,
   good_feedback     INTEGER DEFAULT 0,
   bad_feedback      INTEGER DEFAULT 0,
   regenerations     INTEGER DEFAULT 0,
-  UNIQUE(user_id, date)
+  errors            INTEGER DEFAULT 0,
+  PRIMARY KEY (user_id, date)
 );
 
-CREATE TABLE IF NOT EXISTS public.admin_audit_logs (
-  id             UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  admin_id       UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  admin_email    TEXT,
-  action         TEXT NOT NULL,
-  target_user_id UUID,
-  target_email   TEXT,
-  details        JSONB DEFAULT '{}'::jsonb,
-  ip_address     TEXT,
-  created_at     TIMESTAMPTZ DEFAULT now() NOT NULL
+-- Platform daily totals
+CREATE TABLE IF NOT EXISTS public.platform_daily (
+  date              DATE PRIMARY KEY,
+  new_signups       INTEGER DEFAULT 0,
+  active_users      INTEGER DEFAULT 0,
+  total_sessions    INTEGER DEFAULT 0,
+  total_queries     INTEGER DEFAULT 0,
+  total_tokens      BIGINT  DEFAULT 0,
+  gemini_queries    INTEGER DEFAULT 0,
+  claude_queries    INTEGER DEFAULT 0,
+  openai_queries    INTEGER DEFAULT 0,
+  artifacts_created INTEGER DEFAULT 0,
+  errors            INTEGER DEFAULT 0,
+  good_feedback     INTEGER DEFAULT 0,
+  bad_feedback      INTEGER DEFAULT 0,
+  computed_at       TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS public.user_storage (
-  id                UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  user_id           UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  conversation_id   UUID REFERENCES public.conversations(id) ON DELETE SET NULL,
-  message_id        TEXT,
-  bucket            TEXT NOT NULL,
-  storage_path      TEXT NOT NULL,
-  public_url        TEXT,
-  original_name     TEXT NOT NULL,
-  file_type         TEXT NOT NULL,
-  mime_type         TEXT,
-  file_size_bytes   BIGINT DEFAULT 0,
-  is_deleted        BOOLEAN DEFAULT false,
-  created_at        TIMESTAMPTZ DEFAULT now() NOT NULL
+-- Error log
+CREATE TABLE IF NOT EXISTS public.error_log (
+  id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id         UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  session_id      UUID REFERENCES public.user_sessions(id) ON DELETE SET NULL,
+  error_type      TEXT NOT NULL,
+  error_code      TEXT,
+  error_message   TEXT NOT NULL,
+  stack_trace     TEXT,
+  component       TEXT,
+  model           TEXT,
+  is_critical     BOOLEAN DEFAULT false,
+  is_resolved     BOOLEAN DEFAULT false,
+  resolved_at     TIMESTAMPTZ,
+  resolution_note TEXT,
+  url             TEXT,
+  created_at      TIMESTAMPTZ DEFAULT now() NOT NULL
 );
-
 
 -- ════════════════════════════════════════════════════════════════════════════
--- 4. STORAGE BUCKETS & POLICIES
+-- 11. ADMIN TABLES
+-- ════════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.admin_audit_log (
+  id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  admin_id        UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  admin_email     TEXT,
+  action          TEXT NOT NULL,
+  target_user_id  UUID,
+  target_email    TEXT,
+  old_value       JSONB,
+  new_value       JSONB,
+  reason          TEXT,
+  ip_address      TEXT,
+  created_at      TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.admin_notes (
+  id          UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  admin_id    UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  user_id     UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  note        TEXT NOT NULL,
+  is_pinned   BOOLEAN DEFAULT false,
+  created_at  TIMESTAMPTZ DEFAULT now() NOT NULL,
+  updated_at  TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+-- FIXED: surrogate PK + partial unique indexes (replaces illegal COALESCE in PRIMARY KEY)
+CREATE TABLE IF NOT EXISTS public.feature_flags (
+  id          UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id     UUID REFERENCES auth.users(id) ON DELETE CASCADE,  -- NULL = global flag
+  flag_name   TEXT NOT NULL,
+  is_enabled  BOOLEAN DEFAULT false,
+  notes       TEXT,
+  set_by      UUID REFERENCES auth.users(id),
+  created_at  TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+-- One global flag per name (user_id IS NULL)
+CREATE UNIQUE INDEX IF NOT EXISTS ux_feature_flags_global
+  ON public.feature_flags(flag_name) WHERE user_id IS NULL;
+
+-- One per-user flag per name (user_id IS NOT NULL)
+CREATE UNIQUE INDEX IF NOT EXISTS ux_feature_flags_user
+  ON public.feature_flags(user_id, flag_name) WHERE user_id IS NOT NULL;
+
+COMMENT ON TABLE public.feature_flags IS
+'Global flags: user_id=NULL, flag_name="enable_voice".
+Per-user flags: user_id=<uuid>, flag_name="beta_access".
+FIX: uses partial unique indexes instead of COALESCE() in PRIMARY KEY (illegal in Postgres).';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 12. STORAGE BUCKETS
 -- ════════════════════════════════════════════════════════════════════════════
 
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES (
-  'sedrex-uploads', 'sedrex-uploads', false, 52428800,
-  ARRAY[
-    'image/jpeg','image/jpg','image/png','image/webp','image/gif',
-    'application/pdf','text/plain','text/csv','text/markdown',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'application/vnd.ms-excel','application/msword','application/json'
-  ]
-) ON CONFLICT (id) DO UPDATE SET file_size_limit = EXCLUDED.file_size_limit, allowed_mime_types = EXCLUDED.allowed_mime_types;
+VALUES ('sedrex-uploads', 'sedrex-uploads', false, 104857600, ARRAY[
+  'image/jpeg','image/jpg','image/png','image/webp','image/gif',
+  'image/heic','image/heif','image/tiff','image/bmp','image/svg+xml',
+  'application/pdf','application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain','text/csv','text/markdown','text/html','text/css',
+  'application/json','application/xml',
+  'application/zip','application/x-zip-compressed',
+  'audio/mpeg','audio/wav','audio/mp4','audio/webm',
+  'video/mp4','video/webm','video/quicktime',
+  'application/javascript','application/typescript',
+  'application/octet-stream'
+]) ON CONFLICT (id) DO UPDATE SET
+  file_size_limit=EXCLUDED.file_size_limit,
+  allowed_mime_types=EXCLUDED.allowed_mime_types;
 
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES (
-  'sedrex-avatars', 'sedrex-avatars', true, 5242880,
-  ARRAY['image/jpeg','image/jpg','image/png','image/webp']
-) ON CONFLICT (id) DO UPDATE SET file_size_limit = EXCLUDED.file_size_limit, allowed_mime_types = EXCLUDED.allowed_mime_types;
+VALUES ('sedrex-avatars', 'sedrex-avatars', true, 5242880,
+  ARRAY['image/jpeg','image/jpg','image/png','image/webp','image/heic','image/gif'])
+ON CONFLICT (id) DO UPDATE SET file_size_limit=EXCLUDED.file_size_limit;
 
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES (
-  'sedrex-artifacts', 'sedrex-artifacts', false, 10485760,
-  ARRAY[
-    'text/plain','text/html','text/css','text/markdown',
-    'application/javascript','application/json',
-    'text/x-python','text/x-typescript','application/octet-stream'
-  ]
-) ON CONFLICT (id) DO UPDATE SET file_size_limit = EXCLUDED.file_size_limit, allowed_mime_types = EXCLUDED.allowed_mime_types;
+VALUES ('sedrex-artifacts', 'sedrex-artifacts', false, 52428800, ARRAY[
+  'text/plain','text/html','text/css','text/markdown','text/csv',
+  'application/json','application/javascript','application/zip','application/octet-stream'
+]) ON CONFLICT (id) DO UPDATE SET file_size_limit=EXCLUDED.file_size_limit;
 
--- Storage RLS
-
-CREATE POLICY "Users upload own files" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'sedrex-uploads' AND (storage.foldername(name))[1] = auth.uid()::text);
-CREATE POLICY "Users read own files" ON storage.objects FOR SELECT TO authenticated USING (bucket_id = 'sedrex-uploads' AND (storage.foldername(name))[1] = auth.uid()::text);
-CREATE POLICY "Users delete own files" ON storage.objects FOR DELETE TO authenticated USING (bucket_id = 'sedrex-uploads' AND (storage.foldername(name))[1] = auth.uid()::text);
-
-CREATE POLICY "Users upload own avatars" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'sedrex-avatars' AND (storage.foldername(name))[1] = auth.uid()::text);
-CREATE POLICY "Anyone read avatars" ON storage.objects FOR SELECT TO public USING (bucket_id = 'sedrex-avatars');
-CREATE POLICY "Users delete own avatars" ON storage.objects FOR DELETE TO authenticated USING (bucket_id = 'sedrex-avatars' AND (storage.foldername(name))[1] = auth.uid()::text);
-
-CREATE POLICY "Users upload own artifacts" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'sedrex-artifacts' AND (storage.foldername(name))[1] = auth.uid()::text);
-CREATE POLICY "Users read own artifacts" ON storage.objects FOR SELECT TO authenticated USING (bucket_id = 'sedrex-artifacts' AND (storage.foldername(name))[1] = auth.uid()::text);
-CREATE POLICY "Users delete own artifacts" ON storage.objects FOR DELETE TO authenticated USING (bucket_id = 'sedrex-artifacts' AND (storage.foldername(name))[1] = auth.uid()::text);
-
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('sedrex-exports', 'sedrex-exports', false, 52428800,
+  ARRAY['application/pdf','text/plain','text/markdown','application/json'])
+ON CONFLICT (id) DO UPDATE SET file_size_limit=EXCLUDED.file_size_limit;
 
 -- ════════════════════════════════════════════════════════════════════════════
--- 5. ROW LEVEL SECURITY
+-- 13. ROW LEVEL SECURITY
 -- ════════════════════════════════════════════════════════════════════════════
 
-ALTER TABLE public.profiles            ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_preferences    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_stats          ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.conversations       ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.messages            ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.artifacts           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_sessions       ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_events         ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_query_log      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_daily_metrics  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.admin_audit_log     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.file_uploads        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.generated_images    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.generated_diagrams  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.generated_code      ENABLE ROW LEVEL SECURITY;
+DO $rls$ BEGIN
+  EXECUTE 'ALTER TABLE public.profiles              ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.user_preferences      ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.user_memory           ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.user_auth_events      ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.token_budgets         ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.model_token_summary   ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.user_stats            ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.conversations         ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.messages              ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.artifacts             ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.generated_code        ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.generated_diagrams    ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.generated_images      ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.file_uploads          ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.user_sessions         ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.user_events           ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.user_query_log        ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.user_daily_metrics    ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.platform_daily        ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.error_log             ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.admin_audit_log       ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.admin_notes           ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'ALTER TABLE public.feature_flags         ENABLE ROW LEVEL SECURITY';
+END $rls$;
 
-CREATE POLICY "Enable all for profiles" ON public.profiles FOR ALL USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
-CREATE POLICY "Enable all for user_stats" ON public.user_stats FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Enable all for user_preferences" ON public.user_preferences FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+-- Drop all existing policies before recreating (idempotent)
+DO $drop$ DECLARE r RECORD; BEGIN
+  FOR r IN SELECT policyname, tablename FROM pg_policies WHERE schemaname='public' LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', r.policyname, r.tablename);
+  END LOOP;
+END $drop$;
 
-CREATE POLICY "Users manage own conversations" ON public.conversations FOR ALL USING (auth.uid() = user_id);
-CREATE POLICY "Users manage own messages" ON public.messages FOR ALL USING (
-  EXISTS (SELECT 1 FROM public.conversations WHERE conversations.id = messages.conversation_id AND conversations.user_id = auth.uid())
-);
-CREATE POLICY "Users manage own artifacts" ON public.artifacts FOR ALL USING (auth.uid() = user_id);
-CREATE POLICY "Users manage own images" ON public.generated_images FOR ALL USING (auth.uid() = user_id);
-CREATE POLICY "Users manage own diagrams" ON public.generated_diagrams FOR ALL USING (auth.uid() = user_id);
-CREATE POLICY "Users manage own code" ON public.generated_code FOR ALL USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "user_upload_files"      ON storage.objects;
+DROP POLICY IF EXISTS "user_read_files"        ON storage.objects;
+DROP POLICY IF EXISTS "user_delete_files"      ON storage.objects;
+DROP POLICY IF EXISTS "user_upload_avatars"    ON storage.objects;
+DROP POLICY IF EXISTS "public_read_avatars"    ON storage.objects;
+DROP POLICY IF EXISTS "user_delete_avatars"    ON storage.objects;
+DROP POLICY IF EXISTS "user_upload_artifacts"  ON storage.objects;
+DROP POLICY IF EXISTS "user_read_artifacts"    ON storage.objects;
+DROP POLICY IF EXISTS "user_delete_artifacts"  ON storage.objects;
+DROP POLICY IF EXISTS "user_upload_exports"    ON storage.objects;
+DROP POLICY IF EXISTS "user_read_exports"      ON storage.objects;
+DROP POLICY IF EXISTS "admin_read_all_storage" ON storage.objects;
 
-CREATE POLICY "Users manage own file records" ON public.file_uploads FOR ALL USING (auth.uid() = user_id);
-CREATE POLICY "Users manage own sessions" ON public.user_sessions FOR ALL USING (auth.uid() = user_id);
-CREATE POLICY "Users manage own events" ON public.user_events FOR ALL USING (auth.uid() = user_id);
-CREATE POLICY "Users manage own queries" ON public.user_query_log FOR ALL USING (auth.uid() = user_id);
-CREATE POLICY "Users manage own metrics" ON public.user_daily_metrics FOR ALL USING (auth.uid() = user_id);
+-- Storage policies
+CREATE POLICY "user_upload_files"      ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id='sedrex-uploads'    AND (storage.foldername(name))[1]=auth.uid()::text);
+CREATE POLICY "user_read_files"        ON storage.objects FOR SELECT TO authenticated USING  (bucket_id='sedrex-uploads'    AND (storage.foldername(name))[1]=auth.uid()::text);
+CREATE POLICY "user_delete_files"      ON storage.objects FOR DELETE TO authenticated USING  (bucket_id='sedrex-uploads'    AND (storage.foldername(name))[1]=auth.uid()::text);
+CREATE POLICY "user_upload_avatars"    ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id='sedrex-avatars'   AND (storage.foldername(name))[1]=auth.uid()::text);
+CREATE POLICY "public_read_avatars"    ON storage.objects FOR SELECT TO public         USING  (bucket_id='sedrex-avatars');
+CREATE POLICY "user_delete_avatars"    ON storage.objects FOR DELETE TO authenticated USING  (bucket_id='sedrex-avatars'   AND (storage.foldername(name))[1]=auth.uid()::text);
+CREATE POLICY "user_upload_artifacts"  ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id='sedrex-artifacts' AND (storage.foldername(name))[1]=auth.uid()::text);
+CREATE POLICY "user_read_artifacts"    ON storage.objects FOR SELECT TO authenticated USING  (bucket_id='sedrex-artifacts' AND (storage.foldername(name))[1]=auth.uid()::text);
+CREATE POLICY "user_delete_artifacts"  ON storage.objects FOR DELETE TO authenticated USING  (bucket_id='sedrex-artifacts' AND (storage.foldername(name))[1]=auth.uid()::text);
+CREATE POLICY "user_upload_exports"    ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id='sedrex-exports'   AND (storage.foldername(name))[1]=auth.uid()::text);
+CREATE POLICY "user_read_exports"      ON storage.objects FOR SELECT TO authenticated USING  (bucket_id='sedrex-exports'   AND (storage.foldername(name))[1]=auth.uid()::text);
+CREATE POLICY "admin_read_all_storage" ON storage.objects FOR SELECT TO authenticated
+  USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
 
--- Admin read-all policies
-CREATE POLICY "Admins view all sessions" ON public.user_sessions FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
-CREATE POLICY "Admins view all events" ON public.user_events FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
-CREATE POLICY "Admins view all queries" ON public.user_query_log FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
-CREATE POLICY "Admins view all metrics" ON public.user_daily_metrics FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
-CREATE POLICY "Admins manage audit log" ON public.admin_audit_log FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+-- User own-data policies
+CREATE POLICY "own_profile"          ON public.profiles           FOR ALL  USING (auth.uid()=id);
+CREATE POLICY "own_preferences"      ON public.user_preferences   FOR ALL  USING (auth.uid()=user_id);
+CREATE POLICY "own_memory"           ON public.user_memory        FOR ALL  USING (auth.uid()=user_id);
+CREATE POLICY "own_auth_events"      ON public.user_auth_events   FOR SELECT USING (auth.uid()=user_id);
+CREATE POLICY "own_token_budget"     ON public.token_budgets      FOR SELECT USING (auth.uid()=user_id);
+CREATE POLICY "own_token_summary"    ON public.model_token_summary FOR ALL  USING (auth.uid()=user_id);
+CREATE POLICY "own_stats"            ON public.user_stats         FOR ALL  USING (auth.uid()=user_id);
+CREATE POLICY "own_conversations"    ON public.conversations       FOR ALL  USING (auth.uid()=user_id);
+CREATE POLICY "own_messages"         ON public.messages           FOR ALL  USING (
+  EXISTS (SELECT 1 FROM public.conversations c WHERE c.id=conversation_id AND c.user_id=auth.uid()));
+CREATE POLICY "own_artifacts"        ON public.artifacts          FOR ALL  USING (auth.uid()=user_id);
+CREATE POLICY "own_generated_code"   ON public.generated_code     FOR ALL  USING (auth.uid()=user_id);
+CREATE POLICY "own_diagrams"         ON public.generated_diagrams FOR ALL  USING (auth.uid()=user_id);
+CREATE POLICY "own_images"           ON public.generated_images   FOR ALL  USING (auth.uid()=user_id);
+CREATE POLICY "own_files"            ON public.file_uploads       FOR ALL  USING (auth.uid()=user_id);
+CREATE POLICY "own_sessions"         ON public.user_sessions      FOR ALL  USING (auth.uid()=user_id);
+CREATE POLICY "own_events"           ON public.user_events        FOR ALL  USING (auth.uid()=user_id);
+CREATE POLICY "own_query_log"        ON public.user_query_log     FOR ALL  USING (auth.uid()=user_id);
+CREATE POLICY "own_daily"            ON public.user_daily_metrics FOR ALL  USING (auth.uid()=user_id);
+CREATE POLICY "own_errors"           ON public.error_log          FOR ALL  USING (auth.uid()=user_id);
+CREATE POLICY "service_platform"     ON public.platform_daily     FOR ALL  TO service_role USING (true);
+CREATE POLICY "own_flags"            ON public.feature_flags      FOR SELECT USING (user_id IS NULL OR auth.uid()=user_id);
 
+-- Admin see-everything policies
+DO $admin_pol$ BEGIN EXECUTE $p$
+  CREATE POLICY "admin_profiles"     ON public.profiles           FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_sessions"     ON public.user_sessions      FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_events"       ON public.user_events        FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_query_log"    ON public.user_query_log     FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_messages"     ON public.messages           FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_files"        ON public.file_uploads       FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_artifacts"    ON public.artifacts          FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_gen_code"     ON public.generated_code     FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_gen_diagrams" ON public.generated_diagrams FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_gen_images"   ON public.generated_images   FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_token_budget" ON public.token_budgets      FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_token_sum"    ON public.model_token_summary FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_stats"        ON public.user_stats         FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_daily"        ON public.user_daily_metrics FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_platform"     ON public.platform_daily     FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_auth_events"  ON public.user_auth_events   FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_memory"       ON public.user_memory        FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_audit"        ON public.admin_audit_log    FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_notes_pol"    ON public.admin_notes        FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_errors"       ON public.error_log          FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_flags"        ON public.feature_flags      FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+  CREATE POLICY "admin_preferences"  ON public.user_preferences   FOR ALL USING ((SELECT is_admin FROM public.profiles WHERE id=auth.uid()));
+$p$; END $admin_pol$;
 
 -- ════════════════════════════════════════════════════════════════════════════
--- 6. TRIGGERS & FUNCTIONS
+-- 14. TRIGGERS & FUNCTIONS
 -- ════════════════════════════════════════════════════════════════════════════
 
--- Auth Signup Handler
+-- Auto updated_at
+CREATE OR REPLACE FUNCTION update_updated_at()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN NEW.updated_at = now(); RETURN NEW; END; $$;
+
+DROP TRIGGER IF EXISTS trg_profiles_ts       ON public.profiles;
+DROP TRIGGER IF EXISTS trg_prefs_ts          ON public.user_preferences;
+DROP TRIGGER IF EXISTS trg_memory_ts         ON public.user_memory;
+DROP TRIGGER IF EXISTS trg_artifacts_ts      ON public.artifacts;
+DROP TRIGGER IF EXISTS trg_gen_code_ts       ON public.generated_code;
+DROP TRIGGER IF EXISTS trg_admin_notes_ts    ON public.admin_notes;
+DROP TRIGGER IF EXISTS trg_token_budget_ts   ON public.token_budgets;
+
+CREATE TRIGGER trg_profiles_ts     BEFORE UPDATE ON public.profiles            FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_prefs_ts        BEFORE UPDATE ON public.user_preferences    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_memory_ts       BEFORE UPDATE ON public.user_memory         FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_artifacts_ts    BEFORE UPDATE ON public.artifacts           FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_gen_code_ts     BEFORE UPDATE ON public.generated_code      FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_admin_notes_ts  BEFORE UPDATE ON public.admin_notes         FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_token_budget_ts BEFORE UPDATE ON public.token_budgets       FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- New user signup: creates all required rows atomically
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER SECURITY DEFINER SET search_path = public LANGUAGE plpgsql AS $$
+RETURNS TRIGGER SECURITY DEFINER SET search_path=public LANGUAGE plpgsql AS $$
+DECLARE v_source TEXT := COALESCE(NEW.raw_user_meta_data->>'provider', 'email');
 BEGIN
-  INSERT INTO public.profiles (id, email, full_name, display_name, tier, created_at, updated_at)
-  VALUES (
-    NEW.id, NEW.email, 
-    COALESCE(NEW.raw_user_meta_data->>'full_name', 'Sedrex User'), 
-    COALESCE(NEW.raw_user_meta_data->>'full_name', 'Sedrex User'), 
-    'free', NOW(), NOW()
-  ) ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email;
+  INSERT INTO public.profiles (id, email, full_name, display_name, tier, signup_source, created_at, updated_at)
+  VALUES (NEW.id, NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', 'Sedrex User'),
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', 'Sedrex User'),
+    'free', v_source, NOW(), NOW())
+  ON CONFLICT (id) DO UPDATE SET email=EXCLUDED.email;
 
-  INSERT INTO public.user_stats (user_id, tier) VALUES (NEW.id, 'free') ON CONFLICT (user_id) DO NOTHING;
-  INSERT INTO public.user_preferences (user_id) VALUES (NEW.id) ON CONFLICT (user_id) DO NOTHING;
+  INSERT INTO public.user_preferences (user_id) VALUES (NEW.id) ON CONFLICT DO NOTHING;
+  INSERT INTO public.user_stats (user_id, tier) VALUES (NEW.id, 'free') ON CONFLICT DO NOTHING;
+  INSERT INTO public.token_budgets (user_id, total_token_limit, remaining_tokens)
+    VALUES (NEW.id, 100000, 100000) ON CONFLICT DO NOTHING;
+
+  INSERT INTO public.user_auth_events (user_id, email, event_type, provider, success)
+  VALUES (NEW.id, NEW.email,
+    CASE v_source
+      WHEN 'google'   THEN 'signup_google'
+      WHEN 'github'   THEN 'signup_github'
+      WHEN 'facebook' THEN 'signup_facebook'
+      ELSE 'signup_email'
+    END, v_source, true);
+
   RETURN NEW;
 EXCEPTION WHEN OTHERS THEN RAISE WARNING 'handle_new_user: %', SQLERRM; RETURN NEW;
 END; $$;
 
-CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- Automatic updated_at functionality
-CREATE OR REPLACE FUNCTION update_timestamp_column()
-RETURNS TRIGGER LANGUAGE plpgsql AS $$
-BEGIN NEW.updated_at = now(); RETURN NEW; END; $$;
-
-CREATE TRIGGER trg_profiles_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION update_timestamp_column();
-CREATE TRIGGER trg_user_prefs_updated_at BEFORE UPDATE ON public.user_preferences FOR EACH ROW EXECUTE FUNCTION update_timestamp_column();
-CREATE TRIGGER trg_artifacts_updated_at BEFORE UPDATE ON public.artifacts FOR EACH ROW EXECUTE FUNCTION update_timestamp_column();
-
--- Conversation metrics update on new message
+-- Conversation stats from messages
 CREATE OR REPLACE FUNCTION update_conversation_on_message()
-RETURNS TRIGGER SECURITY DEFINER SET search_path = public LANGUAGE plpgsql AS $$
+RETURNS TRIGGER SECURITY DEFINER SET search_path=public LANGUAGE plpgsql AS $$
 BEGIN
   UPDATE public.conversations SET
-    last_modified = NOW(),
-    message_count = COALESCE(message_count, 0) + 1,
-    total_tokens  = COALESCE(total_tokens, 0) + COALESCE(NEW.input_tokens, 0) + COALESCE(NEW.output_tokens, 0),
-    total_input_tokens = COALESCE(total_input_tokens, 0) + COALESCE(NEW.input_tokens, 0),
-    total_output_tokens = COALESCE(total_output_tokens, 0) + COALESCE(NEW.output_tokens, 0)
-  WHERE id = NEW.conversation_id;
+    last_modified           = NOW(),
+    message_count           = COALESCE(message_count,0) + 1,
+    user_message_count      = COALESCE(user_message_count,0) + CASE WHEN NEW.role='user' THEN 1 ELSE 0 END,
+    assistant_message_count = COALESCE(assistant_message_count,0) + CASE WHEN NEW.role='assistant' THEN 1 ELSE 0 END,
+    total_tokens            = COALESCE(total_tokens,0) + COALESCE(NEW.tokens_used,0),
+    total_input_tokens      = COALESCE(total_input_tokens,0) + COALESCE(NEW.input_tokens,0),
+    total_output_tokens     = COALESCE(total_output_tokens,0) + COALESCE(NEW.output_tokens,0),
+    has_images    = has_images    OR COALESCE(NEW.has_image,false),
+    has_documents = has_documents OR COALESCE(NEW.has_documents,false),
+    has_artifacts = has_artifacts OR COALESCE(NEW.has_artifacts,false)
+  WHERE id=NEW.conversation_id;
+  -- Populate content_length
+  UPDATE public.messages SET content_length=LENGTH(NEW.content) WHERE id=NEW.id AND content_length=0;
   RETURN NEW;
 EXCEPTION WHEN OTHERS THEN RAISE WARNING 'update_conversation_on_message: %', SQLERRM; RETURN NEW;
 END; $$;
 
-CREATE TRIGGER trg_message_updates_conversation AFTER INSERT ON public.messages FOR EACH ROW EXECUTE FUNCTION update_conversation_on_message();
+DROP TRIGGER IF EXISTS trg_message_updates_conversation ON public.messages;
+CREATE TRIGGER trg_message_updates_conversation
+  AFTER INSERT ON public.messages
+  FOR EACH ROW EXECUTE FUNCTION update_conversation_on_message();
 
--- Profile last seen update on session end
-CREATE OR REPLACE FUNCTION update_profile_on_session_end()
-RETURNS TRIGGER SECURITY DEFINER SET search_path = public LANGUAGE plpgsql AS $$
+-- Token deduction + model summary on each query
+CREATE OR REPLACE FUNCTION update_token_budget_on_query()
+RETURNS TRIGGER SECURITY DEFINER SET search_path=public LANGUAGE plpgsql AS $$
 BEGIN
-  IF OLD.is_active = true AND NEW.is_active = false AND NEW.ended_at IS NOT NULL THEN
-    UPDATE public.profiles SET
-      last_seen_at   = NEW.ended_at,
-      total_sessions = COALESCE(total_sessions, 0) + 1
-    WHERE id = NEW.user_id;
-  END IF;
-  RETURN NEW;
-END; $$;
+  UPDATE public.token_budgets SET
+    remaining_tokens  = CASE WHEN is_unlimited THEN remaining_tokens
+                             ELSE GREATEST(0, remaining_tokens - COALESCE(NEW.total_tokens,0)) END,
+    tokens_used_today = COALESCE(tokens_used_today,0) + COALESCE(NEW.total_tokens,0),
+    tokens_used_month = COALESCE(tokens_used_month,0) + COALESCE(NEW.total_tokens,0),
+    tokens_used_total = COALESCE(tokens_used_total,0) + COALESCE(NEW.total_tokens,0),
+    updated_at        = NOW()
+  WHERE user_id=NEW.user_id;
 
-CREATE TRIGGER trg_session_end_updates_profile AFTER UPDATE ON public.user_sessions FOR EACH ROW EXECUTE FUNCTION update_profile_on_session_end();
-
--- Daily metrics aggregation from user_query_log
-CREATE OR REPLACE FUNCTION update_daily_metrics()
-RETURNS TRIGGER SECURITY DEFINER SET search_path = public LANGUAGE plpgsql AS $$
-DECLARE v_date DATE := DATE(NEW.created_at);
-BEGIN
-  INSERT INTO public.user_daily_metrics (
-    user_id, date, queries_made, input_tokens, output_tokens, total_tokens,
-    gemini_queries, claude_queries, openai_queries, coding_queries, reasoning_queries, live_queries, general_queries,
-    artifacts_created, good_feedback, bad_feedback, regenerations
-  ) VALUES (
-    NEW.user_id, v_date, 1, COALESCE(NEW.input_tokens,0), COALESCE(NEW.output_tokens,0), COALESCE(NEW.total_tokens,0),
-    CASE WHEN NEW.model_used ILIKE '%gemini%' THEN 1 ELSE 0 END,
-    CASE WHEN NEW.model_used ILIKE '%claude%' THEN 1 ELSE 0 END,
-    CASE WHEN NEW.model_used ILIKE '%gpt%' OR NEW.model_used ILIKE '%openai%' THEN 1 ELSE 0 END,
-    CASE WHEN NEW.intent='coding' THEN 1 ELSE 0 END, CASE WHEN NEW.intent='reasoning' THEN 1 ELSE 0 END,
-    CASE WHEN NEW.intent='live' THEN 1 ELSE 0 END, CASE WHEN NEW.intent='general' THEN 1 ELSE 0 END,
-    CASE WHEN NEW.artifact_created THEN 1 ELSE 0 END, CASE WHEN NEW.feedback='good' THEN 1 ELSE 0 END,
-    CASE WHEN NEW.feedback='bad' THEN 1 ELSE 0 END, CASE WHEN NEW.was_regenerated THEN 1 ELSE 0 END
-  )
-  ON CONFLICT (user_id, date) DO UPDATE SET
-    queries_made      = user_daily_metrics.queries_made + 1,
-    input_tokens      = user_daily_metrics.input_tokens + COALESCE(NEW.input_tokens,0),
-    output_tokens     = user_daily_metrics.output_tokens + COALESCE(NEW.output_tokens,0),
-    total_tokens      = user_daily_metrics.total_tokens + COALESCE(NEW.total_tokens,0),
-    gemini_queries    = user_daily_metrics.gemini_queries + CASE WHEN NEW.model_used ILIKE '%gemini%' THEN 1 ELSE 0 END,
-    claude_queries    = user_daily_metrics.claude_queries + CASE WHEN NEW.model_used ILIKE '%claude%' THEN 1 ELSE 0 END,
-    openai_queries    = user_daily_metrics.openai_queries + CASE WHEN NEW.model_used ILIKE '%gpt%' OR NEW.model_used ILIKE '%openai%' THEN 1 ELSE 0 END,
-    coding_queries    = user_daily_metrics.coding_queries + CASE WHEN NEW.intent='coding' THEN 1 ELSE 0 END,
-    reasoning_queries = user_daily_metrics.reasoning_queries + CASE WHEN NEW.intent='reasoning' THEN 1 ELSE 0 END,
-    live_queries      = user_daily_metrics.live_queries + CASE WHEN NEW.intent='live' THEN 1 ELSE 0 END,
-    general_queries   = user_daily_metrics.general_queries + CASE WHEN NEW.intent='general' THEN 1 ELSE 0 END,
-    artifacts_created = user_daily_metrics.artifacts_created + CASE WHEN NEW.artifact_created THEN 1 ELSE 0 END,
-    good_feedback     = user_daily_metrics.good_feedback + CASE WHEN NEW.feedback='good' THEN 1 ELSE 0 END,
-    bad_feedback      = user_daily_metrics.bad_feedback + CASE WHEN NEW.feedback='bad' THEN 1 ELSE 0 END,
-    regenerations     = user_daily_metrics.regenerations + CASE WHEN NEW.was_regenerated THEN 1 ELSE 0 END;
-  RETURN NEW;
-END; $$;
-
-CREATE TRIGGER trg_query_log_daily_metrics AFTER INSERT ON public.user_query_log FOR EACH ROW EXECUTE FUNCTION update_daily_metrics();
-
--- User Stats aggregation from user_query_log
-CREATE OR REPLACE FUNCTION update_user_stats_on_query()
-RETURNS TRIGGER SECURITY DEFINER SET search_path = public LANGUAGE plpgsql AS $$
-BEGIN
-  UPDATE public.user_stats SET
-    total_messages           = COALESCE(total_messages,0) + 1,
-    monthly_messages         = COALESCE(monthly_messages,0) + 1,
-    tokens_estimated         = COALESCE(tokens_estimated,0) + COALESCE(NEW.total_tokens,0),
-    total_input_tokens       = COALESCE(total_input_tokens,0) + COALESCE(NEW.input_tokens,0),
-    total_output_tokens      = COALESCE(total_output_tokens,0) + COALESCE(NEW.output_tokens,0),
-    last_message_at          = NEW.created_at,
-    first_message_at         = COALESCE(first_message_at, NEW.created_at),
-    total_artifacts          = COALESCE(total_artifacts,0) + CASE WHEN NEW.artifact_created THEN 1 ELSE 0 END,
-    total_code_requests      = COALESCE(total_code_requests,0) + CASE WHEN NEW.intent='coding' THEN 1 ELSE 0 END,
-    total_live_requests      = COALESCE(total_live_requests,0) + CASE WHEN NEW.intent='live' THEN 1 ELSE 0 END,
-    total_reasoning_requests = COALESCE(total_reasoning_requests,0) + CASE WHEN NEW.intent='reasoning' THEN 1 ELSE 0 END,
-    model_usage = jsonb_set(
-      COALESCE(model_usage,'{}'::jsonb),
-      ARRAY[COALESCE(NEW.model_used,'unknown')],
-      to_jsonb(COALESCE((model_usage->>COALESCE(NEW.model_used,'unknown'))::int,0)+1)
-    )
-  WHERE user_id = NEW.user_id;
+  INSERT INTO public.model_token_summary (user_id, model, model_provider,
+    total_input_tokens, total_output_tokens, total_tokens, query_count, last_used_at)
+  VALUES (NEW.user_id, COALESCE(NEW.model_used,'unknown'), COALESCE(NEW.model_provider,'unknown'),
+    COALESCE(NEW.input_tokens,0), COALESCE(NEW.output_tokens,0), COALESCE(NEW.total_tokens,0), 1, NOW())
+  ON CONFLICT (user_id, model) DO UPDATE SET
+    total_input_tokens  = model_token_summary.total_input_tokens  + COALESCE(NEW.input_tokens,0),
+    total_output_tokens = model_token_summary.total_output_tokens + COALESCE(NEW.output_tokens,0),
+    total_tokens        = model_token_summary.total_tokens        + COALESCE(NEW.total_tokens,0),
+    query_count         = model_token_summary.query_count + 1,
+    error_count         = model_token_summary.error_count + CASE WHEN NEW.had_error THEN 1 ELSE 0 END,
+    last_used_at        = NOW();
 
   UPDATE public.profiles SET
-    total_tokens_lifetime = COALESCE(total_tokens_lifetime,0) + COALESCE(NEW.total_tokens,0)
-  WHERE id = NEW.user_id;
+    total_tokens_lifetime = COALESCE(total_tokens_lifetime,0) + COALESCE(NEW.total_tokens,0),
+    last_message_at       = NEW.created_at
+  WHERE id=NEW.user_id;
 
   RETURN NEW;
+EXCEPTION WHEN OTHERS THEN RAISE WARNING 'update_token_budget_on_query: %', SQLERRM; RETURN NEW;
 END; $$;
 
-CREATE TRIGGER trg_query_log_user_stats AFTER INSERT ON public.user_query_log FOR EACH ROW EXECUTE FUNCTION update_user_stats_on_query();
+DROP TRIGGER IF EXISTS trg_query_updates_tokens ON public.user_query_log;
+CREATE TRIGGER trg_query_updates_tokens
+  AFTER INSERT ON public.user_query_log
+  FOR EACH ROW EXECUTE FUNCTION update_token_budget_on_query();
 
+-- Daily metrics aggregation
+-- FIX: diagrams_created (not diagram_created), NULL fix in intent check
+CREATE OR REPLACE FUNCTION update_daily_metrics_on_query()
+RETURNS TRIGGER SECURITY DEFINER SET search_path=public LANGUAGE plpgsql AS $$
+DECLARE v_date DATE := DATE(NEW.created_at);
+BEGIN
+  INSERT INTO public.user_daily_metrics (user_id, date,
+    queries_made, input_tokens, output_tokens, total_tokens,
+    gemini_queries, claude_queries, openai_queries,
+    coding_queries, reasoning_queries, live_queries, general_queries,
+    artifacts_created, diagrams_created,
+    good_feedback, bad_feedback, regenerations, errors
+  ) VALUES (
+    NEW.user_id, v_date, 1,
+    COALESCE(NEW.input_tokens,0), COALESCE(NEW.output_tokens,0), COALESCE(NEW.total_tokens,0),
+    CASE WHEN NEW.model_provider='google'    OR NEW.model_used ILIKE '%gemini%' THEN 1 ELSE 0 END,
+    CASE WHEN NEW.model_provider='anthropic' OR NEW.model_used ILIKE '%claude%' THEN 1 ELSE 0 END,
+    CASE WHEN NEW.model_provider='openai'    OR NEW.model_used ILIKE '%gpt%'    THEN 1 ELSE 0 END,
+    CASE WHEN NEW.intent='coding'    THEN 1 ELSE 0 END,
+    CASE WHEN NEW.intent='reasoning' THEN 1 ELSE 0 END,
+    CASE WHEN NEW.intent='live'      THEN 1 ELSE 0 END,
+    -- FIX: NULL cannot be in IN() list — use explicit IS NULL check
+    CASE WHEN NEW.intent='general' OR NEW.intent IS NULL THEN 1 ELSE 0 END,
+    CASE WHEN NEW.artifact_created THEN 1 ELSE 0 END,
+    CASE WHEN NEW.diagram_created  THEN 1 ELSE 0 END,
+    CASE WHEN NEW.feedback='good'  THEN 1 ELSE 0 END,
+    CASE WHEN NEW.feedback='bad'   THEN 1 ELSE 0 END,
+    CASE WHEN NEW.was_regenerated  THEN 1 ELSE 0 END,
+    CASE WHEN NEW.had_error        THEN 1 ELSE 0 END
+  )
+  ON CONFLICT (user_id, date) DO UPDATE SET
+    queries_made      = user_daily_metrics.queries_made      + 1,
+    input_tokens      = user_daily_metrics.input_tokens      + COALESCE(NEW.input_tokens,0),
+    output_tokens     = user_daily_metrics.output_tokens     + COALESCE(NEW.output_tokens,0),
+    total_tokens      = user_daily_metrics.total_tokens      + COALESCE(NEW.total_tokens,0),
+    gemini_queries    = user_daily_metrics.gemini_queries    + CASE WHEN NEW.model_provider='google'    OR NEW.model_used ILIKE '%gemini%' THEN 1 ELSE 0 END,
+    claude_queries    = user_daily_metrics.claude_queries    + CASE WHEN NEW.model_provider='anthropic' OR NEW.model_used ILIKE '%claude%' THEN 1 ELSE 0 END,
+    openai_queries    = user_daily_metrics.openai_queries    + CASE WHEN NEW.model_provider='openai'    OR NEW.model_used ILIKE '%gpt%'    THEN 1 ELSE 0 END,
+    coding_queries    = user_daily_metrics.coding_queries    + CASE WHEN NEW.intent='coding'    THEN 1 ELSE 0 END,
+    reasoning_queries = user_daily_metrics.reasoning_queries + CASE WHEN NEW.intent='reasoning' THEN 1 ELSE 0 END,
+    live_queries      = user_daily_metrics.live_queries      + CASE WHEN NEW.intent='live'      THEN 1 ELSE 0 END,
+    general_queries   = user_daily_metrics.general_queries   + CASE WHEN NEW.intent='general' OR NEW.intent IS NULL THEN 1 ELSE 0 END,
+    artifacts_created = user_daily_metrics.artifacts_created + CASE WHEN NEW.artifact_created THEN 1 ELSE 0 END,
+    diagrams_created  = user_daily_metrics.diagrams_created  + CASE WHEN NEW.diagram_created  THEN 1 ELSE 0 END,
+    good_feedback     = user_daily_metrics.good_feedback     + CASE WHEN NEW.feedback='good'  THEN 1 ELSE 0 END,
+    bad_feedback      = user_daily_metrics.bad_feedback      + CASE WHEN NEW.feedback='bad'   THEN 1 ELSE 0 END,
+    regenerations     = user_daily_metrics.regenerations     + CASE WHEN NEW.was_regenerated  THEN 1 ELSE 0 END,
+    errors            = user_daily_metrics.errors            + CASE WHEN NEW.had_error        THEN 1 ELSE 0 END;
+
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN RAISE WARNING 'update_daily_metrics_on_query: %', SQLERRM; RETURN NEW;
+END; $$;
+
+DROP TRIGGER IF EXISTS trg_query_daily_metrics ON public.user_query_log;
+CREATE TRIGGER trg_query_daily_metrics
+  AFTER INSERT ON public.user_query_log
+  FOR EACH ROW EXECUTE FUNCTION update_daily_metrics_on_query();
+
+-- User stats update
+CREATE OR REPLACE FUNCTION update_user_stats_on_query()
+RETURNS TRIGGER SECURITY DEFINER SET search_path=public LANGUAGE plpgsql AS $$
+BEGIN
+  INSERT INTO public.user_stats (user_id, tier, total_messages, total_input_tokens,
+    total_output_tokens, last_message_at, first_message_at,
+    total_artifacts, total_code_requests, total_live_requests, total_reasoning_requests)
+  VALUES (NEW.user_id, 'free', 1,
+    COALESCE(NEW.input_tokens,0), COALESCE(NEW.output_tokens,0),
+    NEW.created_at, NEW.created_at,
+    CASE WHEN NEW.artifact_created THEN 1 ELSE 0 END,
+    CASE WHEN NEW.intent='coding'    THEN 1 ELSE 0 END,
+    CASE WHEN NEW.intent='live'      THEN 1 ELSE 0 END,
+    CASE WHEN NEW.intent='reasoning' THEN 1 ELSE 0 END)
+  ON CONFLICT (user_id) DO UPDATE SET
+    total_messages           = COALESCE(user_stats.total_messages,0)           + 1,
+    monthly_messages         = COALESCE(user_stats.monthly_messages,0)         + 1,
+    tokens_estimated         = COALESCE(user_stats.tokens_estimated,0)         + COALESCE(NEW.total_tokens,0),
+    total_input_tokens       = COALESCE(user_stats.total_input_tokens,0)       + COALESCE(NEW.input_tokens,0),
+    total_output_tokens      = COALESCE(user_stats.total_output_tokens,0)      + COALESCE(NEW.output_tokens,0),
+    last_message_at          = NEW.created_at,
+    first_message_at         = COALESCE(user_stats.first_message_at, NEW.created_at),
+    total_artifacts          = COALESCE(user_stats.total_artifacts,0)          + CASE WHEN NEW.artifact_created THEN 1 ELSE 0 END,
+    total_code_requests      = COALESCE(user_stats.total_code_requests,0)      + CASE WHEN NEW.intent='coding'    THEN 1 ELSE 0 END,
+    total_live_requests      = COALESCE(user_stats.total_live_requests,0)      + CASE WHEN NEW.intent='live'      THEN 1 ELSE 0 END,
+    total_reasoning_requests = COALESCE(user_stats.total_reasoning_requests,0) + CASE WHEN NEW.intent='reasoning' THEN 1 ELSE 0 END,
+    total_good_feedback      = COALESCE(user_stats.total_good_feedback,0)      + CASE WHEN NEW.feedback='good'    THEN 1 ELSE 0 END,
+    total_bad_feedback       = COALESCE(user_stats.total_bad_feedback,0)       + CASE WHEN NEW.feedback='bad'     THEN 1 ELSE 0 END,
+    model_usage = jsonb_set(
+      COALESCE(user_stats.model_usage,'{}'::jsonb),
+      ARRAY[COALESCE(NEW.model_used,'unknown')],
+      to_jsonb(COALESCE((user_stats.model_usage->>COALESCE(NEW.model_used,'unknown'))::int,0)+1)
+    );
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN RAISE WARNING 'update_user_stats_on_query: %', SQLERRM; RETURN NEW;
+END; $$;
+
+DROP TRIGGER IF EXISTS trg_query_user_stats ON public.user_query_log;
+CREATE TRIGGER trg_query_user_stats
+  AFTER INSERT ON public.user_query_log
+  FOR EACH ROW EXECUTE FUNCTION update_user_stats_on_query();
+
+-- Session end: update profile + compute duration
+CREATE OR REPLACE FUNCTION update_profile_on_session_end()
+RETURNS TRIGGER SECURITY DEFINER SET search_path=public LANGUAGE plpgsql AS $$
+BEGIN
+  IF OLD.is_active=true AND NEW.is_active=false AND NEW.ended_at IS NOT NULL THEN
+    NEW.duration_seconds := EXTRACT(EPOCH FROM (NEW.ended_at - OLD.started_at))::INTEGER;
+    UPDATE public.profiles SET
+      last_seen_at   = NEW.ended_at,
+      total_sessions = COALESCE(total_sessions,0) + 1
+    WHERE id=NEW.user_id;
+  END IF;
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN RAISE WARNING 'update_profile_on_session_end: %', SQLERRM; RETURN NEW;
+END; $$;
+
+DROP TRIGGER IF EXISTS trg_session_end ON public.user_sessions;
+CREATE TRIGGER trg_session_end
+  BEFORE UPDATE ON public.user_sessions
+  FOR EACH ROW EXECUTE FUNCTION update_profile_on_session_end();
+
+-- Artifact count on conversation
+CREATE OR REPLACE FUNCTION update_conversation_artifact_count()
+RETURNS TRIGGER SECURITY DEFINER SET search_path=public LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.session_id IS NOT NULL THEN
+    UPDATE public.conversations SET
+      artifact_count = COALESCE(artifact_count,0) + 1,
+      has_artifacts  = true,
+      has_code       = has_code OR (NEW.artifact_type IN ('code','react','html'))
+    WHERE id=NEW.session_id;
+  END IF;
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN RAISE WARNING 'update_conversation_artifact_count: %', SQLERRM; RETURN NEW;
+END; $$;
+
+DROP TRIGGER IF EXISTS trg_artifact_updates_conv ON public.generated_code;
+DROP TRIGGER IF EXISTS trg_diagram_updates_conv  ON public.generated_diagrams;
+CREATE TRIGGER trg_artifact_updates_conv AFTER INSERT ON public.generated_code     FOR EACH ROW EXECUTE FUNCTION update_conversation_artifact_count();
+CREATE TRIGGER trg_diagram_updates_conv  AFTER INSERT ON public.generated_diagrams FOR EACH ROW EXECUTE FUNCTION update_conversation_artifact_count();
 
 -- ════════════════════════════════════════════════════════════════════════════
--- 7. ADMIN VIEWS
+-- 15. INDEXES
 -- ════════════════════════════════════════════════════════════════════════════
 
-CREATE OR REPLACE VIEW public.admin_user_summary AS
+CREATE INDEX IF NOT EXISTS idx_profiles_email       ON public.profiles(email);
+CREATE INDEX IF NOT EXISTS idx_profiles_tier        ON public.profiles(tier);
+CREATE INDEX IF NOT EXISTS idx_profiles_admin       ON public.profiles(is_admin) WHERE is_admin=true;
+CREATE INDEX IF NOT EXISTS idx_profiles_seen        ON public.profiles(last_seen_at DESC NULLS LAST);
+
+CREATE INDEX IF NOT EXISTS idx_conv_user            ON public.conversations(user_id, last_modified DESC);
+CREATE INDEX IF NOT EXISTS idx_conv_favorite        ON public.conversations(user_id, is_favorite) WHERE is_favorite=true;
+CREATE INDEX IF NOT EXISTS idx_conv_training        ON public.conversations(approved_for_training) WHERE approved_for_training=true;
+
+CREATE INDEX IF NOT EXISTS idx_msg_conv_time        ON public.messages(conversation_id, timestamp);
+CREATE INDEX IF NOT EXISTS idx_msg_feedback         ON public.messages(feedback) WHERE feedback IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_msg_training         ON public.messages(approved_for_training) WHERE approved_for_training=true;
+CREATE INDEX IF NOT EXISTS idx_msg_model            ON public.messages(model);
+
+CREATE INDEX IF NOT EXISTS idx_art_user             ON public.artifacts(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_art_conv             ON public.artifacts(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_gencode_user         ON public.generated_code(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_gencode_session      ON public.generated_code(session_id);
+CREATE INDEX IF NOT EXISTS idx_gendiag_user         ON public.generated_diagrams(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_gendiag_session      ON public.generated_diagrams(session_id);
+CREATE INDEX IF NOT EXISTS idx_genimg_user          ON public.generated_images(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_genimg_session       ON public.generated_images(session_id);
+
+CREATE INDEX IF NOT EXISTS idx_files_user           ON public.file_uploads(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_files_type           ON public.file_uploads(file_type);
+CREATE INDEX IF NOT EXISTS idx_files_conv           ON public.file_uploads(conversation_id);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_active      ON public.user_sessions(user_id, is_active) WHERE is_active=true;
+CREATE INDEX IF NOT EXISTS idx_sessions_user        ON public.user_sessions(user_id, started_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_events_user          ON public.user_events(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_events_category      ON public.user_events(event_category, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_events_session       ON public.user_events(session_id);
+
+CREATE INDEX IF NOT EXISTS idx_qlog_user            ON public.user_query_log(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_qlog_model           ON public.user_query_log(model_used);
+CREATE INDEX IF NOT EXISTS idx_qlog_intent          ON public.user_query_log(intent);
+CREATE INDEX IF NOT EXISTS idx_qlog_training        ON public.user_query_log(approved_for_training) WHERE approved_for_training=true;
+CREATE INDEX IF NOT EXISTS idx_qlog_error           ON public.user_query_log(had_error) WHERE had_error=true;
+CREATE INDEX IF NOT EXISTS idx_qlog_date            ON public.user_query_log(created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_daily_user_date      ON public.user_daily_metrics(user_id, date DESC);
+CREATE INDEX IF NOT EXISTS idx_daily_date           ON public.user_daily_metrics(date DESC);
+CREATE INDEX IF NOT EXISTS idx_tokens_low           ON public.token_budgets(remaining_tokens) WHERE remaining_tokens < 10000;
+CREATE INDEX IF NOT EXISTS idx_memory_user          ON public.user_memory(user_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_memory_training      ON public.user_memory(approved_for_training) WHERE approved_for_training=true;
+CREATE INDEX IF NOT EXISTS idx_errors_critical      ON public.error_log(is_critical) WHERE is_critical=true;
+CREATE INDEX IF NOT EXISTS idx_errors_unresolved    ON public.error_log(is_resolved) WHERE is_resolved=false;
+CREATE INDEX IF NOT EXISTS idx_auth_events_user     ON public.user_auth_events(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_auth_events_type     ON public.user_auth_events(event_type);
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 16. ADMIN VIEWS
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- Master admin view: every user, all stats, token budget, live status
+CREATE OR REPLACE VIEW public.admin_user_overview AS
 SELECT
-  p.id                                                               AS user_id,
-  u.email                                                            AS email,
-  COALESCE(p.tier, 'free')                                           AS tier,
-  COALESCE(p.is_admin, false)                                        AS is_admin,
-  COALESCE(p.is_banned, false)                                       AS is_banned,
-  p.last_seen_at,
-  COALESCE(p.total_sessions, 0)                                      AS total_sessions,
-  COALESCE(p.total_tokens_lifetime, 0)                               AS total_tokens_lifetime,
-  p.timezone,  p.country,  p.city,  p.device_type,  p.browser,
-  COALESCE(p.signup_source, 'email')                                 AS signup_source,
-  u.created_at                                                       AS signup_at,
-  COALESCE(us.total_messages, 0)                                     AS total_messages,
-  COALESCE(us.monthly_messages, 0)                                   AS monthly_messages,
-  COALESCE(us.total_input_tokens, 0)                                 AS total_input_tokens,
-  COALESCE(us.total_output_tokens, 0)                                AS total_output_tokens,
-  COALESCE(us.total_input_tokens,0)+COALESCE(us.total_output_tokens,0) AS lifetime_tokens,
-  COALESCE(us.avg_session_minutes, 0)                                AS avg_session_minutes,
-  us.favorite_model,
-  COALESCE(us.total_artifacts, 0)                                    AS total_artifacts,
-  COALESCE(us.total_code_requests, 0)                                AS total_code_requests,
-  COALESCE(us.total_live_requests, 0)                                AS total_live_requests,
-  COALESCE(us.total_reasoning_requests, 0)                           AS total_reasoning_requests,
-  us.first_message_at,  us.last_message_at,
-  COALESCE(us.streak_days, 0)                                        AS streak_days,
-  (SELECT COUNT(*) FROM public.user_sessions s WHERE s.user_id = p.id AND s.is_active = true) AS active_sessions,
-  COALESCE((SELECT dm.queries_made FROM public.user_daily_metrics dm WHERE dm.user_id = p.id AND dm.date = CURRENT_DATE LIMIT 1), 0) AS queries_today,
-  COALESCE((SELECT dm.total_tokens FROM public.user_daily_metrics dm WHERE dm.user_id = p.id AND dm.date = CURRENT_DATE LIMIT 1), 0) AS tokens_today
-FROM public.profiles p
-JOIN auth.users u ON u.id = p.id
-LEFT JOIN public.user_stats us ON us.user_id = p.id;
+  p.id AS user_id, u.email,
+  p.full_name, p.display_name, p.avatar_url,
+  p.tier, p.is_admin, p.is_banned, p.ban_reason,
+  p.country, p.city, p.timezone, p.device_type, p.browser, p.os,
+  p.signup_source, p.referrer,
+  u.created_at AS signup_at, u.email_confirmed_at AS email_verified_at,
+  p.last_seen_at, p.last_login_at, p.last_message_at,
+  p.total_sessions, p.total_logins, p.total_tokens_lifetime,
+  p.personification, p.preferred_model, p.admin_notes,
 
+  -- Token budget (edit these in Table Editor)
+  tb.total_token_limit, tb.remaining_tokens, tb.is_unlimited,
+  tb.tokens_used_today, tb.tokens_used_month, tb.tokens_used_total,
+
+  -- Usage stats
+  COALESCE(us.total_messages,0)           AS total_messages,
+  COALESCE(us.monthly_messages,0)         AS monthly_messages,
+  COALESCE(us.total_conversations,0)      AS total_conversations,
+  COALESCE(us.total_artifacts,0)          AS total_artifacts,
+  COALESCE(us.total_input_tokens,0)       AS total_input_tokens,
+  COALESCE(us.total_output_tokens,0)      AS total_output_tokens,
+  COALESCE(us.total_code_requests,0)      AS total_code_requests,
+  COALESCE(us.total_live_requests,0)      AS total_live_requests,
+  COALESCE(us.total_reasoning_requests,0) AS total_reasoning_requests,
+  COALESCE(us.total_good_feedback,0)      AS total_good_feedback,
+  COALESCE(us.total_bad_feedback,0)       AS total_bad_feedback,
+  us.favorite_model, us.first_message_at,
+
+  -- Today from aggregated table (no query_log scan)
+  COALESCE(dm.queries_made,0)     AS queries_today,
+  COALESCE(dm.total_tokens,0)     AS tokens_today,
+  COALESCE(dm.artifacts_created,0) AS artifacts_today,
+
+  -- Per-model breakdown
+  mts.model_breakdown,
+
+  -- Live status
+  EXISTS (SELECT 1 FROM public.user_sessions s WHERE s.user_id=p.id AND s.is_active=true) AS is_online,
+
+  -- File count
+  (SELECT COUNT(*) FROM public.file_uploads f WHERE f.user_id=p.id AND NOT f.is_deleted) AS total_files,
+
+  -- Memory count
+  (SELECT COUNT(*) FROM public.user_memory m WHERE m.user_id=p.id AND m.is_active=true) AS memory_count
+
+FROM public.profiles p
+JOIN auth.users u ON u.id=p.id
+LEFT JOIN public.user_stats us ON us.user_id=p.id
+LEFT JOIN public.token_budgets tb ON tb.user_id=p.id
+LEFT JOIN public.user_daily_metrics dm ON dm.user_id=p.id AND dm.date=CURRENT_DATE
+LEFT JOIN (
+  SELECT user_id,
+    jsonb_object_agg(model, total_tokens ORDER BY total_tokens DESC) AS model_breakdown
+  FROM public.model_token_summary
+  GROUP BY user_id
+) mts ON mts.user_id=p.id
+ORDER BY p.last_seen_at DESC NULLS LAST;
+
+COMMENT ON VIEW public.admin_user_overview IS
+'Complete user view for admin dashboard. model_breakdown shows per-model token totals.
+Edit token_budgets table directly to change user limits.';
+
+-- Platform daily stats
 CREATE OR REPLACE VIEW public.admin_platform_daily AS
 SELECT
-  date,
-  COUNT(DISTINCT user_id)              AS active_users,
-  SUM(queries_made)                    AS total_queries,
-  SUM(total_tokens)                    AS total_tokens,
-  SUM(input_tokens)                    AS total_input_tokens,
-  SUM(output_tokens)                   AS total_output_tokens,
-  SUM(sessions_count)                  AS total_sessions,
-  SUM(active_minutes)                  AS total_active_minutes,
-  SUM(gemini_queries)                  AS gemini_queries,
-  SUM(claude_queries)                  AS claude_queries,
-  SUM(openai_queries)                  AS openai_queries,
-  SUM(coding_queries)                  AS coding_queries,
-  SUM(reasoning_queries)               AS reasoning_queries,
-  SUM(live_queries)                    AS live_queries,
-  SUM(general_queries)                 AS general_queries,
-  SUM(artifacts_created)               AS artifacts_created,
-  SUM(good_feedback)                   AS good_feedback,
-  SUM(bad_feedback)                    AS bad_feedback,
-  SUM(regenerations)                   AS regenerations,
-  ROUND(AVG(queries_made)::NUMERIC, 2) AS avg_queries_per_user
-FROM public.user_daily_metrics
-GROUP BY date ORDER BY date DESC;
+  dm.date,
+  COUNT(DISTINCT dm.user_id)         AS active_users,
+  SUM(dm.queries_made)               AS total_queries,
+  SUM(dm.total_tokens)               AS total_tokens,
+  SUM(dm.sessions_count)             AS sessions,
+  SUM(dm.gemini_queries)             AS gemini,
+  SUM(dm.claude_queries)             AS claude,
+  SUM(dm.openai_queries)             AS openai,
+  SUM(dm.coding_queries)             AS coding,
+  SUM(dm.reasoning_queries)          AS reasoning,
+  SUM(dm.live_queries)               AS live,
+  SUM(dm.general_queries)            AS general,
+  SUM(dm.artifacts_created)          AS artifacts,
+  SUM(dm.diagrams_created)           AS diagrams,
+  SUM(dm.good_feedback)              AS good_feedback,
+  SUM(dm.bad_feedback)               AS bad_feedback,
+  SUM(dm.errors)                     AS errors,
+  COALESCE(pd.new_signups,0)         AS new_signups,
+  ROUND(AVG(dm.queries_made)::NUMERIC,2) AS avg_per_user
+FROM public.user_daily_metrics dm
+LEFT JOIN public.platform_daily pd ON pd.date=dm.date
+GROUP BY dm.date, pd.new_signups
+ORDER BY dm.date DESC;
 
-CREATE OR REPLACE VIEW public.admin_user_queries AS
-SELECT
-  ql.id, ql.user_id,
-  u.email,
-  ql.session_id, ql.conversation_id,
-  c.title                                                       AS conversation_title,
-  ql.prompt_text, COALESCE(ql.prompt_length, LENGTH(ql.prompt_text)) AS prompt_length,
-  ql.response_text, COALESCE(ql.response_length, LENGTH(COALESCE(ql.response_text,''))) AS response_length,
-  ql.intent, ql.agent_type, ql.model_used, ql.engine,
-  COALESCE(ql.input_tokens,0)         AS input_tokens,
-  COALESCE(ql.output_tokens,0)        AS output_tokens,
-  COALESCE(ql.total_tokens,0)         AS total_tokens,
-  COALESCE(ql.response_time_ms,0)     AS response_time_ms,
-  COALESCE(ql.has_image,false)        AS has_image,
-  COALESCE(ql.has_documents,false)    AS has_documents,
-  COALESCE(ql.has_codebase_ref,false) AS has_codebase_ref,
-  COALESCE(ql.artifact_created,false) AS artifact_created,
-  ql.confidence_level, ql.feedback,
-  COALESCE(ql.was_regenerated,false)  AS was_regenerated,
-  COALESCE(ql.was_edited,false)       AS was_edited,
-  ql.slash_command,
-  COALESCE(ql.had_error,false)        AS had_error,
-  ql.error_type, ql.created_at
+-- Training data export
+CREATE OR REPLACE VIEW public.admin_training_data AS
+SELECT 'query'::TEXT AS data_type,
+  ql.id::TEXT, ql.user_id,
+  ql.prompt_text AS input, m.content AS output,
+  ql.intent, ql.model_used, ql.feedback, ql.created_at
 FROM public.user_query_log ql
-JOIN auth.users u ON u.id = ql.user_id
-LEFT JOIN public.conversations c ON c.id = ql.conversation_id
-ORDER BY ql.created_at DESC;
+LEFT JOIN public.messages m ON m.id=ql.message_id AND m.role='assistant'
+WHERE ql.approved_for_training=true AND (m.approved_for_training=true OR m.id IS NULL)
+UNION ALL
+SELECT 'memory'::TEXT, um.id::TEXT, um.user_id,
+  um.memory_type, um.content, NULL, NULL, NULL, um.created_at
+FROM public.user_memory um
+WHERE um.approved_for_training=true
+ORDER BY created_at DESC;
 
-CREATE OR REPLACE VIEW public.admin_user_sessions AS
-SELECT
-  s.id, s.user_id,
-  u.email,
-  s.started_at, s.ended_at,
-  CASE WHEN s.ended_at IS NOT NULL THEN ROUND(EXTRACT(EPOCH FROM (s.ended_at - s.started_at))::NUMERIC / 60, 1)
-       ELSE ROUND(EXTRACT(EPOCH FROM (NOW() - s.started_at))::NUMERIC / 60, 1) END AS duration_minutes,
-  s.is_active, s.device_type, s.browser, s.os, s.ip_address,
-  s.timezone, s.country, s.city,
-  COALESCE(s.messages_sent,0)      AS messages_sent,
-  COALESCE(s.tokens_used,0)        AS tokens_used,
-  COALESCE(s.artifacts_created,0)  AS artifacts_created,
-  s.ended_reason
-FROM public.user_sessions s
-JOIN auth.users u ON u.id = s.user_id
-ORDER BY s.started_at DESC;
+COMMENT ON VIEW public.admin_training_data IS
+'All approved training rows. Export as CSV: Supabase → Table Editor → admin_training_data → Export.';
 
 -- ════════════════════════════════════════════════════════════════════════════
--- 8. INDEXES & GRANTS
+-- 17. GRANTS
 -- ════════════════════════════════════════════════════════════════════════════
-
-CREATE INDEX idx_conversations_user ON public.conversations(user_id);
-CREATE INDEX idx_messages_conversation ON public.messages(conversation_id);
-CREATE INDEX idx_artifacts_user ON public.artifacts(user_id);
-CREATE INDEX idx_artifacts_session ON public.artifacts(session_id);
-CREATE INDEX idx_artifacts_user_created ON public.artifacts(user_id, created_at DESC);
-CREATE INDEX idx_artifacts_session_created ON public.artifacts(session_id, created_at DESC);
-
-CREATE INDEX idx_genimg_user_created ON public.generated_images(user_id, created_at DESC);
-CREATE INDEX idx_gendiag_user_created ON public.generated_diagrams(user_id, created_at DESC);
-CREATE INDEX idx_gencode_user_created ON public.generated_code(user_id, created_at DESC);
-CREATE INDEX idx_genimg_session ON public.generated_images(session_id);
-CREATE INDEX idx_gendiag_session ON public.generated_diagrams(session_id);
-CREATE INDEX idx_gencode_session ON public.generated_code(session_id);
-CREATE INDEX idx_user_sessions_user_active ON public.user_sessions(user_id, is_active) WHERE is_active = true;
-CREATE INDEX idx_user_events_user_created ON public.user_events(user_id, created_at DESC);
-CREATE INDEX idx_query_log_user_created ON public.user_query_log(user_id, created_at DESC);
-CREATE INDEX idx_file_uploads_user ON public.file_uploads(user_id);
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES    IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
-
--- Make yourself admin if the email exists already
-UPDATE public.profiles SET is_admin = true, tier = 'unlimited' WHERE email = 'unicorntales2@gmail.com';
-UPDATE public.user_stats SET tier = 'unlimited', subscription_status = 'admin', tokens_remaining = 999999999 WHERE user_id IN (SELECT id FROM public.profiles WHERE email = 'unicorntales2@gmail.com');
+GRANT ALL ON ALL ROUTINES  IN SCHEMA public TO anon, authenticated, service_role;
 
 COMMIT;
 
+-- ════════════════════════════════════════════════════════════════════════════
+-- 18. ADMIN SETUP (run immediately after COMMIT)
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- Sync any auth users without profiles (handles existing users after schema drop)
+INSERT INTO public.profiles (id, email, tier, is_admin)
+SELECT u.id, u.email, 'free', false
+FROM auth.users u
+LEFT JOIN public.profiles p ON p.id=u.id
+WHERE p.id IS NULL
+ON CONFLICT (id) DO UPDATE SET email=EXCLUDED.email;
+
+INSERT INTO public.user_stats (user_id, tier)
+SELECT p.id, p.tier FROM public.profiles p
+LEFT JOIN public.user_stats s ON s.user_id=p.id
+WHERE s.user_id IS NULL
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.token_budgets (user_id, total_token_limit, remaining_tokens)
+SELECT p.id, 100000, 100000 FROM public.profiles p
+LEFT JOIN public.token_budgets t ON t.user_id=p.id
+WHERE t.user_id IS NULL
+ON CONFLICT DO NOTHING;
+
+-- YOUR admin accounts (both emails covered)
+UPDATE public.profiles
+SET is_admin=true, tier='admin'
+WHERE email IN ('siddheshrandhir007@gmail.com', 'unicorntales2@gmail.com');
+
+UPDATE public.token_budgets SET
+  total_token_limit=999999999, remaining_tokens=999999999,
+  is_unlimited=true, enforce_limit=false
+WHERE user_id IN (
+  SELECT id FROM public.profiles
+  WHERE email IN ('siddheshrandhir007@gmail.com','unicorntales2@gmail.com')
+);
+
+UPDATE public.user_stats SET tier='admin'
+WHERE user_id IN (
+  SELECT id FROM public.profiles
+  WHERE email IN ('siddheshrandhir007@gmail.com','unicorntales2@gmail.com')
+);
+
+-- Final verification
+SELECT check_type, count FROM (
+  SELECT 'Tables'   AS check_type, COUNT(*)::TEXT AS count FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'
+  UNION ALL
+  SELECT 'Views',    COUNT(*)::TEXT FROM information_schema.views WHERE table_schema='public'
+  UNION ALL
+  SELECT 'Triggers', COUNT(*)::TEXT FROM information_schema.triggers WHERE trigger_schema='public'
+  UNION ALL
+  SELECT 'Indexes',  COUNT(*)::TEXT FROM pg_indexes WHERE schemaname='public'
+  UNION ALL
+  SELECT 'Buckets',  COUNT(*)::TEXT FROM storage.buckets WHERE id LIKE 'sedrex-%'
+) v;
 
 ================================================================================
 FILE: tailwind.config.js

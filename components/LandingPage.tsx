@@ -6,14 +6,14 @@ import './LandingPage.css';
 type Props = { onOpenAuth: () => void };
 
 const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
-  const [theme, setTheme]                     = useState<'light' | 'dark'>('dark');
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
-  const [activeWord, setActiveWord]           = useState(0);
-  const [typedText, setTypedText]             = useState('');
-  const [isTyping, setIsTyping]               = useState(true);
-  const [currentPrompt, setCurrentPrompt]     = useState(0);
+  const [activeWord, setActiveWord] = useState(0);
+  const [typedText, setTypedText] = useState('');
+  const [isTyping, setIsTyping] = useState(true);
+  const [currentPrompt, setCurrentPrompt] = useState(0);
 
-  const rotatingWords    = ['verify.', 'trust.', 'confirm.', 'know.'];
+  const rotatingWords = ['verify.', 'trust.', 'confirm.', 'know.'];
   const typewriterPrompts = [
     'Is this news article actually accurate?',
     'Verify this scientific claim for me',
@@ -21,7 +21,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
     'What are reliable sources on this?',
   ];
   const routeLabels = ['Verification', 'Research', 'Analysis', 'Fact-check'];
-  const routeIcons  = ['✓', '🔍', '📊', '⚡'];
+  const routeIcons = ['✓', '🔍', '📊', '⚡'];
 
   // ── Theme init ─────────────────────────────────────────────────
   useEffect(() => {
@@ -177,7 +177,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
               <a href="#how-it-works" className="btn btn-ghost">
                 See how it works
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="btn-chevron">
-                  <path d="M7 13l5 5 5-5M7 6l5 5 5-5"/>
+                  <path d="M7 13l5 5 5-5M7 6l5 5 5-5" />
                 </svg>
               </a>
             </div>
@@ -251,7 +251,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
             {[
               { num: '01', icon: '💬', title: 'You ask anything', desc: 'Type a question, paste a claim, or share a document. SEDREX understands context instantly.' },
               { num: '02', icon: '🔗', title: 'SEDREX connects sources', desc: 'Cross-references multiple information sources in parallel, building an evidence chain in real time.' },
-              { num: '03', icon: '✓',  title: 'Verified answer delivered', desc: 'You get a structured, confidence-scored, source-backed answer. No guessing, no hallucination.' },
+              { num: '03', icon: '✓', title: 'Verified answer delivered', desc: 'You get a structured, confidence-scored, source-backed answer. No guessing, no hallucination.' },
             ].map((step, i) => (
               <div key={step.num} className={`step-card ${vis('how-it-works') ? 'visible' : ''}`}
                 style={{ transitionDelay: `${i * 100}ms` }}>
@@ -300,7 +300,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
         <div className={`section-inner ${vis('why-sedrex') ? 'visible' : ''}`}>
           <div className="section-header">
             <span className="section-tag">The problem</span>
-            <h2 className="section-title">AI that guesses is dangerous.<br/>SEDREX verifies.</h2>
+            <h2 className="section-title">AI that guesses is dangerous.<br />SEDREX verifies.</h2>
           </div>
           <div className="pain-grid">
             <div className={`pain-card ${vis('why-sedrex') ? 'visible' : ''}`}>
