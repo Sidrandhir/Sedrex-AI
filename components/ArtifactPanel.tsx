@@ -104,24 +104,117 @@ function buildSrcdoc(artifact: Artifact): string {
     return `<!DOCTYPE html><html><head><meta charset="UTF-8">${base}<style>body{display:flex;align-items:center;justify-content:center;padding:20px;background:#fff;min-height:100vh}</style></head><body>${content}</body></html>`;
   }
 
-  // JSX/TSX — Babel
+  // JSX/TSX — Babel (FIXED: was crashing all React previews due to duplicate const Root=)
   if (lang === 'jsx' || lang === 'tsx') {
+    // Strip TypeScript-only constructs and import/export for browser execution
     const clean = content
-      .replace(/^export\s+default\s+(\w+)\s*;?\s*$/gm, '/* $1 */')
+      .replace(/^export\s+default\s+(\w+)\s*;?\s*$/gm, '/* exported: $1 */')
       .replace(/^export\s+default\s+/gm, '')
       .replace(/^export\s+(const|let|var|function|class)\s+/gm, '$1 ')
       .replace(/^export\s*\{[^}]*\}\s*;?\s*$/gm, '')
       .replace(/^import\s+type\s+.*$/gm, '')
       .replace(/^import\s+.*from\s+['"][^'"]+['"]\s*;?\s*$/gm, '')
       .replace(/^import\s+['"][^'"]+['"]\s*;?\s*$/gm, '');
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank"/><script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script><script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script><script>try{localStorage.setItem('sx','1');localStorage.removeItem('sx');}catch(e){Object.defineProperty(window,'localStorage',{value:{_d:{},setItem(k,v){this._d[k]=v},getItem(k){return this._d[k]??null},removeItem(k){delete this._d[k]},clear(){this._d={}}}});}</script><script src="https://unpkg.com/@babel/standalone/babel.min.js"></script><script src="https://cdn.tailwindcss.com"></script>${base}<style>body{padding:16px}</style></head><body><div id="root"></div><script>window.onerror=function(m){document.body.innerHTML='<div class="sx-err">'+m+'</div>';};</script><script type="text/babel">try{const {useState,useEffect,useRef,useCallback,useMemo,useReducer,useContext,createContext,Fragment,memo}=React;${clean}const Root=const _names=Object.keys(window).filter(n=>/^[A-Z]/.test(n)&&typeof window[n]==='function');const _pref=['App','Component','Dashboard','Page','Main','Home','Index','Root','Portfolio','Landing','Layout','Screen','View','Widget','Hero','Profile','Showcase'];const Root=_pref.find(n=>typeof window[n]==='function')&&window[_pref.find(n=>typeof window[n]==='function')]||(_names.length?window[_names[0]]:null);if(Root){ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Root));}else{document.getElementById('root').innerHTML='<div class=\"sx-err\">No root component found.\\nSedrex tried: App, Component, Dashboard, Page, and any exported component.</div>';}}</script></body></html>`;
+
+    // Component name extractor — runs AFTER babel transpiles the clean code
+    // CRITICAL FIX: The old code had `${clean}const Root=const _names=` which is
+    // a JavaScript syntax error causing every React preview to silently crash.
+    // Fix: use a separate script tag for the root-finder so it runs after Babel.
+    const rootFinderScript = `
+const _pref=['App','Component','Dashboard','Page','Main','Home','Index','Root',
+  'Portfolio','Landing','Layout','Screen','View','Widget','Hero','Profile','Showcase',
+  'Form','Modal','Card','Table','List','Grid','Chart','Map','Player','Editor'];
+const _names=Object.keys(window).filter(n=>/^[A-Z]/.test(n)&&typeof window[n]==='function'&&window[n].toString().includes('return'));
+const _Root=_pref.map(n=>window[n]).find(Boolean)||(_names.length?window[_names[0]]:null);
+if(_Root){
+  try{ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(_Root));}
+  catch(e){document.getElementById('root').innerHTML='<div class="sx-err">Render error: '+e.message+'</div>';}
+}else{
+  document.getElementById('root').innerHTML='<div class="sx-err" style="padding:20px"><strong>No component found to render.</strong><br/><br/>Sedrex looked for: App, Component, Dashboard, Page, Layout, and more.<br/><br/>Make sure your component function starts with a capital letter.</div>';
+}`;
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<base target="_blank"/>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script>
+// Safe localStorage shim for sandboxed iframes
+try{localStorage.setItem('_sx','1');localStorage.removeItem('_sx');}
+catch(e){Object.defineProperty(window,'localStorage',{value:{_d:{},setItem(k,v){this._d[k]=v},getItem(k){return this._d[k]??null},removeItem(k){delete this._d[k]},clear(){this._d={}}}});}
+</script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+${base}
+<style>
+body{padding:16px}
+.sx-loading{display:flex;align-items:center;justify-content:center;height:60px;color:rgba(16,185,129,.7);font-family:monospace;font-size:13px;gap:8px}
+</style>
+</head>
+<body>
+<div id="root"><div class="sx-loading">⚡ Rendering component…</div></div>
+<script>
+// Global error handler — shows friendly error instead of blank screen
+window.onerror=function(msg,src,line,col,err){
+  document.getElementById('root').innerHTML=
+    '<div class="sx-err"><strong>Runtime Error</strong><br/>'+msg+
+    (err&&err.stack?'<br/><br/><small style="opacity:.6">'+err.stack.split('\\n').slice(0,3).join('<br/>')+'</small>':'')+'</div>';
+  return true;
+};
+window.addEventListener('unhandledrejection',function(e){
+  document.getElementById('root').innerHTML=
+    '<div class="sx-err"><strong>Promise Rejected</strong><br/>'+(e.reason?.message||String(e.reason))+'</div>';
+});
+</script>
+<script type="text/babel" data-presets="react,typescript">
+try {
+  // React hooks destructuring — available globally
+  const {
+    useState, useEffect, useRef, useCallback, useMemo,
+    useReducer, useContext, createContext, Fragment, memo,
+    forwardRef, useImperativeHandle, useLayoutEffect,
+    useDebugValue, useId, useTransition, useDeferredValue,
+  } = React;
+
+  // User code (imports removed, exports flattened)
+  ${clean}
+
+} catch(compileErr) {
+  document.getElementById('root').innerHTML=
+    '<div class="sx-err"><strong>Compile Error</strong><br/>'+compileErr.message+'</div>';
+}
+</script>
+<script>
+// Root component finder — runs AFTER Babel compiles the component
+// IMPORTANT: This is separate from the Babel script to avoid the
+// "const Root=const _names=" syntax error that was crashing all previews
+${rootFinderScript}
+</script>
+</body>
+</html>`;
   }
 
-  // JavaScript / TypeScript
+  // JavaScript / TypeScript — console output sandbox
   if (['javascript', 'js', 'typescript', 'ts'].includes(lang)) {
-    const jsCode = (lang === 'typescript' || lang === 'ts')
-      ? content.replace(/^import\s+type\s+.*$/gm, '').replace(/^import\s+.*from\s+['"][^'"]+['"]\s*;?$/gm, '').replace(/^export\s+/gm, '').replace(/:\s*(string|number|boolean|void|any|unknown|never|object|null|undefined)(\[\])?/g, '').replace(/^(interface|type)\s+\w[\s\S]*?\n\}/gm, '').replace(/<[A-Z][A-Za-z]*>/g, '')
-      : content.replace(/^import\s+.*from\s+['"][^'"]+['"]\s*;?$/gm, '').replace(/^export\s+/gm, '');
+    const isTS = lang === 'typescript' || lang === 'ts';
+    // Strip TypeScript-only syntax for browser eval
+    const jsCode = isTS
+      ? content
+          .replace(/^import\s+type\s+.*$/gm, '')
+          .replace(/^import\s+.*from\s+['"][^'"]+['"]\s*;?$/gm, '')
+          .replace(/^export\s+default\s+/gm, 'window._defaultExport = ')
+          .replace(/^export\s+/gm, '')
+          .replace(/:\s*(string|number|boolean|void|any|unknown|never|object|null|undefined|bigint)(\[\]|\s*\|\s*null|\s*\|\s*undefined)*/g, '')
+          .replace(/^(interface|type)\s+\w[^{]*\{[\s\S]*?\n\}/gm, '')
+          .replace(/<[A-Z][A-Za-z0-9]*(?:\s*,\s*[A-Z][A-Za-z0-9]*)*>/g, '')
+          .replace(/as\s+\w[\w.<>|&\[\]]*(?=[\s;,)\]])/g, '')
+      : content
+          .replace(/^import\s+.*from\s+['"][^'"]+['"]\s*;?$/gm, '')
+          .replace(/^export\s+default\s+/gm, 'window._defaultExport = ')
+          .replace(/^export\s+/gm, '');
     return `<!DOCTYPE html><html><head><meta charset="UTF-8">${base}</head><body><div class="sx-label">${lang === 'typescript' || lang === 'ts' ? 'TypeScript' : 'JavaScript'} Output</div><div class="sx-out" id="out"></div><script>const _out=document.getElementById('out');const _w=(type,...a)=>{const d=document.createElement('div');d.style.color=type==='error'?'#f87171':type==='warn'?'#fbbf24':'#e4e8f0';d.textContent=a.map(x=>typeof x==='object'?JSON.stringify(x,null,2):String(x)).join(' ');_out.appendChild(d);};const console={log:(...a)=>_w('log',...a),error:(...a)=>_w('error',...a),warn:(...a)=>_w('warn',...a),info:(...a)=>_w('log',...a),table:(d)=>_w('log',JSON.stringify(d,null,2)),dir:(d)=>_w('log',JSON.stringify(d,null,2))};window.onerror=function(m,s,l,c,e){_w('error','Error: '+m+(e&&e.stack?'\\n'+e.stack.split('\\n').slice(0,3).join('\\n'):''));return true;};try{${jsCode}}catch(e){_w('error',e.message+(e.stack?'\\n'+e.stack.split('\\n').slice(0,4).join('\\n'):''));}if(!_out.children.length){const d=document.createElement('div');d.style.color='rgba(255,255,255,.3)';d.style.fontStyle='italic';d.textContent='No console output';_out.appendChild(d);}</script></body></html>`;
   }
 
@@ -152,17 +245,17 @@ function buildSrcdoc(artifact: Artifact): string {
   if (lang === 'sql') {
     const ss = JSON.stringify(content);
     const kk = JSON.stringify(['SELECT', 'FROM', 'WHERE', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'FULL', 'ON', 'GROUP', 'ORDER', 'BY', 'HAVING', 'LIMIT', 'OFFSET', 'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE', 'CREATE', 'TABLE', 'ALTER', 'DROP', 'INDEX', 'VIEW', 'WITH', 'AS', 'AND', 'OR', 'NOT', 'IN', 'LIKE', 'ILIKE', 'BETWEEN', 'IS', 'NULL', 'DISTINCT', 'COUNT', 'SUM', 'AVG', 'MAX', 'MIN', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'BEGIN', 'COMMIT', 'ROLLBACK', 'RETURNING', 'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES', 'UNIQUE', 'DEFAULT', 'CONSTRAINT', 'IF', 'EXISTS']);
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8">${base}<style>body{padding:16px}.note{color:rgba(16,185,129,.7);font-size:11px;margin-bottom:10px;font-family:monospace}pre{background:#0d1117;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:20px;font-family:'Fira Code',monospace;font-size:13px;line-height:1.65;overflow:auto;color:#e4e8f0}.kw{color:#10B981;font-weight:700}.str{color:#98c379}.cmt{color:#6b7280;font-style:italic}.num{color:#79c0ff}</style></head><body><div class="note">📝 SQL — syntax display only (no database connection)</div><pre id="sql"></pre><script>const sql=${ss};const kws=${kk};let h=sql.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');h=h.replace(/'[^']*'/g,m=>'<span class="str">'+m+'</span>');h=h.replace(/--[^\\n]*/g,m=>'<span class="cmt">'+m+'</span>');h=h.replace(/\\b(\\d+(\\.\\d+)?)\\b/g,'<span class="num">$1</span>');const re=new RegExp('\\\\b('+kws.join('|')+')\\\\b','gi');h=h.replace(re,m=>'<span class="kw">'+m.toUpperCase()+'</span>');document.getElementById('sql').innerHTML=h;</script></body></html>`;
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8">${base}<style>body{padding:16px}.note{color:rgba(16,185,129,.7);font-size:11px;margin-bottom:10px;font-family:monospace}pre{background:#0d1117;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:20px;font-family:'Fira Code',monospace;font-size:13px;line-height:1.65;overflow:auto;color:#e4e8f0}.kw{color:#c9a84c;font-weight:700}.str{color:#98c379}.cmt{color:#6b7280;font-style:italic}.num{color:#79c0ff}</style></head><body><div class="note">📝 SQL — syntax display only (no database connection)</div><pre id="sql"></pre><script>const sql=${ss};const kws=${kk};let h=sql.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');h=h.replace(/'[^']*'/g,m=>'<span class="str">'+m+'</span>');h=h.replace(/--[^\\n]*/g,m=>'<span class="cmt">'+m+'</span>');h=h.replace(/\\b(\\d+(\\.\\d+)?)\\b/g,'<span class="num">$1</span>');const re=new RegExp('\\\\b('+kws.join('|')+')\\\\b','gi');h=h.replace(re,m=>'<span class="kw">'+m.toUpperCase()+'</span>');document.getElementById('sql').innerHTML=h;</script></body></html>`;
   }
 
   // Bash/Shell
   if (lang === 'bash' || lang === 'sh' || lang === 'shell') {
     const ls = JSON.stringify(content.split('\n'));
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8">${base}<style>body{padding:0;background:#0d1117}.terminal{background:#0d1117;border:1px solid rgba(255,255,255,.08);border-radius:8px;margin:16px;overflow:hidden}.term-bar{background:#1c1c1c;padding:10px 16px;display:flex;gap:6px;align-items:center}.dot{width:12px;height:12px;border-radius:50%}.term-body{padding:16px;font-family:'Fira Code',monospace;font-size:13px;line-height:1.7}.prompt{color:#10B981}.cmd{color:#e4e8f0}.cmt{color:#6b7280;font-style:italic}.note{color:rgba(255,255,255,.3);font-size:11px;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06)}</style></head><body><div class="terminal"><div class="term-bar"><div class="dot" style="background:#ef4444"></div><div class="dot" style="background:#f59e0b"></div><div class="dot" style="background:#10B981"></div></div><div class="term-body" id="out"></div></div><script>const lines=${ls};const out=document.getElementById('out');lines.forEach(line=>{const d=document.createElement('div');if(!line.trim()){d.innerHTML='&nbsp;';out.appendChild(d);return;}if(line.trim().startsWith('#')){d.innerHTML='<span class="cmt">'+line.replace(/</g,'&lt;')+'</span>';}else{d.innerHTML='<span class="prompt">$ </span><span class="cmd">'+line.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</span>';}out.appendChild(d);});const n=document.createElement('div');n.className='note';n.textContent='Shell preview is read-only. Run in your terminal to execute.';out.appendChild(n);</script></body></html>`;
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8">${base}<style>body{padding:0;background:#0d1117}.terminal{background:#0d1117;border:1px solid rgba(255,255,255,.08);border-radius:8px;margin:16px;overflow:hidden}.term-bar{background:#1c1c1c;padding:10px 16px;display:flex;gap:6px;align-items:center}.dot{width:12px;height:12px;border-radius:50%}.term-body{padding:16px;font-family:'Fira Code',monospace;font-size:13px;line-height:1.7}.prompt{color:#c9a84c}.cmd{color:#e4e8f0}.cmt{color:#6b7280;font-style:italic}.note{color:rgba(255,255,255,.3);font-size:11px;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06)}</style></head><body><div class="terminal"><div class="term-bar"><div class="dot" style="background:#ef4444"></div><div class="dot" style="background:#f59e0b"></div><div class="dot" style="background:#c9a84c"></div></div><div class="term-body" id="out"></div></div><script>const lines=${ls};const out=document.getElementById('out');lines.forEach(line=>{const d=document.createElement('div');if(!line.trim()){d.innerHTML='&nbsp;';out.appendChild(d);return;}if(line.trim().startsWith('#')){d.innerHTML='<span class="cmt">'+line.replace(/</g,'&lt;')+'</span>';}else{d.innerHTML='<span class="prompt">$ </span><span class="cmd">'+line.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</span>';}out.appendChild(d);});const n=document.createElement('div');n.className='note';n.textContent='Shell preview is read-only. Run in your terminal to execute.';out.appendChild(n);</script></body></html>`;
   }
 
   // Generic fallback — all other languages (Go, Rust, Java, C, C++, Ruby, PHP, Swift, etc.)
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8">${base}<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script><style>body{padding:16px;background:#0b0f1a}pre{margin:0;border-radius:8px;overflow:auto;background:#0d1117!important}pre code.hljs{padding:20px;font-size:13px;line-height:1.65;border-radius:8px}.badge{display:inline-block;background:rgba(16,185,129,.1);color:#10B981;font-family:monospace;font-size:10px;padding:2px 8px;border-radius:4px;margin-bottom:10px;text-transform:uppercase;font-weight:700}</style></head><body><div class="badge">${escapeHtml(lang || 'code')}</div><pre><code class="language-${escapeHtml(lang || 'plaintext')}">${escapeHtml(content)}</code></pre><script>hljs.highlightAll();</script></body></html>`;
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">${base}<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script><style>body{padding:16px;background:#0b0f1a}pre{margin:0;border-radius:8px;overflow:auto;background:#0d1117!important}pre code.hljs{padding:20px;font-size:13px;line-height:1.65;border-radius:8px}.badge{display:inline-block;background:rgba(16,185,129,.1);color:#c9a84c;font-family:monospace;font-size:10px;padding:2px 8px;border-radius:4px;margin-bottom:10px;text-transform:uppercase;font-weight:700}</style></head><body><div class="badge">${escapeHtml(lang || 'code')}</div><pre><code class="language-${escapeHtml(lang || 'plaintext')}">${escapeHtml(content)}</code></pre><script>hljs.highlightAll();</script></body></html>`;
 }
 
 // ── Diagram Viewer ────────────────────────────────────────────────
@@ -362,7 +455,7 @@ function buildSrcdocInline(
 
   const localStorageShim = `try{localStorage.setItem('sx','1');localStorage.removeItem('sx');}catch(e){Object.defineProperty(window,'localStorage',{value:{_d:{},setItem(k,v){this._d[k]=v},getItem(k){return this._d[k]??null},removeItem(k){delete this._d[k]},clear(){this._d={}}}});}`;
 
-  const rootDetect = `const _names=Object.keys(window).filter(n=>/^[A-Z]/.test(n)&&typeof window[n]==='function');const _pref=['App','Component','Dashboard','Page','Main','Home','Index','Root','Portfolio','Landing','Layout','Screen','View','Widget','Hero','Profile','Showcase'];const Root=_pref.find(n=>typeof window[n]==='function')&&window[_pref.find(n=>typeof window[n]==='function')]||(_names.length?window[_names[0]]:null);if(Root){ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Root));}else{document.getElementById('root').innerHTML='<div class=\"sx-err\">No root component found.</div>';}`;
+  const rootDetect = `const _names=Object.keys(window).filter(n=>/^[A-Z]/.test(n)&&typeof window[n]==='function'&&window[n].toString().includes('return'));const _pref=['App','Component','Dashboard','Page','Main','Home','Index','Root','Portfolio','Landing','Layout','Screen','View','Widget','Hero','Profile','Showcase'];const _Root=_pref.map(n=>window[n]).find(Boolean)||(_names.length?window[_names[0]]:null);if(_Root){ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(_Root));}else{document.getElementById('root').innerHTML='<div class="sx-err">No component found. Make sure your component function name starts with a capital letter.</div>';}`;
 
   const hooks = `const {useState,useEffect,useRef,useCallback,useMemo,useReducer,useContext,createContext,Fragment,memo}=React;`;
 

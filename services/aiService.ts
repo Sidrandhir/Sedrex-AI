@@ -9,7 +9,15 @@ import {
   QueryIntent,
 } from "../types";
 import { logError } from "./analyticsService";
-import { buildSedrexSystemPrompt, sanitizeConversationHistory, ARTIFACT_PROTOCOL } from "./SedrexsystemPrompt";
+import {
+  buildSedrexSystemPrompt,
+  buildAgentSystemPrompt,
+  sanitizeConversationHistory,
+  ARTIFACT_PROTOCOL,
+  TASK_ENGINE_PROTOCOL,
+  IMAGE_GENERATION_PROTOCOL,
+  buildImagePromptExpansionPrompt,
+} from "./SedrexsystemPrompt";
 import { dispatch as agentDispatch, AgentDispatchResult } from "./agents/agentOrchestrator";
 import { getCodebaseContextForQuery } from "./codebaseContext";
 
@@ -34,9 +42,12 @@ const MODELS = {
 } as const;
 
 const MAX_RETRIES  = 4;
-const MAX_MSG_LEN  = 4_000;
+const MAX_MSG_LEN  = 8_000;  // raised: code pastes need full context
 const MAX_HISTORY: Record<string, number> = {
-  technical: 50, analytical: 60, live: 20, general: 40,
+  technical: 12,   // Code context: recent changes matter most
+  analytical: 16,  // Analysis: needs thread, not whole history
+  live: 6,         // Live data: always fresh, old history irrelevant
+  general: 10,     // General: enough for coherent conversation
 };
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -435,9 +446,11 @@ export function classifyIntent(
   if ([...TECHNICAL_STRONG].some((k) => p.includes(k))) return "technical";
   if ([...ANALYTICAL_SIGNALS].some((k) => p.includes(k))) return "analytical";
   if (prompt.split(/\s+/).length > 50 && hasDocs) return "analytical";
-  const imageTriggers = /\b(generate|create|draw|make|render|depict|paint|illustrate)\b.{0,60}\b(image|picture|photo|graphic|visual|portrait|landscape|illustration|drawing|artwork|logo|icon|avatar|asset|diagram|airplane|car|cat|dog|character|scene)\b/i;
-  const strongGenerate = /^(generate|draw|paint|illustrate) +(a|an|the|some)? +([a-z0-9 ]{2,50})$/i;
-  if (imageTriggers.test(p) || strongGenerate.test(p)) return "image_generation";
+  // Broad image generation detection — catches all visual creation intents
+  const imageTriggers = /\b(generate|create|draw|make|render|depict|paint|illustrate|design|show me|visualize|produce)\b.{0,80}\b(image|picture|photo|graphic|visual|portrait|landscape|illustration|drawing|artwork|logo|icon|avatar|asset|diagram|scene|concept|mockup|ui|interface|banner|poster|thumbnail|wireframe|sketch|render|3d|animation|wallpaper)\b/i;
+  const strongGenerate = /^(generate|draw|paint|illustrate|create|make|design|show) +(a|an|the|some|me|us)? +([a-z0-9 \-]{2,80})$/i;
+  const visualRequest = /^(image|picture|photo|generate image|draw|create image|make image)/i;
+  if (imageTriggers.test(p) || strongGenerate.test(p.trim()) || visualRequest.test(p.trim())) return "image_generation";
 
   return "general";
 }
@@ -628,48 +641,39 @@ function buildSystemInstruction(
   personification: string,
   isProductQuery: boolean,
 ): string {
-  const modeMap: Record<SedrexIntent, string> = {
-    technical:        MODE_TECHNICAL,
-    analytical:       MODE_ANALYTICAL,
-    live:             MODE_LIVE,
-    general:          MODE_GENERAL,
-    image_generation: MODE_GENERAL, // Standard base + prompt guidance
+  // Use the upgraded domain-aware agent system prompt builder
+  // This injects TASK_ENGINE_PROTOCOL, CORE_INTELLIGENCE, domain depth layers,
+  // and ARTIFACT_PROTOCOL — far richer than the old MODE_* strings
+  const domainMap: Record<SedrexIntent, 'coding' | 'reasoning' | 'live' | 'general' | 'image'> = {
+    technical:        'coding',
+    analytical:       'reasoning',
+    live:             'live',
+    general:          'general',
+    image_generation: 'image',
   };
 
-  const tablePrompt = `
-DIRECT TABLE RULE: When user says "build table", "create table", or asks to compare
+  const domain = domainMap[intent] ?? 'general';
+
+  const tablePrompt = `DIRECT TABLE RULE: When user says "build table", "create table", or asks to compare
 two things — DO NOT ask for clarification. Build the most relevant table immediately.
-NEVER respond with "What headers do you want?" — just build it.
-`.trim();
+NEVER respond with "What headers do you want?" — just build it.`.trim();
 
-  const shoppingPrompt = `
-SHOPPING/E-COMMERCE RULES: For product queries always include direct product links
-and prefer Indian retailers if user mentions INR, Flipkart, Croma, etc.
-`.trim();
+  const shoppingPrompt = `SHOPPING/E-COMMERCE RULES: For product queries always include direct product links
+and prefer Indian retailers if user mentions INR, Flipkart, Croma, etc.`.trim();
 
-  const identityPrompt = buildSedrexSystemPrompt({
+  // Use buildAgentSystemPrompt for rich, domain-specific system prompts
+  const agentPrompt = buildAgentSystemPrompt(domain, {
     sessionContext: personification?.trim() || undefined,
   });
 
-  // ── FIX 2: ARTIFACT_PROTOCOL injected for ALL intents ────────────
-  // Previously only injected for technical/analytical — this meant
-  // general and live intents would still truncate code blocks.
-  // Now every response type gets the no-truncation rule.
-  const parts = [
-    identityPrompt,
-    CORE_PROMPT,
-    FORMAT_RULES,
-    modeMap[intent],
-    FAIL_FORWARD,
-    ARTIFACT_MODE,
-    ARTIFACT_PROTOCOL,  // ← injected always, not conditionally
+  const extras = [
     tablePrompt,
     ...(isProductQuery ? [shoppingPrompt] : []),
     `IMPORTANT: Answer ONLY the current question. Never repeat previous answers.`,
     `CONTEXT\nCurrent date/time: ${new Date().toUTCString()}`,
   ];
 
-  return parts.join("\n\n");
+  return [agentPrompt, ...extras].join("\n\n");
 }
 
 // ── Generation config ─────────────────────────────────────────────
@@ -702,11 +706,11 @@ function getGenerationConfig(
   // technical/analytical: up to 32k (full large files)
   // live/general: up to 16k (can still produce medium code blocks)
   const budget: Record<SedrexIntent, [number, number]> = {
-    technical:        [8192, 32000],
-    analytical:       [8192, 32000],
-    live:             [2048, 16000],
-    general:          [2048, 16000],
-    image_generation: [2048, 8192], // Sufficient for prompt refinement
+    technical:        [8192, 32000],   // Full code files
+    analytical:       [8192, 32000],   // Deep analysis
+    live:             [2048, 16000],   // Live data responses
+    general:          [4096, 20000],   // ↑ raised: deep answers need room
+    image_generation: [256,  512],     // Just prompt refinement text
   };
 
   const [min, max] = budget[intent];
@@ -1304,16 +1308,19 @@ async function processRequest(
         personification,
         dynamicMaxTokens,
         genConfig.temperature,
-        undefined,
+        onStreamChunk,  // ← was undefined, now properly passed for real-time streaming
         signal,
       );
 
       if (agentResult.text) {
-        if (onStreamChunk) {
-          const words = agentResult.text.split(" ");
-          for (const word of words) {
+        // Agent streamed in real-time above — no need to re-emit word by word
+        // If streaming was disabled or agent didn't stream, emit the full text now
+        if (onStreamChunk && agentResult.provider !== "claude" && agentResult.provider !== "openai") {
+          // Only re-emit for non-streaming providers (gemini-fallback uses native stream)
+          const chunks = agentResult.text.match(/.{1,80}/g) ?? [agentResult.text];
+          for (const chunk of chunks) {
             if (signal?.aborted) throw new DOMException("Stream aborted by user", "AbortError");
-            onStreamChunk(word + " ");
+            onStreamChunk(chunk);
           }
         }
         fullText     = agentResult.text;
@@ -1589,15 +1596,37 @@ export async function decodeAudioData(
 async function generateImage(
   prompt: string,
   apiKey: string,
-): Promise<{ url: string; text: string; engine: string; tokens: { input: number; output: number; total: number } }> {
+  conversationContext: string = "",
+): Promise<{ url: string; text: string; engine: string; tokens: { input: number; output: number; total: number }; expandedPrompt?: string }> {
   const ai = new GoogleGenAI({ apiKey });
+
+  // ── STEP 0: Expand the prompt professionally before generating ────
+  // This is the fix for problems 4 & 5: vague prompts → rich visual directions
+  let expandedPrompt = prompt;
+  try {
+    console.log("[SEDREX] Expanding image prompt…");
+    const expansionSystemPrompt = buildImagePromptExpansionPrompt(prompt, conversationContext);
+    const expansionResult = await ai.models.generateContent({
+      model: MODELS.FLASH_LITE, // Fast, cheap expansion
+      contents: expansionSystemPrompt,
+      config: { maxOutputTokens: 256, temperature: 0.7 },
+    });
+    const expanded = expansionResult.text?.trim();
+    if (expanded && expanded.length > 20 && !expanded.toLowerCase().includes("return only")) {
+      expandedPrompt = expanded;
+      console.log("[SEDREX] Prompt expanded:", expandedPrompt.slice(0, 100) + "...");
+    }
+  } catch (expansionErr) {
+    console.warn("[SEDREX] Prompt expansion failed, using original:", expansionErr);
+    expandedPrompt = prompt; // Fallback to original
+  }
 
   // ── STRATEGY 1: Imagen 4 (dedicated image generation model) ──────
   try {
     console.log("[SEDREX] Trying Imagen 4…");
     const response = await (ai.models as any).generateImages({
       model: MODELS.IMAGEN,
-      prompt: prompt,
+      prompt: expandedPrompt,
       config: { numberOfImages: 1, outputMimeType: "image/png" },
     });
 
@@ -1608,9 +1637,10 @@ async function generateImage(
       console.log("[SEDREX] ✅ Imagen 4 succeeded");
       return {
         url,
-        text: "Image generated with Imagen 4.",
+        text: `Image generated from: "${expandedPrompt.slice(0, 120)}${expandedPrompt.length > 120 ? '…' : ''}"`,
         engine: MODELS.IMAGEN,
         tokens: { input: 0, output: 0, total: 0 },
+        expandedPrompt,
       };
     }
     throw new Error("Imagen 4 returned no image data");
@@ -1639,8 +1669,9 @@ async function generateImage(
       console.log("[SEDREX] ✅ Gemini Flash Image succeeded");
       return {
         url,
-        text: textPart?.text || "Image generated with Gemini.",
+        text: textPart?.text || `Image generated from: "${expandedPrompt.slice(0, 120)}${expandedPrompt.length > 120 ? '…' : ''}"`,
         engine: MODELS.GEMINI_IMAGE,
+        expandedPrompt,
         tokens: {
           input:  (result.usageMetadata as any)?.promptTokenCount ?? 0,
           output: (result.usageMetadata as any)?.candidatesTokenCount ?? 0,
