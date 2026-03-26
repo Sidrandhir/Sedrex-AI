@@ -1,3 +1,22 @@
+// src/services/aiService.ts
+// ═══════════════════════════════════════════════════════════════════
+// SEDREX AI — MULTI-PROVIDER ENGINE v8.1
+// Verification-First Intelligence
+//
+// SESSION 8 CHANGES:
+//   ✅ 'math' added to SedrexIntent — classifyIntent() now returns it
+//   ✅ Math detection in classifyIntent() BEFORE technical check
+//      Keywords: solve, calculate, equation, derivative, integral,
+//      probability, matrix, proof, theorem, formula, how many,
+//      how far, what is [number], percentage, ratio
+//   ✅ isDiffContent() — content-based diff detector:
+//      Fires when response contains ```diff block AND is <50 lines
+//      AND has no file path comment on the first line
+//   ✅ isDiff now set from EITHER isEditIntent OR isDiffContent(content)
+//   ✅ SedrexResponse interface moved to types.ts — imported here
+//   ✅ All Session 7 fixes preserved exactly
+// ═══════════════════════════════════════════════════════════════════
+
 import { GoogleGenAI } from "@google/genai";
 import {
   AIModel,
@@ -7,6 +26,7 @@ import {
   GroundingChunk,
   AttachedDocument,
   QueryIntent,
+  SedrexResponse,
 } from "../types";
 import { logError } from "./analyticsService";
 import {
@@ -21,36 +41,151 @@ import {
 import { dispatch as agentDispatch, AgentDispatchResult } from "./agents/agentOrchestrator";
 import { getCodebaseContextForQuery } from "./codebaseContext";
 
-// ═══════════════════════════════════════════════════════════════════
-// SEDREX AI — MULTI-PROVIDER ENGINE v7.1
-// Verification-First Intelligence
-//
-// CHANGES from v7.0:
-//   ✅ Code output max tokens raised to 32k (Gemini 3 Flash limit)
-//   ✅ ARTIFACT_PROTOCOL injected for ALL intents (not just technical/analytical)
-//   ✅ isCodeRequest detection broadened — catches more code requests
-//   ✅ 401 enrich-session suppressed cleanly (no browser console spam)
-// ═══════════════════════════════════════════════════════════════════
-
 const MODELS = {
   FLASH:           "gemini-3-flash-preview",
   FLASH_LITE:      "gemini-3.1-flash-lite-preview",
   PRO:             "gemini-3.1-pro-preview",
-  // Image generation models (real, documented names)
   IMAGEN:          "imagen-4.0-generate-001",
   GEMINI_IMAGE:    "gemini-3.1-flash-image",
 } as const;
 
 const MAX_RETRIES  = 4;
-const MAX_MSG_LEN  = 8_000;  // raised: code pastes need full context
+const MAX_MSG_LEN  = 8_000;
 const MAX_HISTORY: Record<string, number> = {
-  technical: 12,   // Code context: recent changes matter most
-  analytical: 16,  // Analysis: needs thread, not whole history
-  live: 6,         // Live data: always fresh, old history irrelevant
-  general: 10,     // General: enough for coherent conversation
+  technical:  12,
+  analytical: 16,
+  live:        6,
+  general:    10,
+  math:       10,
 };
 
+// ── SESSION 7 FIX: Cache is now 30s for non-live intents ──────────
+const RESPONSE_CACHE_TTL_MS = 30_000;
+
+const CIRCUIT_FAIL_THRESHOLD = 6;
+const CIRCUIT_FAIL_WINDOW_MS = 30_000;
+const CIRCUIT_OPEN_MS        = 20_000;
+
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+// ═══════════════════════════════════════════════════════════════════
+// SESSION 7: EDIT INTENT DETECTION
+// ═══════════════════════════════════════════════════════════════════
+
+const EDIT_PATTERNS = [
+  /\b(fix|change|update|modify|edit|adjust|tweak|alter|correct|patch)\b.{0,60}\b(code|function|component|file|script|class|hook|service|line|this|it|that)\b/i,
+  /\b(line|lines)\s+\d+/i,
+  /on\s+line\s+\d+/i,
+  /\b(in this|in that|in the)\s+(component|function|file|class|hook|code|service)\b/i,
+  /\b(refactor|rename|extract|move|reorganize|restructure)\b/i,
+  /\bmake\s+(it|this|that|the\s+\w+)\s+(more|less|faster|smaller|cleaner|readable|efficient|work)\b/i,
+  /\badd\s+.{3,60}\s+to\s+(the|this|that|existing)\b/i,
+  /\bremove\s+.{3,60}\s+from\s+(the|this|that)\b/i,
+  /```[\s\S]{20,}```[\s\S]{0,200}\b(fix|change|update|make|add|remove|refactor)\b/i,
+];
+
+/**
+ * Returns true when the prompt is an edit/fix request targeting existing code.
+ */
+export function detectEditIntent(
+  prompt: string,
+  history: Message[],
+): boolean {
+  const hasPastedCode = /```[\s\S]{20,}```/.test(prompt);
+  const hasCodeInHistory = history.some(
+    m => m.role === 'assistant' && /```[\s\S]{20,}```/.test(m.content ?? '')
+  );
+
+  if (!hasPastedCode && !hasCodeInHistory) return false;
+
+  return EDIT_PATTERNS.some(re => re.test(prompt));
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SESSION 8: CONTENT-BASED DIFF DETECTION
+//
+// detectEditIntent() fires at request time (before AI responds),
+// based on the user prompt. isDiffContent() fires at response time,
+// based on what the AI actually returned.
+//
+// A response is classified as a diff when ALL of these are true:
+//   1. Contains a ```diff fenced block
+//   2. Total content is under 50 lines (diffs are surgical, not full files)
+//   3. First non-empty line does NOT look like a file path comment
+//      (// src/... or # src/... = full file, not a diff)
+//
+// This catches cases where the AI returned a diff without isEditIntent
+// being set (e.g. user said "just show me the change" in plain English
+// without code history in context).
+// ═══════════════════════════════════════════════════════════════════
+
+export function isDiffContent(content: string): boolean {
+  if (!content) return false;
+
+  // Must contain a diff fence
+  if (!/```diff/i.test(content)) return false;
+
+  const lines = content.split('\n');
+
+  // Total content must be under 50 lines — full file rewrites are always longer
+  if (lines.length >= 50) return false;
+
+  // First non-empty line must NOT be a file path comment
+  // File path comments look like: // src/services/foo.ts  or  # path/to/file.py
+  const firstNonEmpty = lines.find(l => l.trim().length > 0) ?? '';
+  const FILE_PATH_COMMENT_RE = /^(?:\/\/|#)\s*[\w./\-]+\.\w{1,10}\s*$/;
+  if (FILE_PATH_COMMENT_RE.test(firstNonEmpty.trim())) return false;
+
+  return true;
+}
+
+// ── DIFF protocol — injected when editIntent=true ─────────────────
+const DIFF_PROTOCOL = `
+## SURGICAL DIFF MODE — ACTIVE
+
+The user is asking to MODIFY existing code. DO NOT rewrite the full file.
+
+OUTPUT FORMAT — follow exactly:
+
+\`\`\`diff
+- [exact line(s) being removed, with enough context to locate them]
++ [exact replacement line(s)]
+\`\`\`
+
+THEN write:
+
+**Changed:** [1-3 bullets — what you changed and why]
+**Location:** [function name / line range where the change lives]
+**Impact:** [what this change affects — one sentence]
+
+RULES:
+1. Show ONLY the changed lines + 2 lines of context above and below.
+2. Never output the full file unless the user explicitly asks for it.
+3. Use --- a/filename and +++ b/filename headers if filename is known.
+4. If multiple separate locations need changes, show each as its own diff block.
+5. If the change is so large (>30% of file) that a diff is harder to read than the full file,
+   write: "This change touches most of the file. Showing complete rewrite:" then output full file.
+
+NEVER say "here is the complete file" when a diff would suffice.
+`.trim();
+
+/**
+ * Wraps the user's prompt with diff-mode context when edit intent is detected.
+ */
+function buildDiffPrompt(
+  prompt: string,
+  history: Message[],
+): string {
+  const lastCodeMsg = [...history].reverse().find(
+    m => m.role === 'assistant' && /```[\s\S]{20,}```/.test(m.content ?? '')
+  );
+
+  const codeContext = lastCodeMsg
+    ? `\nEXISTING CODE (most recent version from this conversation):\n${lastCodeMsg.content}\n`
+    : '';
+
+  return `${codeContext}\nUSER REQUEST: ${prompt}\n\nRespond with a surgical diff. Show only what changes.`;
+}
 
 // ── Concurrency scheduler ─────────────────────────────────────────
 
@@ -193,11 +328,6 @@ function markApiKeySuccess(key: string): void {
 }
 
 // ── Response cache + circuit breaker ─────────────────────────────
-const RESPONSE_CACHE_TTL_MS  = 0;
-const CIRCUIT_FAIL_THRESHOLD = 6;
-const CIRCUIT_FAIL_WINDOW_MS = 30_000;
-const CIRCUIT_OPEN_MS        = 20_000;
-
 type CacheEntry = { value: SedrexResponse; expiresAt: number };
 const responseCache = new Map<string, CacheEntry>();
 
@@ -369,27 +499,30 @@ function computeConfidence(
 
 // ── Intent routing ────────────────────────────────────────────────
 
-type SedrexIntent = "live" | "technical" | "analytical" | "general" | "image_generation";
+// SESSION 8: 'math' added to SedrexIntent — routes to o4-mini via reasoningAgent
+type SedrexIntent = "live" | "technical" | "analytical" | "general" | "image_generation" | "math";
 
 function mapSedrexIntentToQueryIntent(intent: SedrexIntent): QueryIntent {
   switch (intent) {
-    case "live":       return "live";
-    case "technical":  return "coding";
-    case "analytical": return "reasoning";
-    case "general":    return "general";
+    case "live":             return "live";
+    case "technical":        return "coding";
+    case "analytical":       return "reasoning";
+    case "general":          return "general";
     case "image_generation": return "image_generation";
-    default:           return "general";
+    case "math":             return "math";
+    default:                 return "general";
   }
 }
 
 function mapQueryIntentToSedrexIntent(qi: QueryIntent): SedrexIntent {
   switch (qi) {
-    case "live":      return "live";
-    case "coding":    return "technical";
-    case "reasoning": return "analytical";
-    case "general":   return "general";
+    case "live":             return "live";
+    case "coding":           return "technical";
+    case "reasoning":        return "analytical";
+    case "general":          return "general";
     case "image_generation": return "image_generation";
-    default:          return "general";
+    case "math":             return "math";
+    default:                 return "general";
   }
 }
 
@@ -412,12 +545,31 @@ const TECHNICAL_STRONG = new Set([
   "javascript", "python", "rust", "java", "golang", "react", "vue",
   "angular", "node", "express", "django", "flask", "graphql", "jwt",
   "oauth", "cors", "webpack", "vite", "unit test", "ci/cd", "docker",
-  "nginx", "calculus", "derivative", "integral", "matrix", "determinant",
-  "equation", "theorem", "proof", "newton", "ohm", "circuit", "resistor",
-  "velocity", "acceleration", "wavelength", "quantum",
+  "nginx",
 ]);
 
-const MATH_PATTERNS = /\b(solve|calculate|how far|how long|how much|how many|what is \d|percentage|ratio|average|probability|km\/h|mph|m\/s|km\s|miles?\s)\b/i;
+// ── SESSION 8: MATH SIGNALS ───────────────────────────────────────
+// Detected BEFORE the technical check in classifyIntent().
+// These are primary math indicators — they override technical routing
+// because o4-mini dramatically outperforms code models on math tasks.
+//
+// Deliberately excludes: "matrix" (too common in ML code contexts),
+// "algorithm" (code task), "calculus" (ambiguous — keep in TECHNICAL_STRONG).
+// Conservative: false negatives (goes to technical) are less harmful than
+// false positives (math prompt gets o4-mini when user wants code).
+
+const MATH_KEYWORDS = new Set([
+  "solve", "calculate", "equation", "derivative", "integral",
+  "probability", "proof", "theorem", "formula",
+  "differentiate", "integrate", "limit", "series", "summation",
+  "eigenvalue", "eigenvector", "determinant", "factorial",
+  "combinatorics", "permutation", "combination", "binomial",
+  "quadratic", "polynomial", "trigonometry", "sine", "cosine",
+  "logarithm", "exponent", "modulo", "gcd", "lcm",
+]);
+
+// Pattern-based math detection — catches "how far", "what is 3+5", etc.
+const MATH_EXPRESSION_PATTERNS = /\b(how\s+(?:many|far|long|much)\s+(?:is|are|does|will|would)|what\s+is\s+\d|percentage\s+of|ratio\s+of|average\s+of|how\s+much\s+(?:is|are|does)|probability\s+(?:of|that)|calculate\s+the|solve\s+for|find\s+the\s+(?:value|area|volume|length|distance|angle|sum|product|derivative|integral)|simplify|expand\s+the|factor(?:ise|ize)?\s+the|\d+\s*[+\-×÷*\/^]\s*\d|\bx\s*=\s*\d|\ba\s*=\s*\d)\b/i;
 
 const TABLE_PATTERNS = /\b(build.{0,12}table|create.{0,12}table|make.{0,12}table|comparison table|compare .{0,60}|side[- ]by[- ]side|breakdown of|rank(?:ing)? of|tabular|matrix|grid|\bvs\b|\bversus\b|difference between|pros.{0,6}cons|features of)\b/i;
 
@@ -442,11 +594,32 @@ export function classifyIntent(
   if ([...LIVE_SIGNALS].some((k) => p.includes(k))) return "live";
   if ([...PRODUCT_SIGNALS].some((k) => p.includes(k))) return "live";
   if (TABLE_PATTERNS.test(prompt)) return "analytical";
-  if (p.includes("```") || MATH_PATTERNS.test(p)) return "technical";
+
+  // SESSION 8: MATH CHECK — runs BEFORE technical check.
+  // Math intent routes to o4-mini (reasoningAgent with intentHint='math').
+  // Guard: must NOT also contain strong code signals (user could ask
+  // "calculate the time complexity of this algorithm" — that's technical).
+  const hasStrongCodeSignal =
+    p.includes("```") ||
+    /\b(function|component|hook|service|dockerfile|kubernetes|webpack|oauth|cors|jwt)\b/i.test(p);
+
+  if (!hasStrongCodeSignal) {
+    const hasMathKeyword = [...MATH_KEYWORDS].some((k) => p.includes(k));
+    const hasMathExpression = MATH_EXPRESSION_PATTERNS.test(prompt);
+    if (hasMathKeyword || hasMathExpression) return "math";
+  }
+
+  // Technical check (code, calculus, physics, regex etc.)
+  if (p.includes("```")) return "technical";
   if ([...TECHNICAL_STRONG].some((k) => p.includes(k))) return "technical";
+  // Legacy MATH_PATTERNS that were previously in TECHNICAL block
+  // These still route to technical (they're code-adjacent math)
+  const LEGACY_MATH_PATTERNS = /\b(calculus|derivative|integral|matrix|determinant|newton|ohm|circuit|resistor|velocity|acceleration|wavelength|quantum)\b/i;
+  if (LEGACY_MATH_PATTERNS.test(p)) return "technical";
+
   if ([...ANALYTICAL_SIGNALS].some((k) => p.includes(k))) return "analytical";
   if (prompt.split(/\s+/).length > 50 && hasDocs) return "analytical";
-  // Broad image generation detection — catches all visual creation intents
+
   const imageTriggers = /\b(generate|create|draw|make|render|depict|paint|illustrate|design|show me|visualize|produce)\b.{0,80}\b(image|picture|photo|graphic|visual|portrait|landscape|illustration|drawing|artwork|logo|icon|avatar|asset|diagram|scene|concept|mockup|ui|interface|banner|poster|thumbnail|wireframe|sketch|render|3d|animation|wallpaper)\b/i;
   const strongGenerate = /^(generate|draw|paint|illustrate|create|make|design|show) +(a|an|the|some|me|us)? +([a-z0-9 \-]{2,80})$/i;
   const visualRequest = /^(image|picture|photo|generate image|draw|create image|make image)/i;
@@ -468,6 +641,8 @@ export function routePrompt(
     analytical:       { model: AIModel.GPT4,   reason: "Deep Analysis",       explanation: "Structured reasoning engine." },
     general:          { model: AIModel.GPT4,   reason: "Balanced Intelligence",explanation: "Precision synthesis engine." },
     image_generation: { model: AIModel.NANO_BANANA_PRO, reason: "Visual Synthesis", explanation: "Nano Banana image engine." },
+    // SESSION 8: math routes to GPT4 (o4-mini is selected by reasoningAgent when OpenAI key present)
+    math:             { model: AIModel.GPT4,   reason: "Mathematical Precision", explanation: "o4-mini reasoning engine — best-in-class for math." },
   };
   const route = routes[intent];
   return { ...route, confidence: 0.95, complexity, intent: mapSedrexIntentToQueryIntent(intent) };
@@ -483,7 +658,7 @@ function estimateComplexity(
   if      (words > 120) c += 0.35;
   else if (words > 60)  c += 0.2;
   else if (words > 25)  c += 0.1;
-  const weight: Record<string, number> = { analytical: 0.3, technical: 0.25, live: 0.1, general: 0 };
+  const weight: Record<string, number> = { analytical: 0.3, technical: 0.25, live: 0.1, general: 0, math: 0.25 };
   c += weight[intent] ?? 0;
   if (hasDocs) c += 0.15;
   c += 0.05 * Math.min((prompt.match(/\?/g) ?? []).length, 4);
@@ -491,165 +666,23 @@ function estimateComplexity(
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// SYSTEM PROMPTS
+// SYSTEM PROMPT BUILDER
 // ═══════════════════════════════════════════════════════════════════
-
-const CORE_PROMPT = `
-You are SEDREX — a verification-first intelligence engine trusted by analysts,
-researchers, consultants, engineers, founders, teachers, and anyone who needs
-answers they can act on without re-validating elsewhere.
-
-IDENTITY
-When asked who you are:
-I am SEDREX — the AI that verifies before it speaks. Built for professionals
-who need answers that are correct the first time. Every response I give is
-evidence-backed and confidence-scored.
-
-Three principles:
-1. Verification over speed — I check before I answer.
-2. Zero hallucination — If uncertain, I say so. I never fabricate.
-3. Actionable outputs — Every answer is structured for immediate use.
-
-━━ CRITICAL COMPLETION RULES — NEVER BREAK THESE ━━━━━━━━━━━━━━━━
-
-RULE 1 — TABLES: Always complete every table fully. No truncation.
-RULE 2 — CODE: ALWAYS write the COMPLETE code file from first to last line.
-  NEVER write "// rest of the code", "// existing code stays the same",
-  "// implement this", "// add your logic here", "// ...", or any truncation.
-  PARTIAL CODE IS WORSE THAN NO CODE. Write it completely or explain why not.
-RULE 3 — DIRECT ANSWERS: Answer immediately. Never ask for clarification when intent is clear.
-RULE 4 — NO FALSE CONTINUATIONS: If you start something, finish it in the same response.
-RULE 5 — NO META-COMMENTARY ABOUT CODE: Never say "I will create a Claude-style artifact",
-  "Here is an ArtifactSystem component", "This component handles X".
-  Just write the actual code. OUTPUT > DESCRIPTION. Always.
-
-TONE
-Clear, direct, authoritative. No hollow openers or closers.
-
-HONESTY
-State uncertainty explicitly. Never invent facts or citations.
-`.trim();
-
-const FORMAT_RULES = `
-FORMATTING INTELLIGENCE — MATCH FORMAT TO CONTENT TYPE
-
-Short questions → short answers. Long questions → thorough answers.
-
-RESPONSE TYPES:
-TYPE 1 — SIMPLE FACTUAL: 2-4 sentences, no headers.
-TYPE 2 — EXPLANATION: short paragraphs, bold key terms.
-TYPE 3 — HOW-TO: numbered steps + code if needed.
-TYPE 4 — COMPARISON: verdict first, full table, prose analysis, ## 🎯 Verdict.
-TYPE 5 — ANALYSIS: ## 🔍 Finding → ## 📊 Evidence → ## ⚠️ Risks → ## 🎯 Conclusion.
-TYPE 6 — TEST RESULTS: table with ✅ ❌, ## 🎯 What This Means.
-TYPE 7 — DEBUGGING: ## 🔴 Root Cause → ## 🔧 Fix → ## ✅ Why This Works.
-TYPE 8 — CASUAL: 1-2 natural sentences, no formatting.
-
-TABLES: Always use | Col | Col | separator |:---|:---| Never double colons.
-CODE: Always tag language. Always write complete runnable code.
-EMOJI HEADINGS: Use on ## and ### when response has 3+ sections.
-`.trim();
-
-const MODE_TECHNICAL = `
-TECHNICAL MODE — Code, Math, Physics, Engineering
-
-FOR CODE:
-  → Write the COMPLETE file from first to last line. No exceptions.
-  → NEVER truncate. NEVER write "// rest of code...", "// existing code", or "// implement this"
-  → Include ALL imports, ALL exports, ALL error handlers
-  → Declare the file path as a comment on line 1 (e.g. // src/services/authService.ts)
-  → If the file is large, say "Writing the complete X-line file:" before starting
-  → One complete file at a time — finish it before moving to the next
-  → If multiple files are needed, write each one fully before the next
-
-FOR DEBUGGING: ## 🔴 Root Cause → ## 🔧 Fix → ## ✅ Why This Works → ## ⚡ Prevention
-FOR MATH: Problem → Given → Solution (step by step) → Answer → Check ✓
-Write ALL formulas as plain text only. NEVER use LaTeX dollar signs.
-`.trim();
-
-const MODE_ANALYTICAL = `
-ANALYTICAL MODE — Research, Reasoning, Strategy, Comparison
-
-Lead with the answer. Use tables for comparisons — table FIRST, then prose.
-Quantify everything: numbers, %, dates. Every section heading gets an emoji.
-End with ## 🎯 Verdict — clear, decisive, no hedging.
-`.trim();
-
-const MODE_LIVE = `
-LIVE / RESEARCH MODE — Real-time and web-grounded answers
-
-## 🔍 [Topic] — [Key Finding]
-Lead with the single most important current fact.
-Use specific numbers, dates — never "recently" or "approximately".
-Cite sources inline when grounding provides them.
-`.trim();
-
-const MODE_GENERAL = `
-GENERAL MODE — Adapt format to the question type every time.
-
-→ Simple fact → 2-4 sentences, no headers
-→ Explanation → short paragraphs, bold key terms
-→ How-to → numbered list + code if needed
-→ Comparison → table + verdict
-→ Casual ("thanks", "ok", "got it") → ONE natural sentence, no formatting
-
-IMAGE GENERATION RULE:
-If the user asks to generate, create, or draw an image/picture/visual, YOU MUST ONLY output a JSON tool call EXACTLY like this:
-\`\`\`json
-{
-  "action": "nano_banana",
-  "action_input": { "prompt": "highly detailed visual prompt" }
-}
-\`\`\`
-DO NOT output any other text or explanation. DO NOT use dalle.text2im. Use nano_banana ONLY.
-`.trim();
-
-const FAIL_FORWARD = `
-FAIL-FORWARD RULE — Never silently refuse.
-When you cannot answer fully, explain what is missing and give whatever partial value you can.
-BAD: "I cannot access current stock prices."
-GOOD: "Live prices require real-time data. Check Yahoo Finance. Here is what I know: [value]"
-`.trim();
-
-const ARTIFACT_MODE = `
-FILE AND CODE GENERATION — ABSOLUTE RULES
-
-RULE: When generating code or files, OUTPUT THE ACTUAL CODE DIRECTLY.
-NEVER say "here is a Claude-style artifact" or "I will create an artifact".
-NEVER describe what you are going to write — just write it.
-NEVER say "This component handles X logic" as a replacement for the code.
-
-OUTPUT FORMAT FOR CODE:
-  Start the code block immediately with the file path comment.
-  Write the COMPLETE file from first line to last.
-  Use the correct language tag on every fenced block.
-
-CORRECT: Start with the fenced block, file path on line 1, full code inside.
-WRONG:   "Here is a TypeScript file that handles authentication..."
-WRONG:   "I'll create an ArtifactSystem.tsx component for you."
-WRONG:   "This uses Claude-style artifact detection..."
-
-For spreadsheets: complete CSV in a fenced csv block.
-For documents: complete self-contained HTML in a fenced html block.
-For data: complete JSON in a fenced json block.
-For code: complete file in the correct language fenced block.
-ALWAYS include ALL data — never truncate, never use placeholders.
-`.trim();
 
 function buildSystemInstruction(
   intent: SedrexIntent,
   personification: string,
   isProductQuery: boolean,
+  isEditIntent = false,
 ): string {
-  // Use the upgraded domain-aware agent system prompt builder
-  // This injects TASK_ENGINE_PROTOCOL, CORE_INTELLIGENCE, domain depth layers,
-  // and ARTIFACT_PROTOCOL — far richer than the old MODE_* strings
   const domainMap: Record<SedrexIntent, 'coding' | 'reasoning' | 'live' | 'general' | 'image'> = {
     technical:        'coding',
     analytical:       'reasoning',
     live:             'live',
     general:          'general',
     image_generation: 'image',
+    // SESSION 8: math uses reasoning domain — deep step-by-step is correct for math
+    math:             'reasoning',
   };
 
   const domain = domainMap[intent] ?? 'general';
@@ -661,7 +694,10 @@ NEVER respond with "What headers do you want?" — just build it.`.trim();
   const shoppingPrompt = `SHOPPING/E-COMMERCE RULES: For product queries always include direct product links
 and prefer Indian retailers if user mentions INR, Flipkart, Croma, etc.`.trim();
 
-  // Use buildAgentSystemPrompt for rich, domain-specific system prompts
+  const diffSection = isEditIntent
+    ? `\n\n${DIFF_PROTOCOL}`
+    : '';
+
   const agentPrompt = buildAgentSystemPrompt(domain, {
     sessionContext: personification?.trim() || undefined,
   });
@@ -673,7 +709,7 @@ and prefer Indian retailers if user mentions INR, Flipkart, Croma, etc.`.trim();
     `CONTEXT\nCurrent date/time: ${new Date().toUTCString()}`,
   ];
 
-  return [agentPrompt, ...extras].join("\n\n");
+  return [agentPrompt + diffSection, ...extras].join("\n\n");
 }
 
 // ── Generation config ─────────────────────────────────────────────
@@ -698,19 +734,19 @@ function getGenerationConfig(
     technical:        0.1,
     analytical:       0.35,
     live:             0.5,
-    general:          0.55,
-    image_generation: 0.75, // Higher temp for creative synthesis
+    general:          0.3,
+    image_generation: 0.75,
+    // SESSION 8: math uses near-zero temperature — deterministic is essential
+    math:             0.1,
   };
 
-  // ── FIX 2: All intents can now produce large code outputs ────────
-  // technical/analytical: up to 32k (full large files)
-  // live/general: up to 16k (can still produce medium code blocks)
   const budget: Record<SedrexIntent, [number, number]> = {
-    technical:        [8192, 32000],   // Full code files
-    analytical:       [8192, 32000],   // Deep analysis
-    live:             [2048, 16000],   // Live data responses
-    general:          [4096, 20000],   // ↑ raised: deep answers need room
-    image_generation: [256,  512],     // Just prompt refinement text
+    technical:        [8192, 32000],
+    analytical:       [8192, 32000],
+    live:             [2048, 16000],
+    general:          [4096, 20000],
+    image_generation: [256,  512],
+    math:             [4096, 16000],
   };
 
   const [min, max] = budget[intent];
@@ -721,7 +757,7 @@ function getGenerationConfig(
   return {
     temperature: temp[intent],
     maxTokens:   Math.max(Math.round(min + (max - min) * complexityFloor), 8192),
-    useThinking: (intent === "analytical" || intent === "technical") && complexity > 0.65,
+    useThinking: (intent === "analytical" || intent === "technical" || intent === "math") && complexity > 0.65,
   };
 }
 
@@ -732,12 +768,6 @@ function buildHistory(history: Message[], intent: SedrexIntent): any[] {
   const safeHistory = sanitizeConversationHistory(history)
     .filter((msg) => msg.content != null && msg.content !== '');
   return safeHistory.slice(-max).map((msg) => {
-    // ── Strip [ARTIFACT:...] markers from assistant messages ──
-    // These markers are internal UI system tokens. When the AI sees
-    // them in its own previous responses, it learns to output them
-    // directly instead of generating actual code — causing empty cards.
-    // Replace with a neutral note so the AI knows it produced an artifact
-    // but doesn't learn the marker syntax.
     let text = msg.content ?? '';
     if (msg.role === 'assistant') {
       text = text.replace(/\[ARTIFACT:[^\]]+\]/g, '[code artifact generated]');
@@ -882,7 +912,7 @@ async function callOpenAIProvider(
   signal?: AbortSignal,
 ): Promise<{ text: string; inputTokens: number; outputTokens: number }> {
   const cleanHistory = sanitizeConversationHistory(history);
-  const max = MAX_HISTORY.general; // Increased history
+  const max = MAX_HISTORY.general;
   const messages = [
     { role: "system" as const, content: systemInstruction },
     ...cleanHistory.slice(-max).map((m) => ({
@@ -957,7 +987,7 @@ async function callClaudeProvider(
   signal?: AbortSignal,
 ): Promise<{ text: string; inputTokens: number; outputTokens: number }> {
   const cleanHistory = sanitizeConversationHistory(history);
-  const max = MAX_HISTORY.technical; // Use expanded history
+  const max = MAX_HISTORY.technical;
   const messages = [
     ...cleanHistory.slice(-max).map((m) => ({
       role: (m.role === "assistant" ? "assistant" : "user") as "assistant" | "user",
@@ -1027,27 +1057,6 @@ async function callClaudeProvider(
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// RESPONSE TYPE
-// ═══════════════════════════════════════════════════════════════════
-
-export interface SedrexResponse {
-  content:          string;
-  model:            AIModel;
-  tokens:           number;
-  inputTokens:      number;
-  outputTokens:     number;
-  confidence:       ConfidenceSignal;
-  generatedImageUrl?: string;
-  groundingChunks?: GroundingChunk[];
-  routingContext:   SedrexRoute & {
-    engine:          string;
-    thinking:        boolean;
-    agentType?:      string;
-    agentProvider?:  string;
-  };
-}
-
-// ═══════════════════════════════════════════════════════════════════
 // MAIN ENTRY POINT
 // ═══════════════════════════════════════════════════════════════════
 
@@ -1099,7 +1108,8 @@ export const getAIResponse = async (
       effectiveQueueKey,
     )
     .then((res) => {
-      if (res.routingContext.intent !== "live" && !isTablePrompt) {
+      // Don't cache diff responses — they are context-specific
+      if (res.routingContext.intent !== "live" && !isTablePrompt && !res.isDiff) {
         responseCache.set(fingerprint, {
           value:     res,
           expiresAt: Date.now() + RESPONSE_CACHE_TTL_MS,
@@ -1127,13 +1137,21 @@ async function processRequest(
   personification = "",
   onStreamChunk?:   (text: string) => void,
   signal?:          AbortSignal,
-  artifacts:        any[] = [], // NEW: Current session artifacts
+  artifacts:        any[] = [],
 ): Promise<SedrexResponse> {
   if (signal?.aborted) throw new DOMException("Request aborted before processing", "AbortError");
 
   const startTime = Date.now();
   const hasImage  = !!(images?.length);
   const hasDocs   = documents.length > 0;
+
+  // SESSION 7: Detect edit intent before routing
+  const classifiedIntent = classifyIntent(prompt, hasImage, hasDocs);
+  const isEditIntent = classifiedIntent === 'technical' && detectEditIntent(prompt, history);
+
+  if (isEditIntent) {
+    console.log("[SEDREX] Edit intent detected — injecting DIFF_PROTOCOL");
+  }
 
   const routing: SedrexRoute =
     manualModel && manualModel !== "auto"
@@ -1165,24 +1183,31 @@ async function processRequest(
     /^\s*(build|create|make|write)\s*(a\s+)?table\s*$/i.test(prompt.trim());
   const isGenuinelyLive   = intent === "live" && !TABLE_PATTERNS.test(prompt) && !isTablePrompt;
   const useSearch         = isGenuinelyLive || freshnessSignals.test(prompt);
-  const useProModel       = (sedrexIntent === "technical" || sedrexIntent === "analytical") && routing.complexity > 0.65;
+  const useProModel       = (sedrexIntent === "technical" || sedrexIntent === "analytical" || sedrexIntent === "math") && routing.complexity > 0.65;
   const engine            = useProModel ? MODELS.PRO : MODELS.FLASH;
 
   if (isCircuitOpen()) {
     return buildSafeModeResponse(prompt, routing, "High load protection is active. Please retry in a few seconds.");
   }
 
-  // ── Workspace Context Injection ───────────────────────────────────
-  // Construct a concise summary of the current workspace state
-  // to ensure the AI "remembers" every code file it has generated.
   const workspaceContext = artifacts.length > 0
-    ? `\n\nCURRENT WORKSPACE ARTIFACTS:\n${artifacts.map(a => 
+    ? `\n\nCURRENT WORKSPACE ARTIFACTS:\n${artifacts.map(a =>
         `- [ARTIFACT:${a.title}] (${a.language})\n${a.content.slice(0, 1500)}${a.content.length > 1500 ? '...' : ''}`
       ).join('\n')}`
     : '';
 
-  const systemInstruction = buildSystemInstruction(sedrexIntent, personification + workspaceContext, isProductQuery);
-  const genConfig         = getGenerationConfig(sedrexIntent, routing.complexity, prompt);
+  const systemInstruction = buildSystemInstruction(
+    sedrexIntent,
+    personification + workspaceContext,
+    isProductQuery,
+    isEditIntent,
+  );
+
+  const genConfig = getGenerationConfig(sedrexIntent, routing.complexity, prompt);
+
+  const effectivePrompt = isEditIntent
+    ? buildDiffPrompt(prompt, history)
+    : prompt;
 
   const geminiContents = buildHistory(history, sedrexIntent);
   const parts: any[]   = [];
@@ -1194,12 +1219,12 @@ async function processRequest(
       parts.push({ inlineData: { data: img.inlineData.data, mimeType: img.mimeType } });
     });
   }
-  parts.push({ text: prompt });
+  parts.push({ text: effectivePrompt });
   geminiContents.push({ role: "user", parts });
 
   const codebaseContext = getCodebaseContextForQuery(prompt);
 
-  let flatPrompt = prompt;
+  let flatPrompt = effectivePrompt;
   if (documents.length > 0 || codebaseContext) {
     const docContext = documents
       .map((d) => `[DOCUMENT: ${d.title}]\n\`\`\`\n${d.content}\n\`\`\`\n`)
@@ -1207,7 +1232,7 @@ async function processRequest(
     const ctxParts = [
       codebaseContext,
       docContext,
-      `User question: ${prompt}`,
+      `User question: ${effectivePrompt}`,
     ].filter(Boolean);
     flatPrompt = ctxParts.join("\n\n");
   }
@@ -1235,8 +1260,6 @@ async function processRequest(
 
   let lastError: unknown;
 
-  // ── FIX 2: Broadened code detection + raised ceiling to 32k ─────
-  // Now catches: explicit code keywords, file extensions, build/create/write patterns
   const isCodeRequest =
     sedrexIntent === 'technical' ||
     /```|\.tsx?|\.jsx?|\.py|\.rs|\.go|\.java|\.kt|\.css|\.html|\.sql/i.test(prompt) ||
@@ -1244,11 +1267,10 @@ async function processRequest(
     /\b(write|build|create|generate|implement|code|refactor|fix|debug|update)\b.{0,30}\b(file|code|script|app|page|component|api|endpoint|function|class)\b/i.test(prompt) ||
     /\b(give me|show me|write me|build me|create me)\b.{0,20}\b(full|complete|entire|whole|working)\b/i.test(prompt);
 
-  // For code requests: always use 32k max to avoid ANY truncation
-  // For tables: ensure minimum 8k
-  // For everything else: use computed config
-  let dynamicMaxTokens = isCodeRequest
-    ? 32000  // ← FIX 2: raised from 16000 to 32000 (Gemini 3 Flash full output limit)
+  let dynamicMaxTokens = isEditIntent
+    ? 8192
+    : isCodeRequest
+    ? 32000
     : isTablePrompt
     ? Math.max(genConfig.maxTokens, 8192)
     : Math.max(genConfig.maxTokens, 4096);
@@ -1256,7 +1278,7 @@ async function processRequest(
   const fprint = buildFingerprint(prompt, history, manualModel, documents);
   const key    = getApiKey();
 
-  // ── IMAGE GENERATION BRANCH — Bypass retry loop/agents ──────────
+  // ── IMAGE GENERATION BRANCH ──────────────────────────────────────
   if (routing.intent === "image_generation") {
     try {
       const imgResult = await generateImage(flatPrompt, key);
@@ -1286,7 +1308,6 @@ async function processRequest(
       return response;
     } catch (err) {
       console.error("[SEDREX] Image generation failed completely:", err);
-      // Fallback to general text generation if image fails
     }
   }
 
@@ -1308,15 +1329,12 @@ async function processRequest(
         personification,
         dynamicMaxTokens,
         genConfig.temperature,
-        onStreamChunk,  // ← was undefined, now properly passed for real-time streaming
+        onStreamChunk,
         signal,
       );
 
       if (agentResult.text) {
-        // Agent streamed in real-time above — no need to re-emit word by word
-        // If streaming was disabled or agent didn't stream, emit the full text now
         if (onStreamChunk && agentResult.provider !== "claude" && agentResult.provider !== "openai") {
-          // Only re-emit for non-streaming providers (gemini-fallback uses native stream)
           const chunks = agentResult.text.match(/.{1,80}/g) ?? [agentResult.text];
           for (const chunk of chunks) {
             if (signal?.aborted) throw new DOMException("Stream aborted by user", "AbortError");
@@ -1360,7 +1378,6 @@ async function processRequest(
                 return response;
               } catch (err) {
                 console.error("[SEDREX] Redirected image generation failed:", err);
-                // Fallthrough to normal text handling if generation fails
               }
             }
           }
@@ -1408,9 +1425,7 @@ async function processRequest(
           if (gc) groundingChunks.push(...(gc as GroundingChunk[]));
         }
 
-        // Dynamic token expansion for incomplete table or code responses
         if ((isTablePrompt || isCodeRequest) && /max/i.test(finishReason) && attempt < MAX_RETRIES - 1) {
-          // Already at 32k for code — can't go higher, just retry
           if (!isCodeRequest) {
             dynamicMaxTokens = Math.min(Math.round(dynamicMaxTokens * 2.0), 20000);
           }
@@ -1427,6 +1442,26 @@ async function processRequest(
       const confidence = computeConfidence(intent, routing.complexity, useSearch);
       const latency    = Date.now() - startTime;
       markSuccess();
+
+      // ═══════════════════════════════════════════════════════════
+      // SESSION 8: isDiff — dual-signal detection
+      //
+      // A response is marked as a diff when EITHER:
+      //   (a) isEditIntent was true (prompt-time signal — user asked
+      //       to modify existing code, and we injected DIFF_PROTOCOL)
+      //   (b) isDiffContent(content) is true (response-time signal —
+      //       the AI returned a diff block regardless of prompt intent)
+      //
+      // Both signals must be exhausted before setting isDiff=false.
+      // This ensures diffs are caught even when edit intent detection
+      // fired but the user phrased it without code context in history
+      // (isEditIntent=false, but AI still returned a diff).
+      // ═══════════════════════════════════════════════════════════
+      const isDiff = isEditIntent || isDiffContent(content);
+
+      if (isDiff) {
+        console.log("[SEDREX] Diff response detected — skipping artifact extraction");
+      }
 
       emit({
         event:         "query_processed",
@@ -1450,6 +1485,8 @@ async function processRequest(
         outputTokens,
         confidence,
         groundingChunks: groundingChunks.length > 0 ? groundingChunks : undefined,
+        // SESSION 8: isDiff from dual-signal detection
+        isDiff,
         routingContext: {
           ...routing,
           engine:        agentResult.text ? agentResult.provider : engine,
@@ -1505,7 +1542,7 @@ async function processRequest(
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// UTILITIES — PRESERVED EXACTLY FROM ORIGINAL
+// UTILITIES
 // ═══════════════════════════════════════════════════════════════════
 
 export const generateFollowUpSuggestions = async (
@@ -1586,12 +1623,11 @@ export async function decodeAudioData(
   }
   return buffer;
 }
+
 /**
  * Generates an image using a dual-strategy approach:
- *  1. PRIMARY: Imagen 4 via ai.models.generateImages() — dedicated image model
- *  2. FALLBACK: Gemini 2.0 Flash Image via ai.models.generateContent() with responseModalities
- *
- * Returns a data-URL for the generated image, descriptive text, and token counts.
+ *  1. PRIMARY: Imagen 4 via ai.models.generateImages()
+ *  2. FALLBACK: Gemini Flash Image via responseModalities
  */
 async function generateImage(
   prompt: string,
@@ -1600,14 +1636,12 @@ async function generateImage(
 ): Promise<{ url: string; text: string; engine: string; tokens: { input: number; output: number; total: number }; expandedPrompt?: string }> {
   const ai = new GoogleGenAI({ apiKey });
 
-  // ── STEP 0: Expand the prompt professionally before generating ────
-  // This is the fix for problems 4 & 5: vague prompts → rich visual directions
   let expandedPrompt = prompt;
   try {
     console.log("[SEDREX] Expanding image prompt…");
     const expansionSystemPrompt = buildImagePromptExpansionPrompt(prompt, conversationContext);
     const expansionResult = await ai.models.generateContent({
-      model: MODELS.FLASH_LITE, // Fast, cheap expansion
+      model: MODELS.FLASH_LITE,
       contents: expansionSystemPrompt,
       config: { maxOutputTokens: 256, temperature: 0.7 },
     });
@@ -1618,10 +1652,10 @@ async function generateImage(
     }
   } catch (expansionErr) {
     console.warn("[SEDREX] Prompt expansion failed, using original:", expansionErr);
-    expandedPrompt = prompt; // Fallback to original
+    expandedPrompt = prompt;
   }
 
-  // ── STRATEGY 1: Imagen 4 (dedicated image generation model) ──────
+  // STRATEGY 1: Imagen 4
   try {
     console.log("[SEDREX] Trying Imagen 4…");
     const response = await (ai.models as any).generateImages({
@@ -1648,14 +1682,14 @@ async function generateImage(
     console.warn("[SEDREX] Imagen 4 failed, trying Gemini Flash Image…", imagenError.message);
   }
 
-  // ── STRATEGY 2: Gemini 2.0 Flash Image (native multimodal output) ─
+  // STRATEGY 2: Gemini Flash Image
   try {
     console.log("[SEDREX] Trying Gemini Flash Image…");
     const result = await ai.models.generateContent({
       model: MODELS.GEMINI_IMAGE,
       contents: prompt,
       config: {
-        // @ts-ignore — responseModalities is a Gemini image generation feature
+        // @ts-ignore
         responseModalities: ["TEXT", "IMAGE"],
       },
     });

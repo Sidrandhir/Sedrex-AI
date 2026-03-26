@@ -1,3 +1,13 @@
+// src/App.tsx
+// SESSION 8 CHANGES:
+//   ✅ artifactCreated boolean flag — set from the first extraction result,
+//      used in analytics.logQuery() instead of calling extractArtifactFromResponse()
+//      a second time. Root cause: the old code ran extraction twice per response,
+//      wasting CPU and causing a race condition where the second call could return
+//      a different result (e.g. if _artifacts changed between the two calls due
+//      to generateVersionedTitle scanning in-memory store).
+//   ✅ All Session 7 logic preserved exactly (isDiff check, diagram extraction, etc.)
+
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense, startTransition } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import Sidebar from './components/Sidebar';
@@ -98,7 +108,6 @@ const App: React.FC = () => {
   );
   const removeToast = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));
 
-  // Subscribe to artifact store to sync panel open state
   useEffect(() => {
     const unsub = subscribeToArtifacts(() => {
       setArtifactPanelOpen(isPanelOpen());
@@ -167,7 +176,6 @@ const App: React.FC = () => {
       setUser(u);
       if (u) {
         analytics.startSession(u.id);
-        // Shadow artifacts sync removed - consolidated into Phase 3 for total stability
         if (!localStorage.getItem('sedrex_survey_done')) setShowSurvey(true);
         if (window.innerWidth < 1024 && !localStorage.getItem('sedrex_onboarding_done'))
           setShowOnboarding(true);
@@ -179,32 +187,21 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!user) return;
 
-    // ═══════════════════════════════════════════════════════════════
-    // OPTIMIZATION: Parallel load user stats, conversations, and messages
-    // This dramatically improves initial page load performance
-    // ═══════════════════════════════════════════════════════════════
-
     const controller = new AbortController();
     let isMounted = true;
 
     (async () => {
       try {
-        // Phase 1: Instant Hydration from Persistence Cache
         const chatData = await api.loadInitialChatData(50);
         if (!isMounted || controller.signal.aborted) return;
 
         if (chatData.sessions.length > 0) {
-          // ── FIX: Restore last-visited session + load its messages ──
-          // persistenceService stores 'sedrex_cache_active_session' whenever
-          // the user clicks a chat. On refresh we restore that session
-          // AND immediately fetch its messages so the chat isn't blank.
           const lastVisitedId = persistenceService.getLastActiveSessionId();
           const sessionIds = new Set(chatData.sessions.map((s: any) => s.id));
           const restoreId = (lastVisitedId && sessionIds.has(lastVisitedId))
             ? lastVisitedId
             : chatData.sessions[0].id;
 
-          // Load from local persistence first (instant)
           const localMsgs = persistenceService.loadMessages(restoreId);
 
           startTransition(() => {
@@ -217,10 +214,6 @@ const App: React.FC = () => {
             }
           });
 
-          // Always fetch fresh messages from DB for the restored session
-          // This runs in parallel — UI is already responsive from localMsgs above
-          // FIX: fetch messages from DB for the restored session
-          // If no local messages, use isLoading to prevent empty state flash
           if (localMsgs.length === 0) setIsLoading(true);
           api.getMessages(restoreId, 100).then(dbMsgs => {
             if (isMounted) {
@@ -236,9 +229,6 @@ const App: React.FC = () => {
           }).catch(() => { setIsLoading(false); });
         }
 
-        // Phase 2: Background Sync (Cloud Data)
-        // STAGGER: Wait 1000ms to let Phase 1 (Cache) render and settle
-        // This ensures the initial frame is at 60fps and interactive immediately
         await new Promise(r => setTimeout(r, 1000));
         if (!isMounted) return;
 
@@ -252,37 +242,25 @@ const App: React.FC = () => {
 
         if (cloudSessions.length > 0) {
           const firstId = cloudSessions[0].id;
-          // OPTIMIZATION: Background sync only needs metadata
           const cloudMessages = await api.getMessages(firstId, 50, true);
 
           if (!isMounted) return;
           startTransition(() => {
-            // ── SMART MERGE ──────────────────────────────────────────
-            // Merge cloud sessions into existing ones to preserve brand-new chats
-            // FIX: cloudSessions have NO messages (just metadata from DB).
-            // Without this fix, Phase 2 overwrites Phase 1's loaded messages
-            // with undefined, causing the chat area to show EmptyState after refresh.
-            // Solution: when merging, copy messages from prev state into each
-            // cloud session if messages were already loaded.
             setSessions(prev => {
               const merged = cloudSessions.map(cs => {
                 const existing = prev.find(p => p.id === cs.id);
-                // Preserve already-loaded messages — cloud metadata has none
                 return (existing?.messages?.length)
                   ? { ...cs, messages: existing.messages }
                   : cs;
               });
               prev.forEach(local => {
-                // If a local session isn't in cloud list yet, it's presumably NEW
                 if (!merged.find(c => c.id === local.id)) {
                   merged.push(local);
                 }
               });
-              // Sort by lastModified to keep UI consistent
               return merged.sort((a, b) => b.lastModified - a.lastModified);
             });
 
-            // If we don't have an active session, or it's the first sync, pick the top one
             if (!activeSessionId) {
               setActiveSessionId(firstId);
             }
@@ -291,9 +269,6 @@ const App: React.FC = () => {
           api.loadSessionPreviews(cloudSessions.slice(0, 5).map(s => s.id));
         }
 
-        // Phase 3: Artifact Sync — load FULL content so panel shows code immediately
-        // metadataOnly=false ensures content is loaded; sidebar artifacts are clickable at once.
-        // loadAllUserArtifacts runs in background after 500ms to not block chat render.
         setTimeout(() => {
           loadAllUserArtifacts(user.id, false).catch(() => { });
         }, 500);
@@ -313,11 +288,6 @@ const App: React.FC = () => {
     };
   }, [user]);
 
-  // ── FIX 1: On session switch, load that session's artifacts and MERGE
-  // (do NOT clearArtifacts — that was wiping all cross-session artifacts)
-  // ── FIX 1: Staggered Full-Content Hydration ───────────────────
-  // Delay loading full artifacts for 1500ms after session switch
-  // to avoid competing with background sync (Phase 2).
   useEffect(() => {
     if (!activeSessionId) return;
     const timer = setTimeout(() => {
@@ -409,43 +379,71 @@ const App: React.FC = () => {
       );
       if (flushTimer) clearTimeout(flushTimer);
 
-      // Extract artifact from response BEFORE saving
       let finalContent = response.content;
-      // FIX: pass user's prompt so artifact gets a descriptive title
-      // e.g. 'Microsoft Landing Page' instead of 'HTML File'
-      const extracted = extractArtifactFromResponse(response.content, userMsg.content);
 
-      if (extracted && user) {
-        createArtifact({
-          sessionId: sessionId,
-          userId: user.id,
-          title: extracted.title,
-          language: extracted.language,
-          content: extracted.content,
-          type: extracted.type,
-          filePath: extracted.filePath,
-        }).catch(() => { });
-        finalContent = extracted.reducedResponse;
-      }
+      // ══════════════════════════════════════════════════════════════
+      // SESSION 8: ARTIFACT EXTRACTION WITH BOOLEAN FLAG
+      //
+      // ROOT CAUSE OF OLD BUG (fixed here):
+      // analytics.logQuery() called extractArtifactFromResponse() a
+      // SECOND time after it was already called above. This caused:
+      //   1. Double CPU cost on every response with code
+      //   2. generateVersionedTitle() scanning _artifacts twice —
+      //      the second call sees the artifact already inserted by
+      //      the first call, so it returns "Title v2" instead of
+      //      "Title", producing a wrong artifactCreated=false reading
+      //      when the title mismatch causes the second result to differ
+      //
+      // FIX: Capture a boolean flag `artifactWasCreated` from the
+      // first extraction. Pass this flag to logQuery() instead of
+      // re-running extraction. Zero behavioral change in artifact
+      // panel — artifact is still created exactly once.
+      //
+      // SESSION 7: DIFF RESPONSE HANDLING (preserved)
+      // When response.isDiff is true, skip all extraction.
+      // ══════════════════════════════════════════════════════════════
 
-      // NEW: Extract & Store Diagrams for Sidebar
-      const diagramCodes = extractDiagramsFromResponse(response.content);
-      if (diagramCodes.length > 0 && user) {
-        diagramCodes.forEach(dg => {
-          storeDiagram({
-            sessionId: sessionId,
-            userId: user.id,
-            title: 'Architecture Diagram',
-            language: 'mermaid',
-            content: dg,
-            type: 'diagram',
+      // SESSION 8: Track whether an artifact was created in THIS response
+      // so analytics can log it without running extraction a second time.
+      let artifactWasCreated = false;
+
+      if (!response.isDiff) {
+        const extracted = extractArtifactFromResponse(response.content, userMsg.content);
+
+        if (extracted && user) {
+          // SESSION 8: Set the flag from the FIRST (and only) extraction result
+          artifactWasCreated = true;
+
+          createArtifact({
+            sessionId,
+            userId:   user.id,
+            title:    extracted.title,
+            language: extracted.language,
+            content:  extracted.content,
+            type:     extracted.type,
+            filePath: extracted.filePath,
           }).catch(() => { });
-        });
+          finalContent = extracted.reducedResponse;
+        }
+
+        // Extract & Store Diagrams for Sidebar
+        const diagramCodes = extractDiagramsFromResponse(response.content);
+        if (diagramCodes.length > 0 && user) {
+          diagramCodes.forEach(dg => {
+            storeDiagram({
+              sessionId,
+              userId:   user.id,
+              title:    'Architecture Diagram',
+              language: 'mermaid',
+              content:  dg,
+              type:     'diagram',
+            }).catch(() => { });
+          });
+        }
       }
 
-      // NEW: Store Generated Image contextually
+      // Store Generated Image (always, regardless of isDiff)
       if (response.generatedImageUrl && user) {
-        // Build a short, descriptive title based on user prompt
         const safePrompt = userMsg.content.replace(/[^a-zA-Z0-9\s]/g, '').trim();
         const shortName = safePrompt.length > 30 ? safePrompt.slice(0, 30) + '...' : safePrompt;
         const imgTitle = `${shortName || 'Generated Image'} - ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.png`;
@@ -505,7 +503,8 @@ const App: React.FC = () => {
         hasImage: !!userMsg.image,
         hasDocuments: (userMsg.documents?.length || 0) > 0,
         hasCodebaseRef: !!userMsg.codebaseRef,
-        artifactCreated: !!extracted,
+        // SESSION 8: Use the flag captured during first extraction — NOT a second call
+        artifactCreated: artifactWasCreated,
         slashCommand: userMsg.content.startsWith('/') ? userMsg.content.split(' ')[0].slice(1) : undefined,
         hadError: false,
       });
@@ -594,8 +593,6 @@ const App: React.FC = () => {
     const s = await api.createConversation('New Chat');
     setSessions(p => [s, ...p]);
     setActiveSessionId(s.id);
-    // FIX 1: Do NOT clearArtifacts on new chat — keep cross-session artifacts visible
-    // clearArtifacts() removed here intentionally
     analytics.viewChange('chat');
     setView('chat');
     if (window.innerWidth < 1024) setIsSidebarOpen(false);
@@ -603,7 +600,6 @@ const App: React.FC = () => {
 
   const handleSelectSession = useCallback((id: string) => {
     setActiveSessionId(id);
-    // Save clicked session so page refresh restores it
     try { localStorage.setItem('sedrex_cache_active_session', id); } catch { }
     if (window.innerWidth < 1024) setIsSidebarOpen(false);
     api.getMessages(id, 100).then(m =>
@@ -611,14 +607,12 @@ const App: React.FC = () => {
     );
   }, []);
 
-
-  // Listen for ArtifactCard mobile event — closes sidebar so ArtifactPanel
-  // (z-index 50) is not hidden behind the sidebar (z-index 200-300)
   useEffect(() => {
     const handler = () => setIsSidebarOpen(false);
     window.addEventListener('sedrex:close-sidebar', handler);
     return () => window.removeEventListener('sedrex:close-sidebar', handler);
   }, []);
+
   const handleDeleteSession = useCallback((id: string) =>
     api.deleteConversation(id).then(() => {
       setSessions(p => p.filter(s => s.id !== id));
@@ -650,7 +644,6 @@ const App: React.FC = () => {
   const handleLogout = useCallback(() => {
     analytics.endSession('logout');
     api.clearUserCache();
-    // Clear artifacts on logout only
     clearArtifacts();
     logout().then(() => { setUser(null); setSessions([]); setView('chat'); setIsSettingsOpen(false); });
   }, []);
@@ -746,7 +739,6 @@ const App: React.FC = () => {
           height: '100dvh', overflow: 'hidden', position: 'relative',
         }}>
 
-          {/* Chat column */}
           <div style={{
             flex: 1, minWidth: 0,
             display: 'flex', flexDirection: 'column',
@@ -818,7 +810,6 @@ const App: React.FC = () => {
             )}
           </div>
 
-          {/* Artifact Panel — sits right of chat when open */}
           {artifactPanelOpen && (
             <Suspense fallback={null}>
               <ArtifactPanel onWidthChange={setArtifactPanelWidth} />

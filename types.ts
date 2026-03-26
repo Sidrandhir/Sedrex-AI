@@ -1,3 +1,4 @@
+// src/types.ts
 // ══════════════════════════════════════════════════════════════════
 // SEDREX — Type Definitions
 // Verification-First Intelligence Platform
@@ -137,6 +138,34 @@ export interface SedrexRoute {
   confidence: number;
   complexity: number;
   intent: QueryIntent;
+}
+
+// ── SESSION 8: SedrexResponse — added isDiff flag ─────────────────
+// isDiff: true when the AI returned a surgical diff block (```diff)
+// rather than a full file. Used by App.tsx to skip artifact extraction
+// and by ChatArea.tsx to render the diff inline via hljs diff highlighting.
+export interface SedrexResponse {
+  content:          string;
+  model:            AIModel;
+  tokens:           number;
+  inputTokens:      number;
+  outputTokens:     number;
+  confidence: {
+    level:  'high' | 'moderate' | 'low' | 'live';
+    label:  string;
+    reason: string;
+  };
+  generatedImageUrl?: string;
+  groundingChunks?: GroundingChunk[];
+  // true when response is a surgical diff, not a full file rewrite.
+  // Prevents artifact extraction and signals diff rendering in ChatArea.
+  isDiff?: boolean;
+  routingContext: SedrexRoute & {
+    engine:          string;
+    thinking:        boolean;
+    agentType?:      string;
+    agentProvider?:  string;
+  };
 }
 
 export interface AnalyticsEvent {
