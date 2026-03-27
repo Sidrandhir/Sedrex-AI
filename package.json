@@ -26,6 +26,7 @@
     "mermaid": "^11.12.2",
     "pdfjs-dist": "4.4.168",
     "postcss": "^8.4.0",
+    "posthog-js": "^1.363.6",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-katex": "^3.1.0",

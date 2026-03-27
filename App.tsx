@@ -10,6 +10,8 @@
 
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense, startTransition } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
+import { startCheckout, openBillingPortal, detectCheckoutReturn } from './services/billingService';
+import { preflightCheck } from './services/usageLimitService';
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import MessageInput from './components/MessageInput';
@@ -35,6 +37,7 @@ import {
   extractDiagramsFromResponse,
   storeImage,
   getArtifactsForSession,
+  addImageFromMessage,
 } from './services/artifactStore';
 import { Routes, Route } from 'react-router-dom';
 import Privacy from './components/Privacy';
@@ -57,6 +60,11 @@ const ArtifactPanel = lazy(() => import('./components/ArtifactPanel'));
 const MobileOnboarding = lazy(() => import('./components/MobileOnboarding'));
 const OnboardingSurvey = lazy(() => import('./components/OnboardingSurvey'));
 const ResetPasswordPage = lazy(() => import('./components/ResetPasswordPage'));
+const UpgradeModal      = lazy(() => import('./components/UpgradeModal'));
+const LibraryView       = lazy(() => import('./components/LibraryView'));
+const ArtifactsView     = lazy(() => import('./components/ArtifactsView'));
+import { InstallBanner, UpdateBanner, usePWALaunchAction } from './components/InstallPrompt';
+import { trackWebVitals, upgradeClicked, upgradeCompleted, pricingViewed } from './services/posthogService';
 
 const LazyFallback = () => (
   <div className="flex items-center justify-center p-8">
@@ -76,7 +84,7 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
   const [isLoading, setIsLoading] = useState(false);
   const [routingInfo, setRoutingInfo] = useState<SedrexRoute | null>(null);
-  const [view, setView] = useState<'chat' | 'dashboard' | 'pricing' | 'billing' | 'admin'>('chat');
+  const [view, setView] = useState<'chat' | 'dashboard' | 'pricing' | 'billing' | 'admin' | 'library' | 'artifacts'>('chat');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -84,6 +92,8 @@ const App: React.FC = () => {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [artifactPanelOpen, setArtifactPanelOpen] = useState(false);
   const [artifactPanelWidth, setArtifactPanelWidth] = useState(480);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeBlockReason, setUpgradeBlockReason] = useState('');
 
   const [theme, setTheme] = useState<'light' | 'dark'>(
     () => (localStorage.getItem('sedrex_theme') as 'light' | 'dark') || 'dark'
@@ -99,6 +109,19 @@ const App: React.FC = () => {
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Stripe checkout return detection ───────────────────────────
+  useEffect(() => {
+    const result = detectCheckoutReturn();
+    if (result === 'success') {
+      addToast('Upgrade successful! Welcome to Pro.', 'success');
+      upgradeCompleted('pro');
+      // Reload user stats so tier badge updates immediately
+      if (user) getStats(user.id).then(s => s && setUserStats(s));
+    } else if (result === 'cancelled') {
+      addToast('Upgrade cancelled. You can upgrade anytime.', 'info');
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addToast = useCallback(
     (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -157,10 +180,45 @@ const App: React.FC = () => {
     setIsSidebarOpen(prev => !prev);
   };
 
-  const handleSetView = useCallback((v: 'chat' | 'dashboard' | 'pricing' | 'billing' | 'admin') => {
-    analytics.viewChange(v);
+  const handleSetView = useCallback((v: 'chat' | 'dashboard' | 'pricing' | 'billing' | 'admin' | 'library' | 'artifacts') => {
+    analytics.viewChange(v as string);
     setView(v);
   }, []);
+
+  // ── PWA shortcut actions (launched from home screen shortcuts) ──
+  usePWALaunchAction({
+    'new-chat':  () => { handleSetView('chat'); handleNewChat(); },
+    'dashboard': () => handleSetView('dashboard'),
+  });
+
+  // ── Stripe upgrade handler ──────────────────────────────────────
+  const handleUpgrade = useCallback(async () => {
+    if (!user) { setShowAuth(true); return; }
+    setShowUpgradeModal(false);
+    upgradeClicked('upgrade_handler', user.tier ?? 'free');
+    try {
+      await startCheckout(user.id, user.email, 'pro');
+    } catch (err: any) {
+      addToast(err.message ?? 'Could not open checkout. Please try again.', 'error');
+    }
+  }, [user]);
+
+  // ── Open upgrade modal (e.g. when limit hit) ───────────────────
+  const handleShowUpgrade = useCallback((reason = '') => {
+    setUpgradeBlockReason(reason);
+    setShowUpgradeModal(true);
+  }, []);
+
+  // ── Stripe portal handler (manage subscription / cancel) ───────
+  const handleManageBilling = useCallback(async () => {
+    if (!user) return;
+    try {
+      await openBillingPortal(user.id);
+    } catch (err: any) {
+      // If no Stripe customer yet, fall back to checkout
+      handleUpgrade();
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!configured) { setIsAuthChecking(false); return; }
@@ -175,10 +233,11 @@ const App: React.FC = () => {
     getCurrentUser().then(u => {
       setUser(u);
       if (u) {
-        analytics.startSession(u.id);
+        analytics.startSession(u.id, { email: u.email, tier: u.tier, name: u.personification });
         if (!localStorage.getItem('sedrex_survey_done')) setShowSurvey(true);
         if (window.innerWidth < 1024 && !localStorage.getItem('sedrex_onboarding_done'))
           setShowOnboarding(true);
+        trackWebVitals();
       }
     }).finally(() => setIsAuthChecking(false));
     return () => subscription.unsubscribe();
@@ -223,6 +282,13 @@ const App: React.FC = () => {
                     prev.map(s => s.id === restoreId ? { ...s, messages: dbMsgs } : s)
                   )
                 );
+                // Scan loaded messages for generated images — zero DB calls
+                dbMsgs.forEach(msg => {
+                  if (msg.generatedImageUrl) {
+                    const label = msg.content?.slice(0, 40) || 'Generated Image';
+                    addImageFromMessage(msg.id, restoreId, user.id, label, msg.generatedImageUrl, msg.timestamp);
+                  }
+                });
               }
               setIsLoading(false);
             }
@@ -270,11 +336,26 @@ const App: React.FC = () => {
         }
 
         setTimeout(() => {
-          loadAllUserArtifacts(user.id, false).catch(() => { });
+          loadAllUserArtifacts(user.id, true).catch(() => { }); // metadata only — image content loaded on demand
         }, 500);
         if (cloudSessions[0]?.id) {
           loadArtifactsForSession(cloudSessions[0].id, false).catch(() => { });
         }
+
+        // Populate Library images from already-loaded messages — zero DB calls
+        setTimeout(() => {
+          setSessions(prev => {
+            prev.forEach(session => {
+              session.messages.forEach(msg => {
+                if (msg.generatedImageUrl) {
+                  const label = msg.content?.slice(0, 40) || 'Generated Image';
+                  addImageFromMessage(msg.id, session.id, user.id, label, msg.generatedImageUrl, msg.timestamp);
+                }
+              });
+            });
+            return prev; // no state change, just side-effect scan
+          });
+        }, 800);
 
       } catch (error) {
         if (!isMounted) return;
@@ -331,6 +412,13 @@ const App: React.FC = () => {
 
   const requestAIResponse = async (sessionId: string, currentHistory: Message[]) => {
     if (!user || isLoading) return;
+
+    // ── Usage limit preflight — blocked only when limits are actually enforced ──
+    const blockReason = preflightCheck(userStats);
+    if (blockReason) {
+      handleShowUpgrade(blockReason);
+      return;
+    }
     setIsLoading(true);
     abortControllerRef.current = new AbortController();
     const userMsg = currentHistory[currentHistory.length - 1];
@@ -348,6 +436,14 @@ const App: React.FC = () => {
     let accumulatedText = '';
     let flushTimer: ReturnType<typeof setTimeout> | null = null;
     let lastFlushedLength = 0;
+
+    // Adaptive flush: fast at start (user is watching), slower on long responses
+    const flushInterval = () => {
+      const len = accumulatedText.length;
+      if (len < 300)  return 16;   // first ~50 words — one animation frame
+      if (len < 1500) return 40;   // medium response — 40ms
+      return 80;                   // long response — 80ms to limit re-renders
+    };
 
     const flushToUI = () => {
       if (accumulatedText.length === lastFlushedLength) { flushTimer = null; return; }
@@ -372,7 +468,7 @@ const App: React.FC = () => {
         userSettings.personification,
         chunk => {
           accumulatedText += chunk;
-          if (!flushTimer) flushTimer = setTimeout(flushToUI, 80);
+          if (!flushTimer) flushTimer = setTimeout(flushToUI, flushInterval());
         },
         abortControllerRef.current.signal,
         getArtifactsForSession(sessionId).map(a => `[ARTIFACT: ${a.title}]`).join('\n')
@@ -468,7 +564,13 @@ const App: React.FC = () => {
 
       setSessions(prev => prev.map(s => s.id === sessionId ? {
         ...s,
-        messages: s.messages.map(m => m.id === assistantId ? { ...savedMsg, generatedImageUrl: response.generatedImageUrl || savedMsg.generatedImageUrl } : m),
+        messages: s.messages.map(m => m.id === assistantId ? {
+          ...savedMsg,
+          generatedImageUrl: response.generatedImageUrl || savedMsg.generatedImageUrl,
+          // Preserve verification + thinking data that isn't stored in the DB
+          confidence: response.confidence,
+          thinkingContent: response.thinkingContent,
+        } : m),
       } : s));
 
       suggestionsPromise.then(suggestions => {
@@ -770,15 +872,23 @@ const App: React.FC = () => {
                     </Suspense>
                   ) : view === 'pricing' ? (
                     <Suspense fallback={<LazyFallback />}>
-                      <Pricing onUpgrade={() => handleSetView('billing')} onClose={() => handleSetView('chat')} />
+                      <Pricing onUpgrade={handleUpgrade} onClose={() => handleSetView('chat')} currentTier={user?.tier} />
                     </Suspense>
                   ) : view === 'billing' ? (
                     <Suspense fallback={<LazyFallback />}>
-                      <Billing stats={userStats!} onCancel={() => { }} onUpgrade={() => handleSetView('pricing')} onClose={() => handleSetView('chat')} />
+                      <Billing stats={userStats!} userId={user?.id ?? ''} onCancel={handleManageBilling} onUpgrade={handleUpgrade} onClose={() => handleSetView('chat')} />
                     </Suspense>
                   ) : view === 'admin' ? (
                     <Suspense fallback={<LazyFallback />}>
                       <AdminDashboard />
+                    </Suspense>
+                  ) : view === 'library' ? (
+                    <Suspense fallback={<LazyFallback />}>
+                      <LibraryView onClose={() => handleSetView('chat')} userId={user?.id} />
+                    </Suspense>
+                  ) : view === 'artifacts' ? (
+                    <Suspense fallback={<LazyFallback />}>
+                      <ArtifactsView onClose={() => handleSetView('chat')} />
                     </Suspense>
                   ) : (
                     <div className="flex-1 flex flex-col items-center justify-center p-10 text-center">
@@ -856,7 +966,22 @@ const App: React.FC = () => {
           onToggleTheme={handleThemeToggle}
         />
 
+        {/* Upgrade Modal — shown when usage limit is hit */}
+        {showUpgradeModal && user && (
+          <Suspense fallback={null}>
+            <UpgradeModal
+              reason={upgradeBlockReason}
+              currentTier={user.tier}
+              onUpgrade={handleUpgrade}
+              onClose={() => setShowUpgradeModal(false)}
+              onViewPricing={() => { setShowUpgradeModal(false); handleSetView('pricing'); }}
+            />
+          </Suspense>
+        )}
+
         <Toast toasts={toasts} onRemove={removeToast} />
+        <UpdateBanner />
+        <InstallBanner />
       </div>
     </ErrorBoundary>
   );

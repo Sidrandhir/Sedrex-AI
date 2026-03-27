@@ -17,7 +17,7 @@
 // ══════════════════════════════════════════════════════════════════
 
 import { supabase, isSupabaseConfigured } from './supabaseClient';
-import { getArtifactsBySessionId, getAllUserArtifactsByUserId } from './queryOptimizer';
+import { getArtifactsBySessionId, getAllUserArtifactsByUserId, loadImagesWithContent as queryLoadImages } from './queryOptimizer';
 
 export type ArtifactType = 'code' | 'html' | 'document' | 'diagram' | 'image';
 
@@ -566,6 +566,68 @@ export async function loadAllUserArtifacts(userId: string, metadataOnly = false)
   }
 }
 
+// ── Populate images from already-loaded session messages ──────────
+// No DB call — uses generatedImageUrl already in memory.
+// Call this after sessions/messages are loaded.
+export function addImageFromMessage(
+  messageId: string,
+  sessionId: string,
+  userId:    string,
+  title:     string,
+  dataUrl:   string,
+  createdAt?: number,
+): void {
+  if (!dataUrl) return;
+  // Deduplicate by content URL to avoid double entries across reloads
+  if (_artifacts.some(a => a.type === 'image' && (a.id === messageId || a.content === dataUrl))) return;
+  const ts = createdAt ?? Date.now();
+  _artifacts = [{
+    id:        messageId,
+    sessionId, userId, title,
+    language:  'png',
+    content:   dataUrl,
+    type:      'image' as ArtifactType,
+    lineCount: 0,
+    createdAt: ts,
+    updatedAt: ts,
+  }, ..._artifacts];
+  notify();
+}
+
+// ── Load image content on demand (called when LibraryView opens) ──
+// Merges base64 content into already-loaded image entries in _artifacts.
+export async function loadImagesWithContent(userId: string): Promise<void> {
+  if (!isSupabaseConfigured || !userId) return;
+  try {
+    const rows = await queryLoadImages(userId, 20);
+    if (!rows.length) return;
+    // Merge content into existing _artifacts image entries, or add new ones
+    for (const row of rows) {
+      const existing = _artifacts.find(a => a.id === row.id);
+      if (existing) {
+        existing.content = row.content;
+      } else {
+        _artifacts.unshift({
+          id:        row.id,
+          sessionId: row.session_id ?? '',
+          userId:    row.user_id,
+          title:     row.title,
+          language:  row.language ?? 'png',
+          content:   row.content,
+          type:      'image' as ArtifactType,
+          filePath:  row.file_path ?? undefined,
+          lineCount: row.line_count ?? 0,
+          createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+          updatedAt: row.updated_at ? new Date(row.updated_at).getTime() : Date.now(),
+        });
+      }
+    }
+    notify();
+  } catch (e) {
+    console.warn('[SEDREX Images] loadImagesWithContent failed:', e);
+  }
+}
+
 export function clearArtifacts(): void {
   _artifacts  = [];
   _diagrams   = [];
@@ -647,7 +709,7 @@ import { useState, useEffect } from 'react';
 export function useArtifacts() {
   const [artifacts, setArtifacts] = useState<Artifact[]>(_artifacts);
   const [diagrams,  setDiagrams]  = useState<Artifact[]>(_diagrams);
-  const [images,    setImages]    = useState<Artifact[]>([]);
+  const [images,    setImages]    = useState<Artifact[]>(() => _artifacts.filter(a => a.type === 'image'));
   const [activeId,  setActiveId]  = useState<string | null>(_activeId);
   const [panelOpen, setPanelOpen] = useState<boolean>(_panelOpen);
 

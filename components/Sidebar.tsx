@@ -5,14 +5,17 @@ import { Icons } from '../constants';
 import {
   useArtifacts, setActiveArtifact, openPanel, Artifact,
 } from '../services/artifactStore';
+import { UsageBar } from './UsageBar';
+import { runIndexing, useUploadState, resetUploadState } from './ProjectUploader';
+import { useCodebaseIndex } from '../services/codebaseContext';
 
 interface SidebarProps {
   sessions: ChatSession[];
   activeSessionId: string;
   onNewChat: () => void;
   onSelectSession: (id: string) => void;
-  view: 'chat' | 'dashboard' | 'admin' | 'pricing' | 'billing';
-  onSetView: (view: 'chat' | 'dashboard' | 'admin' | 'pricing' | 'billing') => void;
+  view: 'chat' | 'dashboard' | 'admin' | 'pricing' | 'billing' | 'library' | 'artifacts';
+  onSetView: (view: 'chat' | 'dashboard' | 'admin' | 'pricing' | 'billing' | 'library' | 'artifacts') => void;
   stats: UserStats | null;
   onDeleteSession: (id: string) => void;
   onRenameSession: (id: string, newTitle: string) => void;
@@ -47,99 +50,255 @@ const LANG_LABELS: Record<string, string> = {
 };
 const langLabel = (lang: string) => LANG_LABELS[lang.toLowerCase()] ?? lang.toUpperCase();
 
-// ── Artifact row ───────────────────────────────────────────────────
-const ArtifactRow = ({
-  artifact,
-  onOpen,
-}: {
-  artifact: Artifact;
-  onOpen: (id: string) => void;
-}) => (
-  <button
-    className="artifact-sidebar-row"
-    onClick={() => onOpen(artifact.id)}
-    title={`${artifact.title} — ${artifact.lineCount} lines`}
-  >
-    <span className="artifact-sidebar-icon">{langIcon(artifact.language)}</span>
-    <div className="artifact-sidebar-info">
-      <span className="artifact-sidebar-title">{artifact.title}</span>
-      <span className="artifact-sidebar-meta">
-        {langLabel(artifact.language)} · {artifact.lineCount} lines
-      </span>
-    </div>
-    <svg
-      className="artifact-sidebar-arrow"
-      viewBox="0 0 12 12"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      style={{ width: 10, height: 10, flexShrink: 0 }}
-    >
-      <path d="M2 6h8M6 2l4 4-4 4" />
-    </svg>
-  </button>
-);
+// ── Smart title: trim to ≤5 words, strip filler ───────────────────
+const FILLER = new Set(['a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'i', 'me', 'my', 'please', 'can', 'you', 'how', 'do', 'what', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'help']);
 
-// ── Section header with optional refresh button ────────────────────
-const SectionHeader = ({
-  label,
-  icon,
-  count,
-  countBadgeStyle,
-  isOpen: expanded,
-  onToggle,
-  onRefresh,
-}: {
-  label:            string;
-  icon:             React.ReactNode;
-  count:            number;
-  countBadgeStyle?: React.CSSProperties;
-  isOpen:           boolean;
-  onToggle:         () => void;
-  onRefresh?:       () => void;
-}) => (
-  <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-    <button
-      onClick={onToggle}
-      className="sidebar-section-header"
-      aria-expanded={expanded}
-      style={{ flex: 1 }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        {icon}
-        <span>{label}</span>
-        {count > 0 && (
-          <span style={countBadgeStyle ?? {
-            background: 'var(--accent)', color: '#000',
-            borderRadius: 10, fontSize: 9, fontWeight: 700,
-            padding: '1px 5px', lineHeight: 1.6,
-          }}>
-            {count}
+function smartTitle(raw: string): string {
+  if (!raw || raw === 'New Chat') return 'New Chat';
+  // Already short enough
+  const words = raw.trim().split(/\s+/);
+  if (words.length <= 5) return raw.trim();
+  // Try to pick 4-5 meaningful words
+  const meaningful = words.filter(w => !FILLER.has(w.toLowerCase()));
+  const picked = meaningful.slice(0, 4);
+  if (picked.length >= 3) return picked.join(' ');
+  return words.slice(0, 5).join(' ');
+}
+
+// ── Date grouping ─────────────────────────────────────────────────
+type DateGroup = 'Favorites' | 'Today' | 'Yesterday' | 'This week' | 'This month' | 'Older';
+
+function getDateGroup(ts: number): DateGroup {
+  const now = Date.now();
+  const diff = now - ts;
+  const day = 86400000;
+  if (diff < day)           return 'Today';
+  if (diff < 2 * day)       return 'Yesterday';
+  if (diff < 7 * day)       return 'This week';
+  if (diff < 30 * day)      return 'This month';
+  return 'Older';
+}
+
+// ── Codebase Panel ─────────────────────────────────────────────────
+const SidebarCodebasePanel = React.memo(({ isOpen }: { isOpen: boolean }) => {
+  const folderInputRef = React.useRef<HTMLInputElement>(null);
+  const { state, progress, error } = useUploadState();
+  const { hasIndex, projectName, totalFiles, totalChunks, clear } = useCodebaseIndex();
+
+  const handleFolderChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) runIndexing(e.target.files);
+    if (folderInputRef.current) folderInputRef.current.value = '';
+  }, []);
+
+  return (
+    <div className={isOpen ? 'sb-codebase-row' : 'sb-codebase-icon'}>
+      <input ref={folderInputRef} type="file" className="hidden" aria-label="Upload project folder"
+        // @ts-ignore
+        webkitdirectory="" multiple onChange={handleFolderChange} />
+
+      {isOpen ? (
+        /* ── Expanded row ── */
+        <button
+          type="button"
+          onClick={() => !hasIndex && state !== 'indexing' && folderInputRef.current?.click()}
+          className={`sb-codebase-btn${hasIndex ? ' sb-codebase-btn--done' : ''}`}
+          title={hasIndex ? `${projectName} — ${totalFiles} files` : 'Index your codebase for context'}
+        >
+          {/* Icon */}
+          <span className="sb-codebase-btn-icon">
+            {state === 'indexing' ? (
+              <svg className="sb-spin" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M8 1.5A6.5 6.5 0 118 14.5" strokeLinecap="round"/>
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+              </svg>
+            )}
+            {hasIndex && <span className="sb-codebase-dot" />}
           </span>
-        )}
-      </div>
-      <span style={{ fontSize: 9 }}>{expanded ? '▼' : '▶'}</span>
-    </button>
 
-    {onRefresh && (
-      <button
-        onClick={e => { e.stopPropagation(); onRefresh(); }}
-        title={`Refresh ${label}`}
-        style={{
-          background: 'none', border: 'none', cursor: 'pointer',
-          padding: '4px 6px', color: 'var(--text-secondary)',
-          borderRadius: 6, fontSize: 13, lineHeight: 1,
-          transition: 'color 0.15s',
-          flexShrink: 0,
-        }}
-        onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')}
-        onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
-      >
-        ↻
-      </button>
-    )}
-  </div>
-);
+          {/* Label */}
+          <div className="sb-codebase-btn-text">
+            {state === 'indexing' ? (
+              <>
+                <span className="sb-codebase-name">Indexing {progress.pct}%</span>
+                <span className="sb-codebase-sub">{progress.file}</span>
+              </>
+            ) : hasIndex ? (
+              <>
+                <span className="sb-codebase-name">{projectName}</span>
+                <span className="sb-codebase-sub">{totalFiles} files · {totalChunks.toLocaleString()} chunks</span>
+              </>
+            ) : state === 'error' ? (
+              <>
+                <span className="sb-codebase-name sb-codebase-err">Index failed</span>
+                <span className="sb-codebase-sub">{error || 'Click to retry'}</span>
+              </>
+            ) : (
+              <>
+                <span className="sb-codebase-name">Index Codebase</span>
+                <span className="sb-codebase-sub">Upload a project folder</span>
+              </>
+            )}
+          </div>
+
+          {/* Clear button when done */}
+          {hasIndex && state !== 'indexing' && (
+            <button
+              type="button"
+              aria-label="Remove codebase context"
+              className="sb-codebase-clear"
+              onClick={e => { e.stopPropagation(); clear(); resetUploadState(); }}
+            >
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M2 2l12 12M14 2L2 14"/>
+              </svg>
+            </button>
+          )}
+        </button>
+      ) : (
+        /* ── Icon-only mode ── */
+        <button
+          type="button"
+          onClick={() => folderInputRef.current?.click()}
+          title={hasIndex ? `${projectName} — ${totalFiles} files indexed` : 'Index codebase'}
+          className="sb-icon-btn"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+          </svg>
+          {hasIndex && <span className="sb-icon-dot" />}
+        </button>
+      )}
+    </div>
+  );
+});
+SidebarCodebasePanel.displayName = 'SidebarCodebasePanel';
+
+// ── Library panel (lazy — only rendered when active) ───────────────
+type LibraryTab = 'all' | 'images' | 'diagrams';
+
+const LibraryPanel = React.memo(({
+  images,
+  diagrams,
+  onOpenArtifact,
+}: {
+  images: Artifact[];
+  diagrams: Artifact[];
+  onOpenArtifact: (id: string) => void;
+}) => {
+  const [tab, setTab] = useState<LibraryTab>('all');
+  const items = tab === 'all' ? [...images, ...diagrams] : tab === 'images' ? images : diagrams;
+
+  return (
+    <div className="sb-panel">
+      {/* Tabs */}
+      <div className="sb-lib-tabs">
+        {(['all', 'images', 'diagrams'] as LibraryTab[]).map(t => (
+          <button
+            key={t}
+            type="button"
+            className={`sb-lib-tab${tab === t ? ' sb-lib-tab--active' : ''}`}
+            onClick={() => setTab(t)}
+          >
+            {t === 'all' ? `All (${images.length + diagrams.length})` : t === 'images' ? `Images (${images.length})` : `Diagrams (${diagrams.length})`}
+          </button>
+        ))}
+      </div>
+
+      {items.length === 0 ? (
+        <div className="sb-panel-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="3"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <path d="M3 15l5-5 4 4 3-3 6 6"/>
+          </svg>
+          <p>
+            {tab === 'diagrams' ? 'No diagrams yet' : tab === 'images' ? 'No images yet' : 'Nothing in your library yet'}
+          </p>
+          <span>Generated images and diagrams appear here</span>
+        </div>
+      ) : (
+        <div className="sb-gallery">
+          {items.map(item => (
+            <button
+              key={item.id}
+              type="button"
+              className="sb-gallery-cell"
+              onClick={() => onOpenArtifact(item.id)}
+              title={item.title}
+            >
+              {item.type === 'image' ? (
+                <img
+                  src={item.content}
+                  alt={item.title}
+                  loading="lazy"
+                  className="sb-gallery-img"
+                />
+              ) : (
+                <div className="sb-gallery-diagram">
+                  <span className="sb-gallery-diagram-icon">🔷</span>
+                </div>
+              )}
+              <span className="sb-gallery-label">{item.title}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});
+LibraryPanel.displayName = 'LibraryPanel';
+
+// ── Artifacts panel (lazy — only rendered when active) ─────────────
+const ArtifactsPanel = React.memo(({
+  artifacts,
+  diagrams,
+  onOpenArtifact,
+}: {
+  artifacts: Artifact[];
+  diagrams: Artifact[];
+  onOpenArtifact: (id: string) => void;
+}) => {
+  const all = [...artifacts, ...diagrams].sort((a, b) => b.updatedAt - a.updatedAt);
+
+  return (
+    <div className="sb-panel">
+      {all.length === 0 ? (
+        <div className="sb-panel-empty">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M4 3L1 7l3 4M10 3l3 4-3 4M8 1L6 13"/>
+          </svg>
+          <p>No artifacts yet</p>
+          <span>Code files, HTML pages, and documents appear here</span>
+        </div>
+      ) : (
+        <div className="sb-artifact-list">
+          {all.map(a => (
+            <button
+              key={a.id}
+              type="button"
+              className="sb-artifact-item"
+              onClick={() => onOpenArtifact(a.id)}
+              title={`${a.title} — ${a.lineCount} lines`}
+            >
+              <span className="sb-artifact-icon">{langIcon(a.language)}</span>
+              <div className="sb-artifact-info">
+                <span className="sb-artifact-title">{a.title}</span>
+                <span className="sb-artifact-meta">{langLabel(a.language)} · {a.lineCount} lines</span>
+              </div>
+              <svg className="sb-artifact-arrow" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M2 6h8M6 2l4 4-4 4"/>
+              </svg>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});
+ArtifactsPanel.displayName = 'ArtifactsPanel';
 
 // ═══════════════════════════════════════════════════════════════════
 // SIDEBAR
@@ -165,23 +324,20 @@ const Sidebar: React.FC<SidebarProps> = ({
   onRefreshArtifacts,
   id,
 }) => {
-  const [searchTerm,        setSearchTerm]        = useState('');
-  const [debouncedSearch,   setDebouncedSearch]   = useState('');
-  const [editingId,         setEditingId]         = useState<string | null>(null);
-  const [editValue,         setEditValue]         = useState('');
-  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
-  const [showFavorites,     setShowFavorites]     = useState(true);
-  const [showChats,         setShowChats]         = useState(true);
-  const [showArtifacts,     setShowArtifacts]     = useState(true);
-  const [showDiagrams,      setShowDiagrams]      = useState(true);
-  const [showImages,        setShowImages]        = useState(true);
+  const [searchTerm,          setSearchTerm]          = useState('');
+  const [debouncedSearch,     setDebouncedSearch]     = useState('');
+  const [editingId,           setEditingId]           = useState<string | null>(null);
+  const [editValue,           setEditValue]           = useState('');
+  const [confirmingDeleteId,  setConfirmingDeleteId]  = useState<string | null>(null);
+  const [collapsedGroups,     setCollapsedGroups]     = useState<Set<string>>(new Set());
+  const [chatsCollapsed,      setChatsCollapsed]      = useState(false);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Artifact store
   const { artifacts, diagrams, images } = useArtifacts();
 
-  const handleOpenArtifact = useCallback((id: string) => {
-    setActiveArtifact(id);
+  const handleOpenArtifact = useCallback((artifactId: string) => {
+    setActiveArtifact(artifactId);
     openPanel();
   }, []);
 
@@ -197,6 +353,13 @@ const Sidebar: React.FC<SidebarProps> = ({
     return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
   }, []);
 
+  // Search switches back to chat view automatically
+  useEffect(() => {
+    if (debouncedSearch.trim() && (view === 'library' || view === 'artifacts')) {
+      onSetView('chat');
+    }
+  }, [debouncedSearch, view, onSetView]);
+
   // Escape closes sidebar on mobile
   useEffect(() => {
     if (!isOpen) return;
@@ -205,20 +368,22 @@ const Sidebar: React.FC<SidebarProps> = ({
     return () => document.removeEventListener('keydown', handler);
   }, [isOpen, onToggle]);
 
-  // ── Filtered sessions ─────────────────────────────────────────
-  const filteredSessions = useMemo(() => {
+  // ── Filtered flat session list ────────────────────────────────
+  const { filteredSessions, hasNoResults } = useMemo(() => {
     let list = sessions;
     if (debouncedSearch.trim()) {
       const term = debouncedSearch.toLowerCase();
-      list = sessions.filter(s => s.title.toLowerCase().includes(term));
+      list = sessions.filter(s =>
+        s.title.toLowerCase().includes(term) ||
+        s.messages.some(m => m.role === 'user' && m.content.toLowerCase().includes(term))
+      );
     }
-    return list.slice(0, 50);
+    list = list.slice(0, 60);
+    return {
+      filteredSessions: list,
+      hasNoResults: debouncedSearch.trim().length > 0 && list.length === 0,
+    };
   }, [sessions, debouncedSearch]);
-
-  const favorites    = filteredSessions.filter(s =>  s.isFavorite);
-  const regular      = filteredSessions.filter(s => !s.isFavorite);
-  const hasSearch    = debouncedSearch.trim().length > 0;
-  const hasNoResults = hasSearch && filteredSessions.length === 0;
 
   const isMobile = () => typeof window !== 'undefined' && window.innerWidth < 1024;
 
@@ -248,32 +413,21 @@ const Sidebar: React.FC<SidebarProps> = ({
     if (isMobile() && isOpen) onToggle();
   };
 
-  // ── Render session item ───────────────────────────────────────
+  // ── Session item ──────────────────────────────────────────────
   const renderSessionItem = (session: ChatSession) => {
     const isActive     = activeSessionId === session.id && view === 'chat';
     const isConfirming = confirmingDeleteId === session.id;
-    if (!isOpen && !isMobile()) return null;
 
     return (
       <div
         key={session.id}
-        onClick={() => !isConfirming && handleSessionClick(session.id)}
-        className={[
-          'group relative flex items-center w-full p-2.5 rounded-xl text-[13px] transition-all cursor-pointer',
-          isActive
-            ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm border border-[var(--accent)]/20'
-            : 'text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/50',
-          isConfirming ? 'border border-red-500/40 bg-red-500/5' : '',
-        ].join(' ')}
-        role="button"
-        tabIndex={0}
-        onKeyDown={e => e.key === 'Enter' && !isConfirming && handleSessionClick(session.id)}
+        className={`sb-session${isActive ? ' sb-session--active' : ''}${isConfirming ? ' sb-session--confirming' : ''}`}
       >
         {editingId === session.id ? (
           <input
             autoFocus
             aria-label="Rename chat"
-            className="w-full bg-transparent border-none outline-none p-0 text-[var(--text-primary)] text-[13px] font-medium"
+            className="sb-session-rename"
             value={editValue}
             onChange={e => setEditValue(e.target.value)}
             onBlur={() => saveEdit(session.id)}
@@ -281,59 +435,46 @@ const Sidebar: React.FC<SidebarProps> = ({
               if (e.key === 'Enter')  saveEdit(session.id);
               if (e.key === 'Escape') setEditingId(null);
             }}
-            onClick={e => e.stopPropagation()}
           />
         ) : (
           <>
-            <span className={`flex-1 truncate pr-24 text-[13px] font-medium ${isConfirming ? 'text-red-400 font-bold' : ''}`}>
-              {isConfirming ? 'Delete this chat?' : (session.title || 'New Chat')}
-            </span>
+            {/* Main trigger — proper button, no nesting issue */}
+            <button
+              type="button"
+              className={`sb-session-trigger${isConfirming ? ' sb-session-trigger--confirming' : ''}`}
+              onClick={() => !isConfirming && handleSessionClick(session.id)}
+              aria-label={session.title || 'New Chat'}
+            >
+              <span className={`sb-session-title${isConfirming ? ' sb-session-title--confirm' : ''}`}>
+                {isConfirming ? 'Delete this chat?' : smartTitle(session.title || 'New Chat')}
+              </span>
+            </button>
 
-            <div className={`absolute right-2 flex items-center gap-0.5 transition-opacity ${
-              isActive || isConfirming ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-            }`}>
+            {/* Action buttons — siblings to trigger, not children */}
+            <div className={`sb-session-actions${isActive || isConfirming ? ' sb-session-actions--visible' : ''}`}>
               {isConfirming ? (
                 <>
-                  <button
-                    onClick={e => handleDeleteClick(e, session.id)}
-                    className="p-1.5 text-red-400 hover:text-red-300 rounded-lg"
-                    aria-label="Confirm delete"
-                  >
+                  <button type="button" onClick={e => handleDeleteClick(e, session.id)} className="sb-session-btn sb-session-btn--danger" aria-label="Confirm delete">
                     <Icons.Check className="w-3.5 h-3.5" />
                   </button>
-                  <button
-                    onClick={cancelDelete}
-                    className="p-1.5 text-[var(--text-secondary)] rounded-lg"
-                    aria-label="Cancel delete"
-                  >
+                  <button type="button" onClick={cancelDelete} className="sb-session-btn" aria-label="Cancel delete">
                     <Icons.X className="w-3.5 h-3.5" />
                   </button>
                 </>
               ) : (
                 <>
                   <button
+                    type="button"
                     onClick={e => { e.stopPropagation(); onToggleFavorite(session.id); }}
-                    className={`p-1.5 rounded-lg transition-colors ${
-                      session.isFavorite
-                        ? 'text-[var(--accent)]'
-                        : 'hover:text-[var(--accent)] text-[var(--text-secondary)]'
-                    }`}
+                    className={`sb-session-btn${session.isFavorite ? ' sb-session-btn--fav' : ''}`}
                     aria-label={session.isFavorite ? 'Unfavourite' : 'Favourite'}
                   >
                     <Icons.Star fill={session.isFavorite ? 'currentColor' : 'none'} className="w-3.5 h-3.5" />
                   </button>
-                  <button
-                    onClick={e => startEditing(e, session)}
-                    className="p-1.5 hover:text-[var(--accent)] text-[var(--text-secondary)] rounded-lg transition-colors"
-                    aria-label="Rename chat"
-                  >
+                  <button type="button" onClick={e => startEditing(e, session)} className="sb-session-btn" aria-label="Rename chat">
                     <Icons.Edit className="w-3.5 h-3.5" />
                   </button>
-                  <button
-                    onClick={e => handleDeleteClick(e, session.id)}
-                    className="p-1.5 hover:text-red-400 text-[var(--text-secondary)] rounded-lg transition-colors"
-                    aria-label="Delete chat"
-                  >
+                  <button type="button" onClick={e => handleDeleteClick(e, session.id)} className="sb-session-btn sb-session-btn--del" aria-label="Delete chat">
                     <Icons.Trash className="w-3.5 h-3.5" />
                   </button>
                 </>
@@ -345,9 +486,9 @@ const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
-  // ── Logo mark ─────────────────────────────────────────────────
+  // ── Logo ───────────────────────────────────────────────────────
   const SedrexMark = () => (
-    <svg viewBox="0 0 28 28" fill="none" style={{ width: 28, height: 28, flexShrink: 0 }} aria-hidden="true">
+    <svg viewBox="0 0 28 28" fill="none" className="sb-logo-mark" aria-hidden="true">
       <rect width="28" height="28" rx="7" fill="rgba(16,185,129,0.1)" stroke="rgba(16,185,129,0.3)" strokeWidth="1" />
       <path
         d="M19 8H11C9.3 8 8 9.3 8 11V12.5C8 14.2 9.3 15.5 11 15.5H17C18.7 15.5 20 16.8 20 18.5V20C20 21.7 18.7 23 17 23H8"
@@ -357,7 +498,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   );
 
   const HamburgerIcon = () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
       <line x1="3" y1="6"  x2="21" y2="6"  />
       <line x1="3" y1="12" x2="21" y2="12" />
       <line x1="3" y1="18" x2="21" y2="18" />
@@ -365,19 +506,22 @@ const Sidebar: React.FC<SidebarProps> = ({
   );
 
   const CloseIcon = () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
       <line x1="18" y1="6"  x2="6"  y2="18" />
       <line x1="6"  y1="6"  x2="18" y2="18" />
     </svg>
   );
 
-  // ═════════════════════════════════════════════════════════════════
+  const libraryCount  = (images?.length || 0) + diagrams.length;
+  const artifactCount = artifacts.length;
+
+  // ═══════════════════════════════════════════════════════════════
   // RENDER
-  // ═════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════
 
   return (
     <>
-      {/* ── Mobile toggle button ────────────────────────────── */}
+      {/* ── Mobile toggle ─────────────────────────────────────── */}
       <button
         className="sidebar-mobile-toggle"
         onClick={onToggle}
@@ -389,7 +533,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         {isOpen ? <CloseIcon /> : <HamburgerIcon />}
       </button>
 
-      {/* ── Mobile overlay ──────────────────────────────────── */}
+      {/* ── Mobile overlay ────────────────────────────────────── */}
       {isOpen && (
         <div
           className="sidebar-overlay"
@@ -398,414 +542,245 @@ const Sidebar: React.FC<SidebarProps> = ({
         />
       )}
 
-      {/* ── Sidebar panel ───────────────────────────────────── */}
+      {/* ── Sidebar panel ─────────────────────────────────────── */}
       <aside
         id={id || 'app-sidebar'}
         role="navigation"
         aria-label="Sidebar"
-        className={`flex flex-col bg-[var(--bg-secondary)] text-[var(--text-primary)] border-r border-[var(--border)] ${isOpen ? 'translate-x-0' : ''}`}
+        className={`sb${isOpen ? ' translate-x-0' : ''}`}
       >
 
-        {/* ── Header ────────────────────────────────────────── */}
-        <div className="p-3 space-y-3 pt-4">
-          <div className="flex items-center justify-between">
-            {isOpen && (
-              <div className="flex items-center gap-2.5">
-                <SedrexMark />
-                <div>
-                  <h1 style={{
-                    fontFamily: "'IBM Plex Sans', sans-serif",
-                    fontSize: 13, fontWeight: 900, letterSpacing: 4,
-                    color: 'var(--text-primary)', textTransform: 'uppercase' as const,
-                    lineHeight: 1, margin: 0,
-                  }}>
-                    SEDREX
-                  </h1>
-                  <span style={{
-                    fontFamily: "'IBM Plex Mono', monospace",
-                    fontSize: 9, letterSpacing: 2,
-                    color: 'var(--accent, #10B981)',
-                    textTransform: 'uppercase' as const, display: 'block',
-                  }}>
-                    Beta
-                  </span>
-                </div>
+        {/* ── Header: logo + collapse ────────────────────────── */}
+        <div className="sb-header">
+          {isOpen && (
+            <div className="sb-logo">
+              <SedrexMark />
+              <div className="sb-logo-text">
+                <span className="sb-logo-name">SEDREX</span>
+                <span className="sb-logo-tag">Beta</span>
               </div>
-            )}
-
-            {/* Desktop collapse/expand */}
-            <button
-              onClick={onToggle}
-              aria-label={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-              className={`sidebar-desktop-toggle p-2 rounded-xl border border-[var(--border)] hover:border-[var(--accent)]/40 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-all flex items-center justify-center ${!isOpen ? 'mx-auto w-9 h-9' : 'w-8 h-8'}`}
-            >
-              <Icons.PanelLeftOpen className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-            </button>
-          </div>
-
-          {/* New Chat button */}
+            </div>
+          )}
           <button
+            type="button"
+            onClick={onToggle}
+            aria-label={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            className={`sb-collapse-btn sidebar-desktop-toggle${!isOpen ? ' sb-collapse-btn--center' : ''}`}
+          >
+            <Icons.PanelLeftOpen className={`w-4 h-4 transition-transform${isOpen ? ' rotate-180' : ''}`} />
+          </button>
+        </div>
+
+        {/* ── New Chat ──────────────────────────────────────── */}
+        <div className="sb-actions">
+          <button
+            type="button"
             onClick={() => { onNewChat(); onSetView('chat'); if (isMobile()) onToggle(); }}
-            className={`flex items-center gap-2.5 rounded-xl border border-[var(--border)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5 transition-all text-[var(--text-primary)] ${isOpen ? 'w-full p-3' : 'w-9 h-9 p-0 justify-center mx-auto'}`}
+            className={`sb-new-chat${!isOpen ? ' sb-new-chat--icon' : ''}`}
             aria-label="New chat"
           >
             <Icons.Plus />
-            {isOpen && (
-              <span style={{
-                fontFamily: "'IBM Plex Mono', monospace",
-                fontSize: 10, fontWeight: 700,
-                letterSpacing: 3, textTransform: 'uppercase' as const,
-              }}>
-                New Chat
-              </span>
-            )}
+            {isOpen && <span className="sb-new-chat-label">New Chat</span>}
           </button>
 
-          {/* Collapsed: Ctrl+K hint */}
+          {/* Ctrl+K hint (icon mode) */}
           {!isOpen && !isMobile() && (
             <button
+              type="button"
               onClick={onOpenCommandPalette}
               aria-label="Command palette (Ctrl+K)"
-              className="mt-2 w-9 mx-auto rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/6 p-1.5 text-center font-black uppercase leading-tight tracking-wide text-[var(--accent)] transition-all hover:bg-[var(--accent)]/10 flex flex-col items-center"
-              style={{ fontSize: 9 }}
+              className="sb-ctrlk"
             >
               <span>Ctrl</span>
-              <span style={{ fontSize: 10 }}>K</span>
+              <span className="sb-ctrlk-k">K</span>
             </button>
           )}
         </div>
 
-        {/* ── Search ────────────────────────────────────────── */}
+        {/* ── Search (expanded only) ────────────────────────── */}
         {isOpen && (
-          <div className="px-3 mb-2">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-3 flex items-center text-[var(--text-secondary)]">
-                <Icons.Search className="w-3.5 h-3.5" />
-              </div>
+          <div className="sb-search">
+            <div className="sb-search-inner">
+              <Icons.Search className="sb-search-icon" />
               <input
                 ref={searchInputRef}
                 type="text"
-                placeholder="Search chats..."
+                placeholder="Search chats…"
                 value={searchTerm}
                 onChange={handleSearchChange}
                 aria-label="Search chats"
-                className="w-full bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl py-2.5 pl-9 pr-8 text-[12px] font-medium outline-none focus:border-[var(--accent)]/40 text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
+                className="sb-search-input"
               />
               {searchTerm.trim() && (
                 <button
+                  type="button"
                   onClick={() => { setSearchTerm(''); setDebouncedSearch(''); searchInputRef.current?.focus(); }}
                   aria-label="Clear search"
-                  className="absolute inset-y-0 right-3 flex items-center text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  className="sb-search-clear"
                 >
-                  <Icons.X className="w-3.5 h-3.5" />
+                  <Icons.X className="w-3 h-3" />
                 </button>
               )}
             </div>
           </div>
         )}
 
-        {/* ── Scrollable body ───────────────────────────────── */}
-        <div className={`flex-1 overflow-y-auto px-3 custom-scrollbar ${!isOpen && !isMobile() ? 'hidden' : ''}`}>
+        {/* ── Codebase ──────────────────────────────────────── */}
+        <SidebarCodebasePanel isOpen={isOpen} />
 
-          {/* No results banner */}
-          {hasNoResults && (
-            <div className="mb-3 rounded-xl border border-[var(--border)] bg-[var(--bg-primary)] p-3">
-              <p className="text-[12px] font-semibold text-[var(--text-primary)]">No chats found</p>
-              <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
-                No match for "{debouncedSearch}"
+        {/* ── Nav strip: Library + Artifacts + Dashboard ──────── */}
+        {isOpen ? (
+          <div className="sb-nav">
+            <button
+              type="button"
+              className={`sb-nav-btn${view === 'library' ? ' sb-nav-btn--active' : ''}`}
+              onClick={() => { onSetView(view === 'library' ? 'chat' : 'library'); if (isMobile()) onToggle(); }}
+            >
+              <svg className="sb-nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6">
+                <rect x="2" y="2" width="7" height="7" rx="1.5"/>
+                <rect x="11" y="2" width="7" height="7" rx="1.5"/>
+                <rect x="2" y="11" width="7" height="7" rx="1.5"/>
+                <rect x="11" y="11" width="7" height="7" rx="1.5"/>
+              </svg>
+              <span>Library</span>
+              {libraryCount > 0 && <span className="sb-nav-badge">{libraryCount}</span>}
+            </button>
+
+            <button
+              type="button"
+              className={`sb-nav-btn${view === 'artifacts' ? ' sb-nav-btn--active' : ''}`}
+              onClick={() => { onSetView(view === 'artifacts' ? 'chat' : 'artifacts'); if (isMobile()) onToggle(); }}
+            >
+              <svg className="sb-nav-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M4 3L1 7l3 4M10 3l3 4-3 4M8 1L6 13"/>
+              </svg>
+              <span>Artifacts</span>
+              {artifactCount > 0 && <span className="sb-nav-badge">{artifactCount}</span>}
+            </button>
+
+          </div>
+        ) : (
+          /* Icon-only nav */
+          <div className="sb-nav-icons">
+            <button
+              type="button"
+              className={`sb-icon-btn${view === 'library' ? ' sb-icon-btn--active' : ''}`}
+              onClick={() => { onSetView(view === 'library' ? 'chat' : 'library'); }}
+              title="Library"
+            >
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6">
+                <rect x="2" y="2" width="7" height="7" rx="1.5"/>
+                <rect x="11" y="2" width="7" height="7" rx="1.5"/>
+                <rect x="2" y="11" width="7" height="7" rx="1.5"/>
+                <rect x="11" y="11" width="7" height="7" rx="1.5"/>
+              </svg>
+              {libraryCount > 0 && <span className="sb-icon-dot" />}
+            </button>
+
+            <button
+              type="button"
+              className={`sb-icon-btn${view === 'artifacts' ? ' sb-icon-btn--active' : ''}`}
+              onClick={() => { onSetView(view === 'artifacts' ? 'chat' : 'artifacts'); }}
+              title="Artifacts"
+            >
+              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M4 3L1 7l3 4M10 3l3 4-3 4M8 1L6 13"/>
+              </svg>
+              {artifactCount > 0 && <span className="sb-icon-dot" />}
+            </button>
+
+          </div>
+        )}
+
+        {/* ── Scrollable body — favorites + chat list ──────── */}
+        <div className={`sb-body custom-scrollbar${!isOpen && !isMobile() ? ' hidden' : ''}`}>
+
+          {/* Spacer below nav buttons */}
+          <div className="sb-chats-spacer" />
+
+          {/* ── Favorites section ──────────────────────────── */}
+          {filteredSessions.some(s => s.isFavorite) && (
+            <>
+              <p className="sb-section-label">
+                <svg className="sb-section-icon" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+                  <path d="M7 1l1.5 3.1L12 4.6l-2.5 2.4.6 3.4L7 8.8 3.9 10.4l.6-3.4L2 4.6l3.5-.5z"/>
+                </svg>
+                Favorites
               </p>
-              <button
-                onClick={() => { setSearchTerm(''); setDebouncedSearch(''); }}
-                className="mt-1.5 text-[11px] font-bold text-[var(--accent)] hover:opacity-80"
-              >
+              <div className="sb-chat-list sb-favorites-list">
+                {filteredSessions.filter(s => s.isFavorite).map(renderSessionItem)}
+              </div>
+              <div className="sb-section-divider" />
+            </>
+          )}
+
+          {/* ── Chats section label — collapsible ──────────── */}
+          <button
+            type="button"
+            className="sb-chats-label sb-chats-label--btn"
+            onClick={() => setChatsCollapsed(c => !c)}
+            aria-expanded={!chatsCollapsed as unknown as boolean}
+          >
+            <span>Chats</span>
+            <svg
+              className={`sb-chats-arrow${chatsCollapsed ? ' sb-chats-arrow--collapsed' : ''}`}
+              viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8"
+              aria-hidden="true"
+            >
+              <path d="M2 3.5l3 3 3-3"/>
+            </svg>
+          </button>
+
+          {!chatsCollapsed && (hasNoResults ? (
+            <div className="sb-no-results">
+              <p className="sb-no-results-title">No chats found</p>
+              <p className="sb-no-results-sub">No match for &ldquo;{debouncedSearch}&rdquo;</p>
+              <button type="button" onClick={() => { setSearchTerm(''); setDebouncedSearch(''); }} className="sb-no-results-clear">
                 Clear search
               </button>
             </div>
-          )}
+          ) : filteredSessions.length === 0 ? (
+            <div className="sb-empty">
+              <p className="sb-empty-title">No chats yet.</p>
+              <button type="button" onClick={() => { onNewChat(); onSetView('chat'); }} className="sb-empty-cta">
+                Start your first chat →
+              </button>
+            </div>
+          ) : (
+            <div className="sb-chat-list">
+              {filteredSessions.map(renderSessionItem)}
+            </div>
+          ))}
+        </div>
 
-          {/* ── Artifacts ─────────────────────────────────── */}
-          <div className="mb-1">
-            <SectionHeader
-              label="Artifacts"
-              icon={
-                <svg viewBox="0 0 14 14" style={{ width: 11, height: 11, color: 'var(--accent)' }} fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M4 3L1 7l3 4M10 3l3 4-3 4M8 1L6 13" />
-                </svg>
-              }
-              count={artifacts.length}
-              isOpen={showArtifacts}
-              onToggle={() => setShowArtifacts(v => !v)}
-              onRefresh={onRefreshArtifacts}
-            />
-
-            {showArtifacts && (
-              <div className="sidebar-artifact-list">
-                {artifacts.length === 0 ? (
-                  <div className="sidebar-artifact-empty">
-                    Generated code files appear here.
-                  </div>
-                ) : (
-                  artifacts.slice(0, 20).map(a => (
-                    <ArtifactRow key={a.id} artifact={a} onOpen={handleOpenArtifact} />
-                  ))
-                )}
-              </div>
-            )}
+        {/* ── Usage bar ─────────────────────────────────────── */}
+        {isOpen && (
+          <div className="px-3 pb-2">
+            <UsageBar stats={stats} onUpgradeClick={() => onSetView('pricing')} />
           </div>
-
-          {/* ── Diagrams ──────────────────────────────────── */}
-          <div className="mb-1">
-            <SectionHeader
-              label="Diagrams"
-              icon={
-                <svg viewBox="0 0 14 14" style={{ width: 11, height: 11, color: 'var(--accent)' }} fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect x="1" y="1" width="5" height="5" rx="1" />
-                  <rect x="8" y="1" width="5" height="5" rx="1" />
-                  <rect x="4" y="8" width="6" height="5" rx="1" />
-                  <path d="M3.5 6v1.5M10.5 6v1.5M7 6v2" />
-                </svg>
-              }
-              count={diagrams.length}
-              countBadgeStyle={{
-                background: 'rgba(16,185,129,0.2)', color: 'var(--accent)',
-                borderRadius: 10, fontSize: 9, fontWeight: 700,
-                padding: '1px 5px', lineHeight: 1.6,
-                border: '1px solid rgba(16,185,129,0.3)',
-              }}
-              isOpen={showDiagrams}
-              onToggle={() => setShowDiagrams(v => !v)}
-            />
-
-            {showDiagrams && (
-              <div className="sidebar-artifact-list">
-                {diagrams.length === 0 ? (
-                  <div className="sidebar-artifact-empty">
-                    Mermaid diagrams generated in chat appear here.
-                  </div>
-                ) : (
-                  diagrams.slice(0, 20).map(d => (
-                    <ArtifactRow key={d.id} artifact={d} onOpen={handleOpenArtifact} />
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* ── Images ────────────────────────────────────── */}
-          <div className="mb-1">
-            <SectionHeader
-              label="Images"
-              icon={
-                <svg viewBox="0 0 16 16" style={{ width: 12, height: 12, color: 'var(--accent)' }} fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M2 3h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
-                  <circle cx="5" cy="6" r="1.5" />
-                  <path d="M1 12l4-4 4 4" />
-                  <path d="M7 10l3-3 5 5" />
-                </svg>
-              }
-              count={images?.length || 0}
-              countBadgeStyle={{
-                background: 'rgba(16,185,129,0.2)', color: 'var(--accent)',
-                borderRadius: 10, fontSize: 9, fontWeight: 700,
-                padding: '1px 5px', lineHeight: 1.6,
-                border: '1px solid rgba(16,185,129,0.3)',
-              }}
-              isOpen={showImages}
-              onToggle={() => setShowImages(v => !v)}
-            />
-
-            {showImages && (
-              <div className="sidebar-artifact-list">
-                {!images || images.length === 0 ? (
-                  <div className="sidebar-artifact-empty">
-                    Generated images appear here.
-                  </div>
-                ) : (
-                  images.slice(0, 20).map(img => (
-                    <ArtifactRow key={img.id} artifact={img} onOpen={handleOpenArtifact} />
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* ── Favorites ─────────────────────────────────── */}
-          <div className="mb-1">
-            <button
-              onClick={() => setShowFavorites(v => !v)}
-              className="w-full flex items-center justify-between px-1 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-              aria-expanded={showFavorites}
-            >
-              <span>Favorites</span>
-              <span style={{ fontSize: 9 }}>{showFavorites ? '▼' : '▶'}</span>
-            </button>
-
-            {showFavorites && favorites.length > 0 && (
-              <div className="space-y-0.5">
-                {favorites.map(renderSessionItem)}
-              </div>
-            )}
-
-            {showFavorites && favorites.length === 0 && !hasNoResults && (
-              <div className="rounded-xl border border-dashed border-[var(--border)] px-3 py-2 text-[11px] text-[var(--text-secondary)]">
-                Pin chats to keep favorites here.
-              </div>
-            )}
-          </div>
-
-          {/* ── Recent Chats ──────────────────────────────── */}
-          <div className="mb-1">
-            <button
-              onClick={() => setShowChats(v => !v)}
-              className="w-full flex items-center justify-between px-1 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-              aria-expanded={showChats}
-            >
-              <span>Recent Chats</span>
-              <span style={{ fontSize: 9 }}>{showChats ? '▼' : '▶'}</span>
-            </button>
-
-            {showChats && (
-              <div className="space-y-0.5">
-                {regular.map(renderSessionItem)}
-              </div>
-            )}
-
-            {showChats && regular.length === 0 && !hasNoResults && (
-              <div className="rounded-xl border border-dashed border-[var(--border)] px-3 py-3">
-                <p className="text-[11px] font-semibold text-[var(--text-primary)]">No chats yet.</p>
-                <button
-                  onClick={() => { onNewChat(); onSetView('chat'); }}
-                  className="mt-1 text-[11px] font-bold text-[var(--accent)] hover:opacity-80"
-                >
-                  Start your first chat →
-                </button>
-              </div>
-            )}
-          </div>
-
-        </div>{/* end scrollable body */}
+        )}
 
         {/* ── Footer / user ─────────────────────────────────── */}
-        <div className="p-3 mt-auto border-t border-[var(--border)] pb-safe">
+        <div className="sb-footer">
           <button
+            type="button"
             onClick={() => { onOpenSettings(); if (isMobile()) onToggle(); }}
             aria-label="Open settings"
-            className={`flex items-center gap-2.5 rounded-xl hover:bg-[var(--bg-tertiary)] transition-all ${isOpen ? 'w-full p-2.5' : 'w-9 h-9 p-0 justify-center mx-auto'}`}
+            className={`sb-user${!isOpen ? ' sb-user--icon' : ''}`}
           >
-            <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-[13px] font-bold text-white flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, var(--accent, #10B981), #059669)' }}
-              aria-hidden="true"
-            >
+            <div className="sb-avatar" aria-hidden="true">
               {user.email.charAt(0).toUpperCase()}
             </div>
             {isOpen && (
-              <div className="flex-1 text-left min-w-0">
-                <p className="font-semibold truncate text-[12px] text-[var(--text-primary)]">
-                  {user.email.split('@')[0]}
-                </p>
-                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--accent, #10B981)' }}>
-                  {user.tier}
-                </p>
+              <div className="sb-user-info">
+                <p className="sb-user-name">{user.email.split('@')[0]}</p>
+                <p className="sb-user-tier">{user.tier}</p>
               </div>
             )}
           </button>
         </div>
 
       </aside>
-
-      {/* ── Scoped styles ─────────────────────────────────────── */}
-      <style>{`
-        .sidebar-section-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 6px 4px;
-          font-size: 10px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.1em;
-          color: var(--text-secondary);
-          transition: color 0.15s;
-          background: none;
-          border: none;
-          cursor: pointer;
-        }
-        .sidebar-section-header:hover { color: var(--text-primary); }
-
-        .sidebar-artifact-list {
-          display: flex;
-          flex-direction: column;
-          gap: 1px;
-          margin-bottom: 4px;
-        }
-
-        .sidebar-artifact-empty {
-          padding: 8px 12px;
-          font-size: 11px;
-          color: var(--text-secondary);
-          border: 1px dashed var(--border);
-          border-radius: 10px;
-          line-height: 1.5;
-        }
-
-        .artifact-sidebar-row {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          width: 100%;
-          padding: 7px 10px;
-          border-radius: 10px;
-          background: none;
-          border: none;
-          cursor: pointer;
-          text-align: left;
-          transition: background 0.12s;
-          color: var(--text-primary);
-        }
-        .artifact-sidebar-row:hover { background: var(--bg-tertiary); }
-
-        .artifact-sidebar-icon {
-          font-size: 14px;
-          flex-shrink: 0;
-          width: 20px;
-          text-align: center;
-        }
-
-        .artifact-sidebar-info {
-          display: flex;
-          flex-direction: column;
-          gap: 1px;
-          flex: 1;
-          min-width: 0;
-          overflow: hidden;
-        }
-
-        .artifact-sidebar-title {
-          font-size: 12px;
-          font-weight: 600;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          color: var(--text-primary);
-        }
-
-        .artifact-sidebar-meta {
-          font-size: 10px;
-          color: var(--text-secondary);
-          white-space: nowrap;
-        }
-
-        .artifact-sidebar-arrow {
-          color: var(--text-secondary);
-          opacity: 0;
-          transition: opacity 0.12s;
-        }
-        .artifact-sidebar-row:hover .artifact-sidebar-arrow {
-          opacity: 1;
-          color: var(--accent);
-        }
-      `}</style>
     </>
   );
 };

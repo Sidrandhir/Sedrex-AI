@@ -27,8 +27,9 @@ let _listeners: Array<() => void> = [];
 function setUploadState(s: UploadState) { _uploadState = s; _listeners.forEach(f => f()); }
 function setProgress(p: typeof _progress) { _progress = p; _listeners.forEach(f => f()); }
 function setError(e: string) { _error = e; _listeners.forEach(f => f()); }
+export function resetUploadState() { setUploadState('idle'); }
 
-function useUploadState() {
+export function useUploadState() {
   const [, rerender] = useState(0);
   useEffect(() => {
     const fn = () => rerender(n => n + 1);
@@ -38,7 +39,7 @@ function useUploadState() {
   return { state: _uploadState, progress: _progress, error: _error };
 }
 
-async function runIndexing(files: FileList) {
+export async function runIndexing(files: FileList) {
   if (!files || files.length === 0) return;
   setUploadState('indexing');
   setError('');
@@ -89,9 +90,11 @@ export const ProjectUploaderMenuItem: React.FC<{ onClose: () => void }> = ({ onC
   return (
     <>
       <input ref={folderInputRef} type="file" style={{ display: 'none' }}
+        aria-label="Upload project folder"
         // @ts-ignore
         webkitdirectory="" multiple onChange={onFolderChange} />
       <input ref={fileInputRef} type="file" style={{ display: 'none' }}
+        aria-label="Upload project files"
         multiple accept={Array.from(SUPPORTED_EXTENSIONS).join(',')} onChange={onFileChange} />
 
       {/* Section label */}
@@ -214,7 +217,7 @@ export const ProjectIndexChip: React.FC = () => {
         <span style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {error || 'Indexing failed'}
         </span>
-        <button onClick={() => setUploadState('idle')} type="button"
+        <button onClick={() => setUploadState('idle')} type="button" aria-label="Dismiss error"
           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#f87171', display: 'flex' }}>
           <svg style={{ width: 11, height: 11 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M2 2l12 12M14 2L2 14"/>

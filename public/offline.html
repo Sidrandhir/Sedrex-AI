@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0d0d0d" />
+  <title>Sedrex — Offline</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #171717;
+      --surface: #212121;
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #d4d4d8;
+      --muted: #71717a;
+      --accent: #10b981;
+      --font: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      min-height: 100dvh;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 400px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 40px 32px;
+      text-align: center;
+    }
+
+    .logo {
+      width: 52px;
+      height: 52px;
+      margin: 0 auto 24px;
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo svg { width: 28px; height: 28px; }
+
+    .eyebrow {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: -0.025em;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+
+    p {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.7;
+      margin-bottom: 28px;
+    }
+
+    .retry-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #10b981, #34d399);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: inherit;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
+    }
+    .retry-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4); }
+    .retry-btn:active { transform: scale(0.97); }
+
+    .divider {
+      width: 48px;
+      height: 1px;
+      background: var(--border);
+      margin: 24px auto;
+    }
+
+    .tips {
+      text-align: left;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .tips li {
+      list-style: none;
+      padding: 5px 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .tips li::before {
+      content: '→';
+      color: var(--accent);
+      flex-shrink: 0;
+      font-weight: 700;
+    }
+
+    .status {
+      margin-top: 24px;
+      font-size: 11px;
+      color: var(--muted);
+      opacity: 0.6;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: none;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    .retry-btn.loading .spinner { display: block; }
+    .retry-btn.loading .btn-text { display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <svg viewBox="0 0 32 32" fill="none">
+        <path d="M21 9.5H13C11.07 9.5 9.5 11.07 9.5 13V14.2C9.5 16.13 11.07 17.7 13 17.7H19C20.93 17.7 22.5 19.27 22.5 21.2V22C22.5 23.93 20.93 25.5 19 25.5H9.5"
+          stroke="#10B981" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <p class="eyebrow">No Connection</p>
+    <h1>You're offline</h1>
+    <p>
+      Sedrex needs an internet connection to reach the AI models.<br />
+      Check your connection and try again.
+    </p>
+
+    <button class="retry-btn" id="retryBtn" onclick="handleRetry()">
+      <span class="btn-text">Try again</span>
+      <span class="spinner"></span>
+    </button>
+
+    <div class="divider"></div>
+
+    <ul class="tips">
+      <li>Check your Wi-Fi or mobile data</li>
+      <li>Try disabling a VPN if you're using one</li>
+      <li>Your chat history is saved locally</li>
+    </ul>
+
+    <p class="status" id="statusText">Waiting for connection…</p>
+  </div>
+
+  <script>
+    function handleRetry() {
+      const btn = document.getElementById('retryBtn');
+      btn.classList.add('loading');
+      setTimeout(() => {
+        window.location.reload();
+      }, 600);
+    }
+
+    // Auto-reload when connection is restored
+    window.addEventListener('online', () => {
+      document.getElementById('statusText').textContent = 'Connection restored — reloading…';
+      setTimeout(() => window.location.replace('/'), 800);
+    });
+
+    window.addEventListener('offline', () => {
+      document.getElementById('statusText').textContent = 'Still offline…';
+    });
+
+    if (navigator.onLine) {
+      // We somehow got here while online — just go home
+      window.location.replace('/');
+    }
+  </script>
+</body>
+</html>

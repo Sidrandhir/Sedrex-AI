@@ -39,6 +39,7 @@ import {
   buildImagePromptExpansionPrompt,
 } from "./SedrexsystemPrompt";
 import { dispatch as agentDispatch, AgentDispatchResult } from "./agents/agentOrchestrator";
+import { verifyResponse } from "./agents/verificationAgent";
 import { getCodebaseContextForQuery } from "./codebaseContext";
 
 const MODELS = {
@@ -1314,6 +1315,7 @@ async function processRequest(
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
       let fullText       = "";
+      let thinkingContent = "";
       let inputTokens    = 0;
       let outputTokens   = 0;
       let finishReason   = "";
@@ -1405,6 +1407,13 @@ async function processRequest(
           });
           for await (const chunk of stream) {
             if (signal?.aborted) throw new DOMException("Stream aborted by user", "AbortError");
+            // Capture thinking tokens (thought parts are excluded from chunk.text by the SDK)
+            const chunkParts = chunk.candidates?.[0]?.content?.parts ?? [];
+            for (const tp of chunkParts) {
+              if ((tp as any).thought === true && (tp as any).text) {
+                thinkingContent += (tp as any).text;
+              }
+            }
             const text = chunk.text ?? "";
             fullText += text;
             onStreamChunk(text);
@@ -1419,6 +1428,13 @@ async function processRequest(
             model: engine, contents: geminiContents, config: geminiModelConfig,
           });
           fullText     = response.text ?? "";
+          // Capture thinking tokens from non-streaming response
+          const resParts = response.candidates?.[0]?.content?.parts ?? [];
+          for (const tp of resParts) {
+            if ((tp as any).thought === true && (tp as any).text) {
+              thinkingContent += (tp as any).text;
+            }
+          }
           usage        = (response.usageMetadata as typeof usage) ?? usage;
           finishReason = String(response.candidates?.[0]?.finishReason ?? "");
           const gc = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
@@ -1439,7 +1455,18 @@ async function processRequest(
       }
 
       const content    = postProcess(fullText);
-      const confidence = computeConfidence(intent, routing.complexity, useSearch);
+      const rawConfidence = computeConfidence(intent, routing.complexity, useSearch);
+
+      // ── VERIFICATION PIPELINE ────────────────────────────────────
+      // Runs a second Gemini Flash call to cross-check the answer for
+      // coding, reasoning, math, and research intents.
+      // Upgrades confidence label to "✓ Verified" on pass,
+      // or downgrades to moderate/low if issues are found.
+      // Silent on failure — never degrades the primary response.
+      const verKey = getApiKey();
+      const verification = await verifyResponse(content, prompt, intent as QueryIntent, rawConfidence, verKey);
+      const confidence = verification.confidence;
+
       const latency    = Date.now() - startTime;
       markSuccess();
 
@@ -1487,6 +1514,8 @@ async function processRequest(
         groundingChunks: groundingChunks.length > 0 ? groundingChunks : undefined,
         // SESSION 8: isDiff from dual-signal detection
         isDiff,
+        // Thinking tokens captured from Gemini extended thinking mode
+        thinkingContent: thinkingContent.trim() || undefined,
         routingContext: {
           ...routing,
           engine:        agentResult.text ? agentResult.provider : engine,

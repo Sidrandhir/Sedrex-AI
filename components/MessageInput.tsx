@@ -511,7 +511,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
             {imagePreviews.map((preview, i) => (
               <div key={`img-${i}`} className="mi-img-card">
                 <img src={preview} className="mi-img-card-img" alt="Attached" />
-                <button className="mi-img-card-remove" onClick={() => {
+                <button className="mi-img-card-remove" aria-label="Remove image" onClick={() => {
                   setAttachedImages(p => p.filter((_, j) => j !== i));
                   setImagePreviews(p => p.filter((_, j) => j !== i));
                 }}>
@@ -528,7 +528,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
                     <span className="mi-attach-card-name">{doc.title}</span>
                     <span className="mi-attach-card-sub">{doc.type}</span>
                   </div>
-                  <button className="mi-attach-card-remove" onClick={() => setAttachedDocs(p => p.filter((_, j) => j !== i))}>
+                  <button className="mi-attach-card-remove" aria-label="Remove attachment" onClick={() => setAttachedDocs(p => p.filter((_, j) => j !== i))}>
                     <Icons.X className="icon-sm" />
                   </button>
                 </div>
@@ -643,9 +643,9 @@ const MessageInput: React.FC<MessageInputProps> = ({
       )}
 
       <input ref={imageInputRef} type="file" accept="image/*,.heic,.heif" multiple style={{ display: 'none' }}
-        onChange={e => handleImageFiles(e.target.files)} />
+        aria-label="Upload images" onChange={e => handleImageFiles(e.target.files)} />
       <input ref={docInputRef} type="file" accept={ACCEPTED_DOC_TYPES} multiple style={{ display: 'none' }}
-        onChange={e => handleDocFiles(e.target.files)} />
+        aria-label="Upload documents" onChange={e => handleDocFiles(e.target.files)} />
     </div>
   );
 };

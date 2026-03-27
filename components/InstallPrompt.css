@@ -1,0 +1,197 @@
+/* ═══════════════════════════════════════════════════
+   PWA BANNERS — SEDREX
+   ═══════════════════════════════════════════════════ */
+
+/* ── Install Banner (bottom) ──────────────────────── */
+.install-banner {
+  position: fixed;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9800;
+  width: calc(100% - 32px);
+  max-width: 420px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--bg-tertiary);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(16, 185, 129, 0.1);
+  animation: bannerSlideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  font-family: 'IBM Plex Sans', sans-serif;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+@keyframes bannerSlideUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(24px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.install-banner-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.install-banner-logo {
+  width: 22px;
+  height: 22px;
+}
+
+.install-banner-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.install-banner-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.install-banner-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 1px;
+}
+
+.install-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.install-banner-btn {
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.install-banner-btn.install {
+  padding: 8px 16px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #10b981, #34d399);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 62px;
+  min-height: 34px;
+  box-shadow: 0 3px 12px rgba(16, 185, 129, 0.3);
+}
+.install-banner-btn.install:hover:not(:disabled) {
+  transform: scale(1.04);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.42);
+}
+.install-banner-btn.install:disabled { opacity: 0.7; cursor: not-allowed; }
+
+.install-banner-btn.dismiss {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  border: 1px solid var(--border);
+}
+.install-banner-btn.dismiss:hover { color: var(--text-primary); }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.install-spinner {
+  width: 14px;
+  height: 14px;
+  animation: spin 0.7s linear infinite;
+  color: #fff;
+}
+
+/* ── Update Banner (top) ──────────────────────────── */
+.update-banner {
+  position: fixed;
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9900;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 40px;
+  background: var(--bg-tertiary);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  animation: bannerDropIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  font-family: 'IBM Plex Sans', sans-serif;
+  white-space: nowrap;
+}
+
+@keyframes bannerDropIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.update-banner-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  flex-shrink: 0;
+  animation: updatePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes updatePulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  50%       { opacity: 0.8; box-shadow: 0 0 0 5px rgba(16, 185, 129, 0); }
+}
+
+.update-banner-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.update-banner-btn {
+  padding: 5px 12px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #10b981, #34d399);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.update-banner-btn:hover { filter: brightness(1.1); transform: scale(1.04); }
+
+.update-banner-close {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+  flex-shrink: 0;
+}
+.update-banner-close:hover { color: var(--text-primary); }

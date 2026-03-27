@@ -1,19 +1,67 @@
 {
   "id": "/",
-  "name": "SEDREX",
-  "short_name": "SEDREX",
-  "description": "Multi-Model AI Intelligence Platform",
-  "start_url": "/",
+  "name": "Sedrex AI",
+  "short_name": "Sedrex",
+  "description": "Multi-model AI intelligence platform — Claude, GPT-4, Gemini with verification loops and thinking mode.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "background_color": "#0d0d0d",
   "theme_color": "#0d0d0d",
   "orientation": "any",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["productivity", "utilities", "education"],
   "icons": [
     {
       "src": "/sedrex-logo.svg",
-      "sizes": "32x32",
+      "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/sedrex-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
-  ]
+  ],
+  "shortcuts": [
+    {
+      "name": "New Chat",
+      "short_name": "New Chat",
+      "description": "Start a new AI conversation",
+      "url": "/?action=new-chat&source=shortcut",
+      "icons": [{ "src": "/sedrex-logo.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "View usage and stats",
+      "url": "/?action=dashboard&source=shortcut",
+      "icons": [{ "src": "/sedrex-logo.svg", "sizes": "any" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/sedrex-logo.svg",
+      "sizes": "1280x720",
+      "type": "image/svg+xml",
+      "form_factor": "wide",
+      "label": "Sedrex AI — Chat interface"
+    },
+    {
+      "src": "/sedrex-logo.svg",
+      "sizes": "390x844",
+      "type": "image/svg+xml",
+      "form_factor": "narrow",
+      "label": "Sedrex AI — Mobile chat"
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 480
+  }
 }

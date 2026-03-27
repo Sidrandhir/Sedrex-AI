@@ -1,0 +1,131 @@
+// services/usageLimitService.ts
+// ══════════════════════════════════════════════════════════════════
+// SEDREX — Usage Limit Service
+//
+// All limit-checking logic lives here. The actual numbers come from
+// tierConfig.ts — this file only enforces them.
+//
+// IMPORTANT: Limits are currently set to Infinity in tierConfig.ts.
+// This service will silently pass all checks until you set real numbers.
+// When you're ready, edit TIER_CONFIG in tierConfig.ts — no code changes needed here.
+// ══════════════════════════════════════════════════════════════════
+
+import { UserStats } from '../types';
+import { getTierConfig, isLimitEnforced, TierConfig } from './tierConfig';
+
+// ── Result types ──────────────────────────────────────────────────
+
+export type LimitStatus = 'ok' | 'warning' | 'blocked';
+
+export interface LimitCheck {
+  status:       LimitStatus;
+  used:         number;
+  limit:        number;
+  percentUsed:  number;           // 0–100
+  remaining:    number;           // Infinity if uncapped
+  isEnforced:   boolean;          // false = limit is Infinity, no cap active
+  upgradeReason?: string;         // shown in upgrade modal when blocked
+}
+
+export interface UsageSummary {
+  messages:     LimitCheck;
+  dailyMessages:LimitCheck;
+  tokens:       LimitCheck;
+  // Overall: blocked if ANY check is blocked
+  overallStatus: LimitStatus;
+}
+
+// ── Internal helpers ──────────────────────────────────────────────
+
+function buildCheck(used: number, limit: number, upgradeReason?: string): LimitCheck {
+  const enforced   = isLimitEnforced(limit);
+  const pct        = enforced ? Math.min((used / limit) * 100, 100) : 0;
+  const remaining  = enforced ? Math.max(limit - used, 0) : Infinity;
+
+  let status: LimitStatus = 'ok';
+  if (enforced) {
+    if (used >= limit)             status = 'blocked';
+    else if (pct >= 85)            status = 'warning';
+  }
+
+  return { status, used, limit, percentUsed: pct, remaining, isEnforced: enforced, upgradeReason };
+}
+
+function getTodayUsage(stats: UserStats): number {
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const entry = stats.dailyHistory?.find(d => d.date === today);
+  return entry?.count ?? 0;
+}
+
+// ── Main exports ──────────────────────────────────────────────────
+
+/**
+ * Full usage summary for a user.
+ * Call this before sending a message — if overallStatus === 'blocked', show upgrade modal.
+ */
+export function getUsageSummary(stats: UserStats | null): UsageSummary {
+  if (!stats) {
+    // No stats = new user, everything ok
+    const open = buildCheck(0, Infinity);
+    return { messages: open, dailyMessages: open, tokens: open, overallStatus: 'ok' };
+  }
+
+  const cfg: TierConfig = getTierConfig(stats.tier);
+
+  const messages = buildCheck(
+    stats.monthlyMessagesSent,
+    cfg.monthlyMessages,
+    `You've used all ${cfg.monthlyMessages} messages in your ${cfg.name} plan this month.`,
+  );
+
+  const dailyMessages = buildCheck(
+    getTodayUsage(stats),
+    cfg.dailyMessages,
+    `Daily message limit reached. Resets at midnight.`,
+  );
+
+  const tokens = buildCheck(
+    stats.tokensEstimated,
+    cfg.monthlyTokens,
+    `Monthly token limit reached on ${cfg.name}. Upgrade for more capacity.`,
+  );
+
+  const checks = [messages, dailyMessages, tokens];
+  const overallStatus: LimitStatus =
+    checks.some(c => c.status === 'blocked') ? 'blocked' :
+    checks.some(c => c.status === 'warning') ? 'warning' : 'ok';
+
+  return { messages, dailyMessages, tokens, overallStatus };
+}
+
+/**
+ * Quick pre-flight check before sending a message.
+ * Returns null (ok to proceed) or a string reason (show upgrade modal).
+ */
+export function preflightCheck(stats: UserStats | null): string | null {
+  const summary = getUsageSummary(stats);
+  if (summary.overallStatus !== 'blocked') return null;
+
+  if (summary.messages.status === 'blocked')      return summary.messages.upgradeReason!;
+  if (summary.dailyMessages.status === 'blocked')  return summary.dailyMessages.upgradeReason!;
+  if (summary.tokens.status === 'blocked')         return summary.tokens.upgradeReason!;
+  return 'Usage limit reached. Upgrade to continue.';
+}
+
+/**
+ * Formatted usage text for UI display.
+ * e.g. "38 / 50 messages" or "Unlimited" if uncapped.
+ */
+export function formatUsage(check: LimitCheck, unit = 'messages'): string {
+  if (!check.isEnforced) return `Unlimited ${unit}`;
+  return `${check.used.toLocaleString()} / ${check.limit.toLocaleString()} ${unit}`;
+}
+
+/**
+ * Usage bar color based on status.
+ */
+export function getUsageColor(status: LimitStatus): string {
+  if (status === 'blocked') return '#ef4444';  // red
+  if (status === 'warning') return '#f59e0b';  // amber
+  return '#10B981';                            // green
+}

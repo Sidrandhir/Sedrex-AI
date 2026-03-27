@@ -9,6 +9,7 @@
 // ══════════════════════════════════════════════════════════════════
 
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import * as ph from './posthogService';
 
 export interface QueryLogInput {
   userId:           string;
@@ -73,9 +74,10 @@ async function _flush(): Promise<void> {
 class AnalyticsService {
 
   // ── Session ────────────────────────────────────────────────────
-  async startSession(userId: string): Promise<void> {
+  async startSession(userId: string, traits?: { email?: string; tier?: string; name?: string }): Promise<void> {
     if (!isSupabaseConfigured || !supabase) return;
     _userId = userId;
+    ph.identifyUser(userId, traits);
     const d = detectDevice();
     try {
       const { data, error } = await supabase
@@ -84,7 +86,7 @@ class AnalyticsService {
           user_id: userId, is_active: true,
           device_type: d.device_type, browser: d.browser,
           os: d.os, timezone: d.timezone,
-          user_agent: navigator.userAgent.slice(0, 500),
+          // NOTE: user_agent column does not exist in schema — removed
         })
         .select('id').single();
 
@@ -139,6 +141,7 @@ class AnalyticsService {
         .eq('id', _userId);
     } catch { /* never crash */ }
     _sessionId = null;
+    if (reason === 'logout') ph.resetUser();
   }
 
   getSessionId() { return _sessionId; }
@@ -154,11 +157,14 @@ class AnalyticsService {
     const from = _currentView;
     _currentView = toView;
     this._track('view', `view_${toView}`, { from, to: toView });
+    ph.pageView(toView, from);
+    if (toView === 'pricing') ph.pricingViewed('unknown');
   }
 
   // ── Category 3: Model changes ──────────────────────────────────
   modelChange(fromModel: string, toModel: string): void {
     this._track('model_change', 'model_change', { from: fromModel, to: toModel, view: _currentView });
+    ph.modelChanged(fromModel, toModel);
   }
 
   // ── Category 4: Sidebar / theme ───────────────────────────────
@@ -174,6 +180,7 @@ class AnalyticsService {
   }
   feedback(messageId: string, value: 'good' | 'bad', conversationId?: string): void {
     this._track('feedback', `feedback_${value}`, { value, message_id: messageId }, { messageId, conversationId });
+    ph.feedbackGiven(value);
   }
 
   // ── Other events ──────────────────────────────────────────────
@@ -191,14 +198,27 @@ class AnalyticsService {
 
   // ── Query logging ──────────────────────────────────────────────
   logQuery(input: QueryLogInput): void {
+    // Dual-write to PostHog
+    ph.messageSent({
+      model:          input.modelUsed ?? input.modelRequested ?? 'unknown',
+      inputTokens:    input.inputTokens ?? 0,
+      outputTokens:   input.outputTokens ?? 0,
+      responseTimeMs: input.responseTimeMs ?? 0,
+      hasImage:       input.hasImage,
+      hasDoc:         input.hasDocuments,
+      hasCodebase:    input.hasCodebaseRef,
+      intent:         input.intent,
+      confidence:     input.confidenceLevel,
+    });
+
     if (!isSupabaseConfigured || !supabase) return;
     enqueue(async () => {
       const totalTokens = (input.inputTokens ?? 0) + (input.outputTokens ?? 0);
       await supabase!.from('user_query_log').insert({
         user_id: input.userId, session_id: _sessionId,
         conversation_id: input.conversationId, message_id: input.messageId,
-        prompt_text: input.promptText.slice(0, 8000),
-        response_text: input.responseText?.slice(0, 8000) ?? null,
+        prompt_text: input.promptText.slice(0, 500), // schema cap: VARCHAR(500)
+        // response_text column does not exist in schema — responses live in messages table
         intent: input.intent, agent_type: input.agentType, agent_provider: input.agentProvider,
         model_requested: input.modelRequested, model_used: input.modelUsed, engine: input.engine,
         input_tokens: input.inputTokens ?? 0, output_tokens: input.outputTokens ?? 0,
@@ -217,13 +237,14 @@ class AnalyticsService {
 
   // ── Error logging ──────────────────────────────────────────────
   logError(message: string, critical = false, model?: string): void {
+    ph.trackError(message, critical, model);
     if (!isSupabaseConfigured || !supabase || !_userId) return;
     enqueue(async () => {
       await supabase!.from('user_events').insert({
         user_id: _userId, session_id: _sessionId,
-        event_type: 'error', event_name: 'client_error',
+        event_category: 'error', event_type: 'client_error',
         properties: { message: message.slice(0, 500), critical, model: model ?? null },
-        view: _currentView,
+        page_view: _currentView,
       });
     });
   }
@@ -279,11 +300,13 @@ class AnalyticsService {
     enqueue(async () => {
       await supabase!.from('user_events').insert({
         user_id: _userId, session_id: _sessionId,
-        event_type: eventType, event_name: eventName,
+        // DB schema: event_category (NOT NULL), event_type (NOT NULL)
+        // analyticsService: eventType = category (click/view/model), eventName = specific action
+        event_category: eventType,
+        event_type:     eventName,
         properties: { ...props, timestamp: Date.now() },
         conversation_id: ctx.conversationId ?? null,
-        message_id: ctx.messageId ?? null,
-        view: ctx.view ?? _currentView,
+        page_view: ctx.view ?? _currentView,
         device_type: d.device_type,
         timezone: d.timezone,
       });

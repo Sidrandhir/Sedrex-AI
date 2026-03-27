@@ -155,10 +155,11 @@ export async function getAllUserArtifactsByUserId(
           .order('created_at', { ascending: false })
           .limit(50),
 
-        // generated_images — content column: base64_data
+        // generated_images — NEVER fetch base64_data in bulk (causes timeout).
+        // Image content is loaded separately via loadImagesWithContent().
         supabase!
           .from('generated_images')
-          .select(metadataOnly ? metaCols : `${metaCols}, base64_data`)
+          .select(metaCols)
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
           .limit(50),
@@ -169,9 +170,10 @@ export async function getAllUserArtifactsByUserId(
       if (imageRes.error)   console.warn('[QUERY] generated_images error:',   imageRes.error.message);
 
       const normalised: NormalisedArtifactRow[] = [
-        ...(codeRes.data    || []).map((r: any) => ({ ...r, content: r.code_content    ?? '' })),
-        ...(diagramRes.data || []).map((r: any) => ({ ...r, content: r.mermaid_code    ?? '' })),
-        ...(imageRes.data   || []).map((r: any) => ({ ...r, content: r.base64_data     ?? '' })),
+        ...(codeRes.data    || []).map((r: any) => ({ ...r, content: r.code_content ?? '' })),
+        ...(diagramRes.data || []).map((r: any) => ({ ...r, content: r.mermaid_code ?? '' })),
+        // images: content left empty — filled by loadImagesWithContent()
+        ...(imageRes.data   || []).map((r: any) => ({ ...r, content: '' })),
       ];
 
       // Sort newest first across all tables
@@ -213,7 +215,7 @@ export async function getArtifactsBySessionId(
 
         supabase!
           .from('generated_images')
-          .select(metadataOnly ? metaCols : `${metaCols}, base64_data`)
+          .select(metaCols)
           .eq('session_id', sessionId)
           .order('created_at', { ascending: false })
           .limit(20),
@@ -226,7 +228,7 @@ export async function getArtifactsBySessionId(
       const normalised: NormalisedArtifactRow[] = [
         ...(codeRes.data    || []).map((r: any) => ({ ...r, content: r.code_content ?? '' })),
         ...(diagramRes.data || []).map((r: any) => ({ ...r, content: r.mermaid_code ?? '' })),
-        ...(imageRes.data   || []).map((r: any) => ({ ...r, content: r.base64_data  ?? '' })),
+        ...(imageRes.data   || []).map((r: any) => ({ ...r, content: '' })),
       ];
 
       normalised.sort((a, b) =>
@@ -236,6 +238,34 @@ export async function getArtifactsBySessionId(
       return normalised;
     },
     `getArtifactsBySessionId:${sessionId}:${metadataOnly ? 'meta' : 'full'}`
+  );
+}
+
+// ── Dedicated image content loader ───────────────────────────────
+// Fetches base64_data for a user's images in small batches.
+// Called ONLY when LibraryView opens — never at startup.
+export async function loadImagesWithContent(
+  userId: string,
+  limit  = 20
+): Promise<NormalisedArtifactRow[]> {
+  if (!supabase) return [];
+  return QueryOptimizer.executeWithTimeout(
+    async () => {
+      const metaCols = 'id, user_id, session_id, title, language, artifact_type, line_count, created_at, updated_at, file_path';
+      const { data, error } = await supabase!
+        .from('generated_images')
+        .select(`${metaCols}, base64_data`)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.warn('[QUERY] loadImagesWithContent error:', error.message);
+        return [];
+      }
+      return (data || []).map((r: any) => ({ ...r, content: r.base64_data ?? '' }));
+    },
+    `loadImagesWithContent:${userId}`
   );
 }
 

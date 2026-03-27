@@ -88,6 +88,8 @@ export interface Message {
     label: string;
     reason: string;
   };
+  // Thinking content shown in collapsible reasoning block
+  thinkingContent?: string;
 }
 
 export interface ChatSession {
@@ -102,7 +104,7 @@ export interface ChatSession {
   preferredModel?: AIModel | 'auto';
 }
 
-export type UserTier = 'free' | 'pro';
+export type UserTier = 'free' | 'pro' | 'enterprise';
 
 export interface DailyUsage {
   date: string;
@@ -160,6 +162,8 @@ export interface SedrexResponse {
   // true when response is a surgical diff, not a full file rewrite.
   // Prevents artifact extraction and signals diff rendering in ChatArea.
   isDiff?: boolean;
+  // Thinking content captured from Gemini's extended thinking mode
+  thinkingContent?: string;
   routingContext: SedrexRoute & {
     engine:          string;
     thinking:        boolean;

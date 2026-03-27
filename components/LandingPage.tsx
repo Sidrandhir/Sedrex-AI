@@ -224,7 +224,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
               </button>
             </div>
 
-            <p className="sdx-bar-hint">Click anywhere to start building — free, no card needed</p>
+            <p className="sdx-bar-hint">Click anywhere to start building for free</p>
 
             <div className="sdx-chips">
               {['Write code', 'Draw diagrams', 'Generate images', 'Deep analysis', 'Run & preview'].map(c => (
@@ -250,12 +250,12 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
             </div>
             <div className="sdx-proof-divider" />
             <div className="sdx-proof-item">
-              <div className="sdx-proof-num">{counters.b}<span>M</span></div>
+              <div className="sdx-proof-num">{counters.b}<span>M+</span></div>
               <div className="sdx-proof-label">Token context</div>
             </div>
             <div className="sdx-proof-divider" />
             <div className="sdx-proof-item">
-              <div className="sdx-proof-num">0<span>ms</span></div>
+              <div className="sdx-proof-num">110<span>ms</span></div>
               <div className="sdx-proof-label">Tool switching</div>
             </div>
             <div className="sdx-proof-divider" />

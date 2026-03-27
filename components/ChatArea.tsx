@@ -13,6 +13,7 @@ import 'highlight.js/styles/github-dark.css';
 import { ConfidenceBadge } from './ConfidenceBadge';
 import type { ConfidenceSignal } from '../services/aiService';
 import ArtifactCard from './ArtifactCard';
+import { RunButton, CodeRunner } from './CodeRunner';
 import { getArtifacts } from '../services/artifactStore';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -416,6 +417,7 @@ const MIME_MAP: Record<string, string> = {
 
 const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; className?: string }) => {
   const [copied, setCopied] = useState(false);
+  const [runnerOpen, setRunnerOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const language = (className ?? '').replace('language-', '').toLowerCase();
   const codeString = String(children ?? '').replace(/\n$/, '');
@@ -498,6 +500,7 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
       <div className="nx-code-header">
         <span className="nx-code-lang">{language || 'code'}</span>
         <div className="nx-code-actions">
+          <RunButton code={codeString} language={language} onClick={() => setRunnerOpen(true)} />
           <button onClick={handleDownload} className="nx-code-btn">
             <Icons.Download className="icon-12" />Download
           </button>
@@ -515,6 +518,7 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
           />
         </pre>
       </div>
+      {runnerOpen && <CodeRunner code={codeString} language={language} onClose={() => setRunnerOpen(false)} />}
     </div>
   );
 });
@@ -700,7 +704,7 @@ const markdownComponents = {
 const STREAMING_CURSOR_CSS = `
 .streaming-cursor::after {
   content: "▋";
-  animation: blink-cursor 1s step-start infinite;
+  animation: blink-cursor 0.8s step-start infinite;
   margin-left: 2px;
   font-size: 0.9em;
   vertical-align: baseline;
@@ -710,6 +714,16 @@ const STREAMING_CURSOR_CSS = `
 @keyframes blink-cursor {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0; }
+}
+.streaming-word-count {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+  transition: opacity 0.3s;
 }
 `;
 
@@ -872,6 +886,39 @@ interface MessageItemProps {
   remarkPlugins: any[];
 }
 
+// ══════════════════════════════════════════════════════════════════
+// THINKING BLOCK — collapsible reasoning trace for complex queries
+// Shown above the answer when Gemini extended thinking is active.
+// ══════════════════════════════════════════════════════════════════
+const ThinkingBlock = memo(({ content }: { content: string }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  // Approximate word count as a proxy for thinking depth
+  const wordCount = content.trim().split(/\s+/).length;
+  const depthLabel = wordCount > 300 ? 'deeply' : wordCount > 100 ? 'carefully' : 'briefly';
+
+  return (
+    <div className="thinking-block">
+      <button
+        type="button"
+        className="thinking-toggle"
+        onClick={() => setIsOpen(v => !v)}
+        aria-expanded={isOpen}
+      >
+        <span className={`thinking-chevron${isOpen ? ' open' : ''}`}>›</span>
+        <span className="thinking-label">
+          Sedrex thought {depthLabel} about this
+        </span>
+        <span className="thinking-word-count">{wordCount} tokens of reasoning</span>
+      </button>
+      {isOpen && (
+        <div className="thinking-content">
+          <pre className="thinking-text">{content}</pre>
+        </div>
+      )}
+    </div>
+  );
+});
+
 const DOC_META: Record<string, { color: string; bg: string; icon: string; label: string }> = {
   pdf: { color: '#f87171', bg: 'rgba(248,113,113,0.08)', icon: '📄', label: 'PDF' },
   docx: { color: '#60a5fa', bg: 'rgba(96,165,250,0.08)', icon: '📝', label: 'DOC' },
@@ -898,16 +945,17 @@ const MessageItem = memo(
     const isStreaming = isLoading && isLast && !isUser;
 
     // ── Markdown processing with caching ──────────────────────────
+    // Skip preprocessMarkdown during streaming — transforms (mermaid detection,
+    // table normalization, etc.) only matter at final render. Raw content is fine.
     const processedMarkdown = useMemo(() => {
       const content = typeof msg.content === 'string' ? msg.content : String(msg.content ?? '');
-      // FIX 4: Hash key — long messages (5k+ tokens) as Map keys = multi-MB leak.
-      // djb2 hash collapses the key to 7 bytes regardless of content length.
+      if (isStreaming) return content;
       const cacheKey = djb2(content);
       if (markdownCache.has(cacheKey)) return markdownCache.get(cacheKey)!;
       const result = preprocessMarkdown(content);
       setMarkdownCache(cacheKey, result);
       return result;
-    }, [msg.content]);
+    }, [msg.content, isStreaming]);
 
     return (
       <div className={`message-group message-enter ${isUser ? 'message-user' : 'message-assistant'}`}>
@@ -920,12 +968,7 @@ const MessageItem = memo(
                 key={idx}
                 src={`data:${img.mimeType};base64,${img.inlineData.data}`}
                 alt="attachment"
-                style={{
-                  maxWidth: '100%', maxHeight: '400px',
-                  borderRadius: '12px', marginBottom: '8px',
-                  border: '1px solid rgba(16, 185, 129, 0.2)',
-                  display: 'block'
-                }}
+                className="msg-attachment-img"
               />
             ))}
             {msg.documents && msg.documents.length > 0 && (
@@ -937,9 +980,9 @@ const MessageItem = memo(
                     <div
                       key={i}
                       className="doc-chip"
-                      style={{ border: `1px solid ${meta.color}30`, background: meta.bg }}
+                      style={{ '--doc-color': meta.color, '--doc-bg': meta.bg } as React.CSSProperties}
                     >
-                      <div className="doc-chip-icon" style={{ background: meta.bg }}>{meta.icon}</div>
+                      <div className="doc-chip-icon">{meta.icon}</div>
                       <div className="doc-chip-info">
                         <div className="doc-chip-title">{doc.title}</div>
                         <div className="doc-chip-label">{meta.label}</div>
@@ -958,10 +1001,11 @@ const MessageItem = memo(
                   onChange={e => onEditChange(e.target.value)}
                   rows={3}
                   autoFocus
+                  aria-label="Edit message"
                 />
                 <div className="edit-actions">
-                  <button className="edit-btn-primary" onClick={() => onSubmitEdit(msg.id)}>Update</button>
-                  <button className="edit-btn-cancel" onClick={onCancelEdit}>Cancel</button>
+                  <button type="button" className="edit-btn-primary" onClick={() => onSubmitEdit(msg.id)}>Update</button>
+                  <button type="button" className="edit-btn-cancel" onClick={onCancelEdit}>Cancel</button>
                 </div>
               </div>
             ) : (
@@ -975,26 +1019,13 @@ const MessageItem = memo(
                 message was sent. Right-aligned below the bubble.
                 Nothing else in this component was changed. */}
             {!isEditing && msg.codebaseRef && (
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 5 }}>
-                <div style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                  padding: '3px 9px 3px 7px',
-                  background: 'rgba(74,222,128,0.05)',
-                  border: '1px solid rgba(74,222,128,0.18)',
-                  borderRadius: 6, fontSize: 11,
-                  color: 'var(--text-secondary)',
-                  userSelect: 'none' as const,
-                }}>
-                  <svg style={{ width: 11, height: 11, flexShrink: 0, color: '#4ade80' }}
-                    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <div className="codebase-ref-row">
+                <div className="codebase-ref-chip">
+                  <svg className="codebase-ref-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
                   </svg>
-                  <span style={{ color: '#4ade80', fontWeight: 600 }}>
-                    {msg.codebaseRef.projectName}
-                  </span>
-                  <span style={{ opacity: 0.6, fontSize: 10 }}>
-                    {msg.codebaseRef.totalFiles} files referenced
-                  </span>
+                  <span className="codebase-ref-name">{msg.codebaseRef.projectName}</span>
+                  <span className="codebase-ref-count">{msg.codebaseRef.totalFiles} files referenced</span>
                 </div>
               </div>
             )}
@@ -1002,13 +1033,14 @@ const MessageItem = memo(
             {!isEditing && (
               <div className="message-actions message-actions-end">
                 <button
+                  type="button"
                   className={`message-action-btn${isCopied ? ' active-copy' : ''}`}
                   onClick={() => onCopy(msg.content, msg.id)}
                   title="Copy"
                 >
                   {isCopied ? <Icons.Check className="icon-14" /> : <Icons.Copy className="icon-14" />}
                 </button>
-                <button className="message-action-btn" onClick={() => onStartEdit(msg.id, msg.content)} title="Edit">
+                <button type="button" className="message-action-btn" onClick={() => onStartEdit(msg.id, msg.content)} title="Edit">
                   <Icons.Edit className="icon-14" />
                 </button>
               </div>
@@ -1028,6 +1060,11 @@ const MessageItem = memo(
               </div>
             )}
 
+            {/* Thinking block — collapsible reasoning trace, only for complex intents */}
+            {!isStreaming && msg.thinkingContent && (
+              <ThinkingBlock content={msg.thinkingContent} />
+            )}
+
             {/* FIX 6: Smart streaming render.
                 - Plain prose, bold, lists → render with ReactMarkdown immediately (no layout shift)
                 - Tables and fenced code blocks → defer to plain text until stream ends
@@ -1041,7 +1078,7 @@ const MessageItem = memo(
                   const openFence = (c.match(/```/g) || []).length % 2 !== 0;
                   const openTable = /\|[^\n]+\|/.test(c) && !/\|[-:\s|]+\|/.test(c);
                   if (openFence || openTable) {
-                    return <span style={{ whiteSpace: 'pre-wrap' }}>{c}</span>;
+                    return <span className="streaming-raw">{c}</span>;
                   }
                   return (
                     <ReactMarkdown remarkPlugins={remarkPlugins} components={mdComponents}>
@@ -1056,6 +1093,13 @@ const MessageItem = memo(
               </div>
             )}
 
+            {/* Live word counter during streaming */}
+            {isStreaming && msg.content && (
+              <div className="streaming-word-count">
+                {msg.content.trim().split(/\s+/).length} words
+              </div>
+            )}
+
             {/* Confidence badge */}
             {msg.content && !isStreaming && confidence && (
               <div className="confidence-spacer">
@@ -1063,63 +1107,95 @@ const MessageItem = memo(
               </div>
             )}
 
-            {/* Grounding sources */}
+            {/* P8 — Grounding sources with favicon */}
             {msg.groundingChunks && msg.groundingChunks.length > 0 && (
               <div className="sources-strip">
                 {msg.groundingChunks.map((chunk: GroundingChunk, i: number) => {
-                  const uri = chunk.web?.uri || chunk.maps?.uri;
+                  const uri   = chunk.web?.uri || chunk.maps?.uri;
                   const title = chunk.web?.title || chunk.maps?.title;
                   if (!uri) return null;
+                  let domain = '';
+                  try { domain = new URL(uri).hostname.replace(/^www\./, ''); } catch { domain = ''; }
+                  const faviconSrc = domain
+                    ? `https://www.google.com/s2/favicons?domain=${domain}&sz=16`
+                    : '';
                   return (
                     <a key={i} href={uri} target="_blank" rel="noopener noreferrer" className="source-chip">
-                      <span>{title || 'Source'}</span>
+                      {faviconSrc && (
+                        <img
+                          src={faviconSrc}
+                          alt=""
+                          aria-hidden="true"
+                          className="source-chip-favicon"
+                          width="12"
+                          height="12"
+                          onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      )}
+                      <span className="source-chip-domain">{domain || 'Source'}</span>
+                      {title && title !== domain && (
+                        <span className="source-chip-title">{title}</span>
+                      )}
                     </a>
                   );
                 })}
               </div>
             )}
 
-            {/* Action toolbar */}
+            {/* Action toolbar — always visible */}
             <div className="message-actions message-actions-start">
               <button
+                type="button"
                 className={`message-action-btn${isCopied ? ' active-copy' : ''}`}
                 onClick={() => onCopy(msg.content, msg.id)}
                 title="Copy"
               >
                 {isCopied ? <Icons.Check className="icon-14" /> : <Icons.Copy className="icon-14" />}
+                <span className="action-btn-label">{isCopied ? 'Copied' : 'Copy'}</span>
               </button>
-              <button className="message-action-btn" onClick={() => onRegenerate(msg.id)} title="Regenerate">
+              <button type="button" className="message-action-btn" onClick={() => onRegenerate(msg.id)} title="Regenerate">
                 <Icons.RotateCcw className="icon-14" />
+                <span className="action-btn-label">Retry</span>
               </button>
               <button
+                type="button"
                 className={`message-action-btn${isSpeaking ? ' active-speak' : ''}`}
                 onClick={() => onSpeak(msg.id, msg.content)}
-                title={isSpeaking ? 'Stop' : 'Read aloud'}
+                title={isSpeaking ? 'Stop speaking' : 'Read aloud'}
               >
                 {isSpeaking ? <Icons.VolumeX className="icon-14" /> : <Icons.Volume2 className="icon-14" />}
+                <span className="action-btn-label">{isSpeaking ? 'Stop' : 'Listen'}</span>
               </button>
               <button
+                type="button"
                 className="message-action-btn feedback-form-btn"
                 onClick={() => window.open('https://forms.gle/SB93bLtFPjvJnRNRA', '_blank')}
-                title="Feedback"
+                title="Send feedback"
               >
-                Feedback Form
+                Feedback
               </button>
               <div className="message-action-divider" />
               <button
+                type="button"
                 className={`message-action-btn${msg.feedback === 'good' ? ' active-good' : ''}`}
                 onClick={() => onFeedback(msg.id, msg.feedback === 'good' ? null : 'good')}
-                title="Good"
+                title="Good response"
               >
                 <Icons.ThumbsUp className="icon-14" />
+                <span className="action-btn-label">Good</span>
               </button>
               <button
+                type="button"
                 className={`message-action-btn${msg.feedback === 'bad' ? ' active-bad' : ''}`}
                 onClick={() => onFeedback(msg.id, msg.feedback === 'bad' ? null : 'bad')}
-                title="Bad"
+                title="Bad response"
               >
                 <Icons.ThumbsDown className="icon-14" />
+                <span className="action-btn-label">Bad</span>
               </button>
+              {!isStreaming && msg.content && (
+                <span className="generated-badge" aria-label="Output complete">✓ Done</span>
+              )}
             </div>
 
             {/* Generated Image Logic */}
@@ -1132,6 +1208,7 @@ const MessageItem = memo(
                 />
                 <div className="absolute top-2 right-2 opacity-0 group-hover/img:opacity-100 transition-opacity">
                   <button
+                    type="button"
                     onClick={() => {
                       const link = document.createElement('a');
                       link.href = msg.generatedImageUrl!;
@@ -1207,9 +1284,15 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     const el = scrollRef.current;
     if (!el) return;
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-    setAutoScroll(nearBottom);
+    if (nearBottom && !autoScroll) {
+      // User scrolled back to bottom — re-engage and snap immediately
+      setAutoScroll(true);
+      el.scrollTop = el.scrollHeight;
+    } else if (!nearBottom) {
+      setAutoScroll(false);
+    }
     setShowScrollBtn(!nearBottom);
-  }, []);
+  }, [autoScroll]);
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current)
@@ -1311,13 +1394,14 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       {/* Top controls */}
       <div className="chat-controls">
         <button
+          type="button"
           className="chat-ctrl-btn"
           onClick={onThemeToggle}
           title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
         >
           {theme === 'dark' ? <Icons.Sun className="icon-16" /> : <Icons.Moon className="icon-16" />}
         </button>
-        <button className="chat-ctrl-btn" onClick={onExport} title="Export chat">
+        <button type="button" className="chat-ctrl-btn" onClick={onExport} title="Export chat">
           <Icons.Download className="icon-16" />
         </button>
       </div>
@@ -1332,14 +1416,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({
             />
           )}
           {messages.length === 0 && isLoading && (
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flex: 1, height: '60vh', flexDirection: 'column', gap: 12,
-            }}>
+            <div className="chat-loading-state">
               <div className="nx-spinner" />
-              <span style={{ fontSize: 13, color: 'var(--text-secondary)', opacity: 0.6 }}>
-                Loading messages…
-              </span>
+              <span className="chat-loading-label">Loading messages…</span>
             </div>
           )}
 
@@ -1377,11 +1456,12 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       {/* Scroll to bottom */}
       {showScrollBtn && (
         <button
+          type="button"
           className="scroll-to-bottom-btn-center"
           onClick={scrollToBottom}
           aria-label="Scroll to latest"
         >
-          <svg viewBox="0 0 24 24" style={{ width: 16, height: 16 }} fill="none" stroke="currentColor" strokeWidth="2.5">
+          <svg className="scroll-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <path d="M7 13l5 5 5-5M7 6l5 5 5-5" />
           </svg>
         </button>
