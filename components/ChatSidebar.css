@@ -1855,3 +1855,325 @@ aside[role="navigation"] {
   .sb-collapse-btn,
   .sb-nav-btn { -webkit-transition: none; transition: none; }
 }
+
+/* ================================================================
+   CLAUDE-STYLE RESTYLE — Clean vertical nav layout
+   All overrides below. No features removed, only visual changes.
+   ================================================================ */
+
+/* ── Core sidebar: slightly narrower, cleaner bg ─────────────── */
+.sb {
+  background: #1a1a1a;
+  border-right: 1px solid rgba(255,255,255,0.07);
+}
+[data-theme='light'] .sb {
+  background: #f5f5f0;
+  border-right: 1px solid rgba(0,0,0,0.08);
+}
+
+/* ── Header: less padding, simpler ──────────────────────────── */
+.sb-header {
+  padding: 12px 10px 8px;
+}
+
+/* ── Logo: tighter, more refined ────────────────────────────── */
+.sb-logo-name {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 3px;
+}
+
+/* ── New chat: full-width clean row, no border ───────────────── */
+.sb-actions {
+  padding: 4px 8px 2px;
+  gap: 2px;
+}
+
+.sb-new-chat {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  gap: 10px;
+  color: var(--text-primary);
+  -webkit-transition: background 0.12s;
+          transition: background 0.12s;
+}
+.sb-new-chat:hover {
+  border-color: transparent;
+  background: rgba(255,255,255,0.07);
+}
+[data-theme='light'] .sb-new-chat:hover {
+  background: rgba(0,0,0,0.06);
+}
+
+.sb-new-chat-label {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ── Search: cleaner input ───────────────────────────────────── */
+.sb-search {
+  padding: 2px 8px 6px;
+}
+
+.sb-search-input {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  font-size: 13px;
+  padding: 7px 28px 7px 32px;
+}
+[data-theme='light'] .sb-search-input {
+  background: rgba(0,0,0,0.05);
+  border-color: rgba(0,0,0,0.1);
+}
+.sb-search-input:focus {
+  border-color: rgba(16,185,129,0.35);
+  background: rgba(255,255,255,0.07);
+}
+
+/* ── Codebase panel: subtle dashed border ────────────────────── */
+.sb-codebase-row { padding: 0 8px 6px; }
+
+.sb-codebase-btn {
+  border-radius: 8px;
+  border-color: rgba(255,255,255,0.1);
+  padding: 8px 10px;
+}
+
+/* ── Nav: vertical stacked rows (like Claude) ────────────────── */
+.sb-nav {
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: column;
+          flex-direction: column;
+  gap: 2px;
+  padding: 2px 8px 6px;
+}
+
+.sb-nav-btn {
+  -webkit-box-flex: unset;
+      -ms-flex: unset;
+          flex: unset;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 400;
+  gap: 10px;
+  -webkit-transition: background 0.12s, color 0.12s;
+          transition: background 0.12s, color 0.12s;
+}
+
+.sb-nav-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255,255,255,0.07);
+  border: none;
+}
+[data-theme='light'] .sb-nav-btn:hover {
+  background: rgba(0,0,0,0.06);
+}
+
+.sb-nav-btn--active {
+  color: var(--text-primary);
+  border: none;
+  background: rgba(255,255,255,0.09);
+}
+[data-theme='light'] .sb-nav-btn--active {
+  background: rgba(0,0,0,0.07);
+}
+
+.sb-nav-icon {
+  width: 15px;
+  height: 15px;
+  opacity: 0.75;
+}
+
+.sb-nav-badge {
+  background: rgba(255,255,255,0.1);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+}
+[data-theme='light'] .sb-nav-badge {
+  background: rgba(0,0,0,0.08);
+}
+
+/* ── Icon-only nav (collapsed mode) ────────────────────────── */
+.sb-nav-icons {
+  gap: 4px;
+  padding: 2px 0 6px;
+}
+
+.sb-icon-btn {
+  border-radius: 8px;
+  border: none;
+  background: none;
+  width: 36px;
+  height: 36px;
+  color: var(--text-secondary);
+}
+.sb-icon-btn:hover,
+.sb-icon-btn--active {
+  background: rgba(255,255,255,0.08);
+  border: none;
+  color: var(--text-primary);
+}
+[data-theme='light'] .sb-icon-btn:hover,
+[data-theme='light'] .sb-icon-btn--active {
+  background: rgba(0,0,0,0.07);
+  color: var(--text-primary);
+}
+
+/* ── Collapse button: cleaner ────────────────────────────────── */
+.sb-collapse-btn {
+  border: none;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  background: none;
+  width: 30px;
+  height: 30px;
+  padding: 4px;
+}
+.sb-collapse-btn:hover {
+  background: rgba(255,255,255,0.07);
+  border: none;
+  color: var(--text-primary);
+}
+[data-theme='light'] .sb-collapse-btn:hover {
+  background: rgba(0,0,0,0.06);
+}
+
+/* ── "Recents" / section labels: smaller, less uppercase ──────── */
+.sb-chats-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  padding: 0 12px 4px;
+}
+
+.sb-chats-label--btn {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  opacity: 0.6;
+  padding: 0 12px 4px;
+}
+.sb-chats-label--btn:hover { opacity: 0.85; }
+
+.sb-section-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  opacity: 0.6;
+  padding: 0 12px 4px;
+}
+
+/* ── Session items: tighter, cleaner ────────────────────────── */
+.sb-session {
+  border-radius: 8px;
+  min-height: 34px;
+}
+
+.sb-session:hover { background: rgba(255,255,255,0.05); }
+[data-theme='light'] .sb-session:hover { background: rgba(0,0,0,0.05); }
+
+.sb-session--active {
+  background: rgba(255,255,255,0.08) !important;
+  -webkit-box-shadow: none;
+          box-shadow: none;
+}
+[data-theme='light'] .sb-session--active {
+  background: rgba(0,0,0,0.07) !important;
+}
+
+.sb-session-trigger {
+  padding: 7px 4px 7px 10px;
+}
+
+.sb-session-title {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+.sb-session--active .sb-session-title {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* ── Body: tighter padding ───────────────────────────────────── */
+.sb-body {
+  padding: 0 6px;
+}
+
+.sb-chats-spacer { height: 8px; }
+
+/* ── Footer: cleaner ──────────────────────────────────────────── */
+.sb-footer {
+  padding: 8px 10px;
+  padding-bottom: 10px;
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+[data-theme='light'] .sb-footer {
+  border-top-color: rgba(0,0,0,0.08);
+}
+
+.sb-user {
+  border-radius: 8px;
+  padding: 6px 6px;
+}
+.sb-user:hover { background: rgba(255,255,255,0.06); }
+[data-theme='light'] .sb-user:hover { background: rgba(0,0,0,0.05); }
+
+.sb-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.sb-user-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.sb-user-tier {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: capitalize;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+/* ── Section divider: softer ─────────────────────────────────── */
+.sb-section-divider {
+  margin: 6px 10px;
+  opacity: 0.3;
+}
+
+/* ── Empty state: cleaner ────────────────────────────────────── */
+.sb-empty {
+  border: none;
+  background: none;
+  padding: 12px 10px;
+  margin: 0;
+}
+.sb-empty-title {
+  color: var(--text-secondary);
+  font-weight: 400;
+  font-size: 12px;
+}

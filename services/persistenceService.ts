@@ -1,5 +1,6 @@
 
-import { ChatSession, Message, Artifact } from '../types';
+import { ChatSession, Message } from '../types';
+import { Artifact } from './artifactStore';
 
 /**
  * SEDREX PERSISTENCE SERVICE v1.0

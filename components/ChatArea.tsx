@@ -1,7 +1,7 @@
 import React, {
   useRef, useEffect, useState, useCallback, useMemo, memo,
 } from 'react';
-import { Message, AIModel, SedrexRoute, ChatSession, GroundingChunk } from '../types';
+import { Message, AIModel, SedrexRoute, ChatSession, GroundingChunk, MessageImage } from '../types';
 import { Icons } from '../constants';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';

@@ -20,12 +20,12 @@
 import { supabase } from './supabaseClient';
 
 export class QueryOptimizer {
-  private static readonly TIMEOUT_MS  = 30000;
-  private static readonly MAX_RETRIES = 3;
-  private static readonly RETRY_DELAY = 1500;
+  private static readonly TIMEOUT_MS  = 20000; // 20s — Supabase cold start is typically ≤15s
+  private static readonly MAX_RETRIES = 1;      // 1 retry only — 3 retries × 20s = 60s wait was too long
+  private static readonly RETRY_DELAY = 800;    // retry faster
 
   private static activeQueries = 0;
-  private static readonly MAX_CONCURRENT = 2;
+  private static readonly MAX_CONCURRENT = 6;  // was 2 — startup fires ~10 queries; 6 allows them to run in parallel
   private static queue: (() => void)[] = [];
 
   private static async enqueue(): Promise<void> {
@@ -69,14 +69,36 @@ export class QueryOptimizer {
         return result;
       } catch (error: any) {
         this.dequeue();
-        const msg       = error?.message || '';
-        const isTimeout = msg.includes('timeout') || msg.includes('57014') || msg.includes('500');
+        const msg  = error?.message || '';
+        const code = error?.code    || '';
 
-        console.warn(`[QUERY] ${operationName} attempt ${attempt + 1} failed:`, msg);
+        // Classify transient errors that warrant a single retry:
+        // - Query timeout (57014) or generic timeout message
+        // - 500/503 HTTP errors embedded in message
+        // - PGRST002: PostgREST schema cache not ready (Supabase cold start)
+        // - "Service Unavailable" / "unavailable" in message
+        const isTransient =
+          msg.includes('timeout')       ||
+          msg.includes('57014')         ||
+          msg.includes('503')           ||
+          msg.includes('unavailable')   ||
+          code === 'PGRST002'           ||
+          msg.includes('schema cache');
 
-        if (!isTimeout || attempt === maxRetries) throw error;
+        // Cold-start errors need a longer pause before retry
+        const isColdStart = code === 'PGRST002' || msg.includes('schema cache');
+        const retryDelay  = isColdStart ? 5000 : this.RETRY_DELAY;
 
-        await new Promise(r => setTimeout(r, this.RETRY_DELAY * (attempt + 1)));
+        // Log cold-start as info (expected), other failures as warn
+        if (isColdStart) {
+          console.info(`[QUERY] ${operationName} Supabase waking up, retry in ${retryDelay}ms`);
+        } else {
+          console.warn(`[QUERY] ${operationName} attempt ${attempt + 1} failed:`, msg);
+        }
+
+        if (!isTransient || attempt === maxRetries) throw error;
+
+        await new Promise(r => setTimeout(r, retryDelay));
       }
     }
 

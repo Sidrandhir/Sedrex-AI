@@ -94,9 +94,26 @@ function buildSrcdoc(artifact: Artifact): string {
 
   const base = `<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui,sans-serif;background:#0b0f1a;color:#e4e8f0;min-height:100vh}.sx-err{color:#f87171;background:rgba(248,113,113,.08);padding:14px;border-radius:8px;border:1px solid rgba(248,113,113,.25);font-family:monospace;font-size:13px;white-space:pre-wrap;margin:12px}.sx-out{font-family:'Fira Code',monospace;font-size:13px;line-height:1.6;padding:16px;white-space:pre-wrap;word-break:break-word}.sx-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(16,185,129,.7);padding:12px 16px 4px;font-family:monospace}pre{margin:0}</style>`;
 
-  // HTML direct
+  // HTML direct — inject a compatibility patch for common AI-generated issues:
+  // 1. Lucide deprecated icon names (twitter→x, etc.)
+  // 2. Suppress CDN production warnings
   if (lang === 'html' || content.trimStart().toLowerCase().startsWith('<!doctype html') || content.trimStart().toLowerCase().startsWith('<html')) {
-    return content;
+    const lucidePatch = `<script>
+// Patch deprecated lucide icon names the AI commonly uses
+document.addEventListener('DOMContentLoaded',()=>{
+  const aliases={'twitter':'x','github':'github','linkedin':'linkedin','facebook':'facebook','instagram':'instagram','youtube':'youtube','mail':'mail','home':'house','search':'search'};
+  const deprecated={'twitter':'x'};
+  document.querySelectorAll('[data-lucide]').forEach(el=>{
+    const name=el.getAttribute('data-lucide');
+    if(deprecated[name])el.setAttribute('data-lucide',deprecated[name]);
+  });
+});
+// Suppress CDN warnings from inside preview
+const _cw=console.warn;console.warn=(...a)=>{if(typeof a[0]==='string'&&a[0].includes('cdn.tailwindcss.com'))return;_cw(...a);};
+</script>`;
+    // Inject before </head> if present, otherwise prepend
+    if (content.includes('</head>')) return content.replace('</head>', lucidePatch + '</head>');
+    return lucidePatch + content;
   }
 
   // SVG
@@ -148,6 +165,10 @@ catch(e){Object.defineProperty(window,'localStorage',{value:{_d:{},setItem(k,v){
 </script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
+<script>
+// Suppress CDN-only warnings that pollute the host DevTools console
+const _cw=console.warn;console.warn=(...a)=>{if(typeof a[0]==='string'&&(a[0].includes('cdn.tailwindcss.com')||a[0].includes('should not be used in production')))return;_cw(...a);};
+</script>
 ${base}
 <style>
 body{padding:16px}
@@ -561,7 +582,7 @@ const PreviewPane = memo(({ artifact }: { artifact: Artifact }) => {
         </div>
       )}
       <iframe ref={iframeRef} className={`ap-preview-iframe${loaded ? ' ap-preview-iframe--visible' : ''}`}
-        sandbox="allow-scripts allow-popups allow-forms allow-same-origin" title="Live preview"
+        sandbox="allow-scripts allow-popups allow-forms" title="Live preview"
         onLoad={() => setTimeout(() => setLoaded(true), 50)}
         onError={() => setErrMsg('Failed to load preview')}
         style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} />

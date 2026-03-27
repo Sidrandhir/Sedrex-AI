@@ -54,7 +54,6 @@ const Pricing = lazy(() => import('./components/Pricing'));
 const Billing = lazy(() => import('./components/Billing'));
 const AuthPage = lazy(() => import('./components/AuthPage'));
 const LandingPage = lazy(() => import('./components/LandingPage'));
-const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
 const SettingsModal = lazy(() => import('./components/SettingsModal'));
 const ArtifactPanel = lazy(() => import('./components/ArtifactPanel'));
 const MobileOnboarding = lazy(() => import('./components/MobileOnboarding'));
@@ -84,7 +83,7 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
   const [isLoading, setIsLoading] = useState(false);
   const [routingInfo, setRoutingInfo] = useState<SedrexRoute | null>(null);
-  const [view, setView] = useState<'chat' | 'dashboard' | 'pricing' | 'billing' | 'admin' | 'library' | 'artifacts'>('chat');
+  const [view, setView] = useState<'chat' | 'dashboard' | 'pricing' | 'billing' | 'library' | 'artifacts'>('chat');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -180,7 +179,7 @@ const App: React.FC = () => {
     setIsSidebarOpen(prev => !prev);
   };
 
-  const handleSetView = useCallback((v: 'chat' | 'dashboard' | 'pricing' | 'billing' | 'admin' | 'library' | 'artifacts') => {
+  const handleSetView = useCallback((v: 'chat' | 'dashboard' | 'pricing' | 'billing' | 'library' | 'artifacts') => {
     analytics.viewChange(v as string);
     setView(v);
   }, []);
@@ -273,34 +272,57 @@ const App: React.FC = () => {
             }
           });
 
-          if (localMsgs.length === 0) setIsLoading(true);
-          api.getMessages(restoreId, 100).then(dbMsgs => {
-            if (isMounted) {
-              if (dbMsgs.length > 0) {
+          // Skip DB fetch if local cache already has enough messages — avoids startup timeout
+          const needsDbFetch = localMsgs.length < 5;
+          if (needsDbFetch) {
+            setIsLoading(true);
+            api.getMessages(restoreId, 40).then(dbMsgs => {
+              if (isMounted) {
+                if (dbMsgs.length > 0) {
+                  startTransition(() =>
+                    setSessions(prev =>
+                      prev.map(s => s.id === restoreId ? { ...s, messages: dbMsgs } : s)
+                    )
+                  );
+                  dbMsgs.forEach(msg => {
+                    if (msg.generatedImageUrl) {
+                      const label = msg.content?.slice(0, 40) || 'Generated Image';
+                      addImageFromMessage(msg.id, restoreId, user.id, label, msg.generatedImageUrl, msg.timestamp);
+                    }
+                  });
+                }
+                setIsLoading(false);
+              }
+            }).catch(() => { setIsLoading(false); });
+          } else {
+            // Sync in background after a delay — don't block startup
+            setTimeout(() => {
+              if (!isMounted) return;
+              api.getMessages(restoreId, 40).then(dbMsgs => {
+                if (!isMounted || dbMsgs.length === 0) return;
                 startTransition(() =>
                   setSessions(prev =>
                     prev.map(s => s.id === restoreId ? { ...s, messages: dbMsgs } : s)
                   )
                 );
-                // Scan loaded messages for generated images — zero DB calls
                 dbMsgs.forEach(msg => {
                   if (msg.generatedImageUrl) {
                     const label = msg.content?.slice(0, 40) || 'Generated Image';
                     addImageFromMessage(msg.id, restoreId, user.id, label, msg.generatedImageUrl, msg.timestamp);
                   }
                 });
-              }
-              setIsLoading(false);
-            }
-          }).catch(() => { setIsLoading(false); });
+              }).catch(() => {});
+            }, 2000);
+          }
         }
 
-        await new Promise(r => setTimeout(r, 1000));
+        // Short yield to let React render the cached UI before hitting DB
+        await new Promise(r => setTimeout(r, 300));
         if (!isMounted) return;
 
         const [stats, cloudSessions] = await Promise.all([
           getStats(user.id),
-          api.getConversations(50, 0),
+          api.getConversations(30, 0),
         ]);
 
         if (!isMounted) return;
@@ -308,9 +330,9 @@ const App: React.FC = () => {
 
         if (cloudSessions.length > 0) {
           const firstId = cloudSessions[0].id;
-          const cloudMessages = await api.getMessages(firstId, 50, true);
 
           if (!isMounted) return;
+          // Merge cloud sessions with local — no extra getMessages call here
           startTransition(() => {
             setSessions(prev => {
               const merged = cloudSessions.map(cs => {
@@ -332,7 +354,10 @@ const App: React.FC = () => {
             }
           });
 
-          api.loadSessionPreviews(cloudSessions.slice(0, 5).map(s => s.id));
+          // Defer session previews — low priority, don't compete with main load
+          setTimeout(() => {
+            if (isMounted) api.loadSessionPreviews(cloudSessions.slice(0, 3).map(s => s.id));
+          }, 3000);
         }
 
         setTimeout(() => {
@@ -345,12 +370,18 @@ const App: React.FC = () => {
         // Populate Library images from already-loaded messages — zero DB calls
         setTimeout(() => {
           setSessions(prev => {
-            prev.forEach(session => {
-              session.messages.forEach(msg => {
-                if (msg.generatedImageUrl) {
-                  const label = msg.content?.slice(0, 40) || 'Generated Image';
-                  addImageFromMessage(msg.id, session.id, user.id, label, msg.generatedImageUrl, msg.timestamp);
-                }
+            // Side effects must run OUTSIDE the updater — addImageFromMessage triggers
+            // a Sidebar setState, which causes React's "setState during render" error
+            // when called synchronously inside setSessions. Promise.resolve defers it
+            // to the next microtask, after the current render cycle completes.
+            Promise.resolve().then(() => {
+              prev.forEach(session => {
+                (session.messages ?? []).forEach(msg => {
+                  if (msg.generatedImageUrl) {
+                    const label = msg.content?.slice(0, 40) || 'Generated Image';
+                    addImageFromMessage(msg.id, session.id, user.id, label, msg.generatedImageUrl, msg.timestamp);
+                  }
+                });
               });
             });
             return prev; // no state change, just side-effect scan
@@ -877,10 +908,6 @@ const App: React.FC = () => {
                   ) : view === 'billing' ? (
                     <Suspense fallback={<LazyFallback />}>
                       <Billing stats={userStats!} userId={user?.id ?? ''} onCancel={handleManageBilling} onUpgrade={handleUpgrade} onClose={() => handleSetView('chat')} />
-                    </Suspense>
-                  ) : view === 'admin' ? (
-                    <Suspense fallback={<LazyFallback />}>
-                      <AdminDashboard />
                     </Suspense>
                   ) : view === 'library' ? (
                     <Suspense fallback={<LazyFallback />}>

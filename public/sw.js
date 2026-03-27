@@ -94,8 +94,9 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = request.url;
 
-  // Only intercept GET requests
+  // Only intercept GET requests over http(s) — skip chrome-extension:// and other schemes
   if (request.method !== 'GET') return;
+  if (!url.startsWith('http://') && !url.startsWith('https://')) return;
 
   // 1. Network-only: AI/auth/billing APIs — never cache
   if (isNetworkOnly(url)) {

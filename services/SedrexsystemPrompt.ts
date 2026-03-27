@@ -228,6 +228,11 @@ RULE 2: Complete files — all imports, all functions, all exports.
 RULE 3: No placeholders — // TODO, // FIXME, // add logic here
   Write it or explain precisely why you can't.
 
+RULE 3b: Every variable declaration must be complete — never write bare const/let/var without an assignment.
+  WRONG: const
+  WRONG: const myVar
+  RIGHT: const myVar = 'value'
+
 RULE 4: Declare file path in first comment line.
   Example: // src/services/authService.ts
 

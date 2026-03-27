@@ -21,24 +21,25 @@ export const isSupabaseConfigured = config.url.length > 10 && config.key.length 
 /**
  * iOS-resilient fetch wrapper.
  * iOS WebKit throws "TypeError: Load failed" instead of "Failed to fetch".
- * This custom fetch retries on transient network errors.
+ * Retries once on true network errors (not on 5xx server errors).
+ *
+ * NOTE: 503/521 responses are NOT retried here — they return a Response object
+ * successfully, so the catch block is never triggered. Supabase-level retries
+ * for PGRST002 / cold-start errors are handled in queryOptimizer.ts.
  */
 const resilientFetch: typeof globalThis.fetch = async (input, init) => {
-  const MAX_RETRIES = 3;
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    try {
-      return await globalThis.fetch(input, init);
-    } catch (err: any) {
-      const msg = (err?.message || '').toLowerCase();
-      const isTransient = msg.includes('load failed') || msg.includes('failed to fetch') || msg.includes('network') || msg.includes('aborted');
-      if (isTransient && attempt < MAX_RETRIES - 1) {
-        await new Promise(r => setTimeout(r, 800 * (attempt + 1)));
-        continue;
-      }
-      throw err;
+  try {
+    return await globalThis.fetch(input, init);
+  } catch (err: any) {
+    const msg = (err?.message || '').toLowerCase();
+    const isTransient = msg.includes('load failed') || msg.includes('failed to fetch') || msg.includes('network') || msg.includes('aborted');
+    if (isTransient) {
+      // Single retry after 600ms — avoids spamming CORS errors in the console
+      await new Promise(r => setTimeout(r, 600));
+      return globalThis.fetch(input, init);
     }
+    throw err;
   }
-  return globalThis.fetch(input, init); // fallback
 };
 
 /**

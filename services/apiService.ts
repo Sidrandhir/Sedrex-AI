@@ -55,7 +55,7 @@ const API_ERROR_MESSAGES = {
 // Sessions saved to localStorage are considered fresh for 10 minutes.
 // After that, skip the cache and fetch from Supabase so the user
 // always sees their latest conversations on page refresh.
-const PERSISTENCE_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const PERSISTENCE_CACHE_TTL_MS = 45 * 60 * 1000; // 45 minutes — covers Supabase free-tier cold starts
 const PERSISTENCE_CACHE_TS_KEY = 'sedrex_cache_sessions_ts';
 
 function markPersistenceCacheSaved() {
@@ -188,11 +188,14 @@ export const api = {
         return sessions;
       });
     } catch (error: any) {
-      if (error?.code === '57014' || error?.message?.includes('timeout')) {
-        console.warn('[API] Conversations load timeout');
-        return [];
+      const isTransient = error?.code === '57014' || error?.code === 'PGRST002' ||
+        error?.message?.includes('timeout') || error?.message?.includes('schema cache') ||
+        error?.message?.includes('unavailable');
+      if (isTransient) {
+        console.warn('[API] Conversations unavailable (Supabase cold start or timeout), using cache');
+      } else {
+        console.warn('[API] Error fetching conversations:', error?.message);
       }
-      console.error('[API] Error fetching conversations:', error);
       return [];
     }
   },
@@ -314,11 +317,14 @@ export const api = {
         return messages;
       });
     } catch (error: any) {
-      if (error?.code === '57014' || error?.message?.includes('timeout')) {
-        console.warn('[API] Message load timeout, returning empty array');
-        return [];
+      const isTransient = error?.code === '57014' || error?.code === 'PGRST002' ||
+        error?.message?.includes('timeout') || error?.message?.includes('schema cache') ||
+        error?.message?.includes('unavailable');
+      if (isTransient) {
+        console.warn('[API] Messages unavailable (Supabase cold start or timeout)');
+      } else {
+        console.warn('[API] Error fetching messages:', error?.message);
       }
-      console.error('[API] Error fetching messages:', error);
       return [];
     }
   },
@@ -531,14 +537,14 @@ export const api = {
   },
 
   async loadSessionPreviews(sessionIds: string[]): Promise<Record<string, Message[]>> {
-    const previews: Record<string, Message[]> = {};
-    for (const id of sessionIds) {
-      try {
-        previews[id] = await this.getMessages(id, 5, true);
-      } catch {
-        previews[id] = [];
-      }
-    }
-    return previews;
+    // Run all preview fetches in parallel instead of sequentially
+    const entries = await Promise.all(
+      sessionIds.map(id =>
+        this.getMessages(id, 5, true)
+          .then(msgs => [id, msgs] as const)
+          .catch(() => [id, []] as const)
+      )
+    );
+    return Object.fromEntries(entries);
   },
 };

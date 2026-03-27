@@ -22,10 +22,10 @@ const _env = (typeof import.meta !== 'undefined' && import.meta.env)
 
 export const MODELS = {
   // ── Google Gemini ────────────────────────────────────────────────
-  GEMINI_FLASH:        'gemini-3-flash-preview',        // Primary — fast general queries
-  GEMINI_FLASH_LITE:   'gemini-3.1-flash-lite-preview', // Ultra-lightweight — prompt expansion, classification
-  GEMINI_PRO:          'gemini-3.1-pro-preview',        // Deep reasoning, long context, science
-  GEMINI_FLASH_IMAGE:  'gemini-2.5-flash-image-preview',// Image generation fallback
+  GEMINI_FLASH:        'gemini-2.0-flash',               // Primary — fast general queries (15 RPM free tier)
+  GEMINI_FLASH_LITE:   'gemini-1.5-flash', // Ultra-lightweight — prompt expansion, classification
+  GEMINI_PRO:          'gemini-2.5-pro-preview-03-25',   // Deep reasoning, long context, science
+  GEMINI_FLASH_IMAGE:  'gemini-2.0-flash-preview-image-generation', // Image generation fallback
   IMAGEN:              'imagen-4.0-generate-001',        // Primary image generation
 
   // ── Anthropic Claude ─────────────────────────────────────────────
@@ -151,8 +151,8 @@ export const INTENT_ROUTING: Record<string, ProviderRoute> = {
       { provider: 'deepseek', model: MODELS.DEEPSEEK_CHAT,    label: 'DeepSeek V4'       },
       { provider: 'openai',   model: MODELS.GPT_CODE,         label: 'GPT-5.1 Codex'     },
       { provider: 'grok',     model: MODELS.GROK_FAST,        label: 'Grok 4.1 Fast'     },
-      { provider: 'gemini',   model: MODELS.GEMINI_PRO,       label: 'Gemini 3.1 Pro'    },
-      { provider: 'gemini',   model: MODELS.GEMINI_FLASH,     label: 'Gemini 3 Flash'    },
+      { provider: 'gemini',   model: MODELS.GEMINI_PRO,       label: 'Gemini 2.5 Pro'    },
+      { provider: 'gemini',   model: MODELS.GEMINI_FLASH,     label: 'Gemini 2.0 Flash'    },
     ],
   },
 
@@ -167,8 +167,8 @@ export const INTENT_ROUTING: Record<string, ProviderRoute> = {
       { provider: 'claude',   model: MODELS.CLAUDE_SONNET,    label: 'Claude Sonnet 4.6' },
       { provider: 'deepseek', model: MODELS.DEEPSEEK_REASONING,label: 'DeepSeek R1'      },
       { provider: 'grok',     model: MODELS.GROK_PRO,         label: 'Grok 4'            },
-      { provider: 'gemini',   model: MODELS.GEMINI_PRO,       label: 'Gemini 3.1 Pro'    },
-      { provider: 'gemini',   model: MODELS.GEMINI_FLASH,     label: 'Gemini 3 Flash'    },
+      { provider: 'gemini',   model: MODELS.GEMINI_PRO,       label: 'Gemini 2.5 Pro'    },
+      { provider: 'gemini',   model: MODELS.GEMINI_FLASH,     label: 'Gemini 2.0 Flash'    },
     ],
   },
 
@@ -181,8 +181,8 @@ export const INTENT_ROUTING: Record<string, ProviderRoute> = {
     fallbacks: [
       { provider: 'deepseek', model: MODELS.DEEPSEEK_REASONING,label: 'DeepSeek R1'      },
       { provider: 'claude',   model: MODELS.CLAUDE_SONNET,    label: 'Claude Sonnet 4.6' },
-      { provider: 'gemini',   model: MODELS.GEMINI_PRO,       label: 'Gemini 3.1 Pro'    },
-      { provider: 'gemini',   model: MODELS.GEMINI_FLASH,     label: 'Gemini 3 Flash'    },
+      { provider: 'gemini',   model: MODELS.GEMINI_PRO,       label: 'Gemini 2.5 Pro'    },
+      { provider: 'gemini',   model: MODELS.GEMINI_FLASH,     label: 'Gemini 2.0 Flash'    },
     ],
   },
 
@@ -195,7 +195,7 @@ export const INTENT_ROUTING: Record<string, ProviderRoute> = {
     label:     'Gemini 3 Flash + Search',
     fallbacks: [
       { provider: 'grok',   model: MODELS.GROK_FAST,          label: 'Grok 4.1 Fast'     },
-      { provider: 'gemini', model: MODELS.GEMINI_PRO,         label: 'Gemini 3.1 Pro'    },
+      { provider: 'gemini', model: MODELS.GEMINI_PRO,         label: 'Gemini 2.5 Pro'    },
     ],
   },
 
@@ -210,7 +210,7 @@ export const INTENT_ROUTING: Record<string, ProviderRoute> = {
       { provider: 'grok',     model: MODELS.GROK_FAST,        label: 'Grok 4.1 Fast'     },
       { provider: 'deepseek', model: MODELS.DEEPSEEK_CHAT,    label: 'DeepSeek V4'       },
       { provider: 'openai',   model: MODELS.GPT_FAST,         label: 'GPT-5 Mini'        },
-      { provider: 'gemini',   model: MODELS.GEMINI_FLASH,     label: 'Gemini 3 Flash'    },
+      { provider: 'gemini',   model: MODELS.GEMINI_FLASH,     label: 'Gemini 2.0 Flash'    },
     ],
   },
 
@@ -235,7 +235,7 @@ export const INTENT_ROUTING: Record<string, ProviderRoute> = {
     fallbacks: [
       { provider: 'deepseek', model: MODELS.DEEPSEEK_CHAT,    label: 'DeepSeek V4'       },
       { provider: 'mistral',  model: MODELS.MISTRAL_FAST,     label: 'Mistral Small'     },
-      { provider: 'gemini',   model: MODELS.GEMINI_FLASH,     label: 'Gemini 3 Flash'    },
+      { provider: 'gemini',   model: MODELS.GEMINI_FLASH,     label: 'Gemini 2.0 Flash'    },
     ],
   },
 
@@ -248,7 +248,7 @@ export const INTENT_ROUTING: Record<string, ProviderRoute> = {
     fallbacks: [
       { provider: 'fireworks', model: MODELS.LLAMA_FAST,      label: 'Llama 4 Scout 10M' },
       { provider: 'claude',    model: MODELS.CLAUDE_SONNET,   label: 'Claude Sonnet 4.6' },
-      { provider: 'gemini',    model: MODELS.GEMINI_FLASH,    label: 'Gemini 3 Flash'    },
+      { provider: 'gemini',    model: MODELS.GEMINI_FLASH,    label: 'Gemini 2.0 Flash'    },
     ],
   },
 };

@@ -100,8 +100,8 @@ export function preprocessMarkdownOptimized(raw: string): string {
 
   // Limit cache size to 100 entries
   if (markdownCache.size > 100) {
-    const firstKey = markdownCache.keys().next().value;
-    markdownCache.delete(firstKey);
+    const firstKey = markdownCache.keys().next().value as string | undefined;
+    if (firstKey !== undefined) markdownCache.delete(firstKey);
   }
 
   markdownCache.set(raw, result);

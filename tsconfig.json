@@ -30,7 +30,8 @@
   },
   "exclude": [
     "node_modules",
-    "services/sentry-setup-example.ts"
+    "services/sentry-setup-example.ts",
+    "supabase/functions"
   ],
   "include": ["**/*.ts", "**/*.tsx", "vite-env.d.ts"]
 }

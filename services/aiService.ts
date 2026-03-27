@@ -43,11 +43,13 @@ import { verifyResponse } from "./agents/verificationAgent";
 import { getCodebaseContextForQuery } from "./codebaseContext";
 
 const MODELS = {
-  FLASH:           "gemini-3-flash-preview",
-  FLASH_LITE:      "gemini-3.1-flash-lite-preview",
-  PRO:             "gemini-3.1-pro-preview",
+  FLASH:           "gemini-2.0-flash",              // Primary: 15 RPM free tier
+  FLASH_LITE:      "gemini-1.5-flash",
+  PRO:             "gemini-2.5-pro-preview-03-25",
   IMAGEN:          "imagen-4.0-generate-001",
-  GEMINI_IMAGE:    "gemini-3.1-flash-image",
+  GEMINI_IMAGE:    "gemini-2.0-flash-preview-image-generation",
+  // Stable fallback — broader availability, used when primary hits 429
+  STABLE_FLASH:    "gemini-1.5-flash",
 } as const;
 
 const MAX_RETRIES  = 4;
@@ -250,7 +252,7 @@ const requestQueue = new KeyedConcurrentQueue(MAX_CONCURRENT_REQUESTS, MAX_QUEUE
 
 const REQUEST_RATE_WINDOW_MS = 60_000;
 const REQUEST_RATE_MAX       = 30;
-const API_KEY_COOLDOWN_MS    = 30_000;
+const API_KEY_COOLDOWN_MS    = 65_000; // Gemini rate limits reset every 60s; 65s ensures the window has cleared
 
 // ── Gemini API key pool ───────────────────────────────────────────
 const _vite = typeof import.meta !== "undefined" ? import.meta.env : {} as any;
@@ -1185,7 +1187,7 @@ async function processRequest(
   const isGenuinelyLive   = intent === "live" && !TABLE_PATTERNS.test(prompt) && !isTablePrompt;
   const useSearch         = isGenuinelyLive || freshnessSignals.test(prompt);
   const useProModel       = (sedrexIntent === "technical" || sedrexIntent === "analytical" || sedrexIntent === "math") && routing.complexity > 0.65;
-  const engine            = useProModel ? MODELS.PRO : MODELS.FLASH;
+  let engine: string      = useProModel ? MODELS.PRO : MODELS.FLASH;
 
   if (isCircuitOpen()) {
     return buildSafeModeResponse(prompt, routing, "High load protection is active. Please retry in a few seconds.");
@@ -1534,10 +1536,20 @@ async function processRequest(
       if (isRetryable) {
         const currentKey = getApiKey();
         if (currentKey) markApiKeyFailure(currentKey);
+
+        // After 2 failed attempts on a preview model (429/rate-limit), switch to the
+        // stable fallback which has higher quotas. Keeps retrying with remaining keys.
+        const is429 = /429|resource exhausted|rate limit|quota/.test(msg);
+        if (is429 && attempt >= 1 && engine !== MODELS.STABLE_FLASH) {
+          console.warn(`[SEDREX] Rate-limited on ${engine} after ${attempt + 1} attempts — switching to ${MODELS.STABLE_FLASH}`);
+          engine = MODELS.STABLE_FLASH;
+        }
       }
 
       if (isRetryable && attempt < MAX_RETRIES - 1) {
-        if ((err as any)?.name !== "AbortError") markRetryableFailure();
+        // 429 = quota exhausted — not a server failure; don't trip the circuit breaker
+        const is429ForCircuit = /429|resource exhausted|rate limit|quota/.test(msg);
+        if ((err as any)?.name !== "AbortError" && !is429ForCircuit) markRetryableFailure();
         const backoff = Math.min(1500 * 2 ** attempt, 20_000);
         console.warn(`[SEDREX] Retryable error (attempt ${attempt + 1}/${MAX_RETRIES}). Retry in ${backoff}ms…`);
         await sleep(backoff);
@@ -1559,7 +1571,8 @@ async function processRequest(
 
       logError(msg, true, routing.model);
       if ((err as any)?.name === "AbortError") throw err;
-      if (isRetryable && (err as any)?.name !== "AbortError") markRetryableFailure();
+      const is429Final = /429|resource exhausted|rate limit|quota/.test(msg);
+      if (isRetryable && (err as any)?.name !== "AbortError" && !is429Final) markRetryableFailure();
       return buildSafeModeResponse(prompt, routing, normalizeErrorMessage(err));
     }
   }
@@ -1579,6 +1592,9 @@ export const generateFollowUpSuggestions = async (
   intent: string,
 ): Promise<string[]> => {
   if (apiKeyPool.length === 0) return [];
+  // Small delay so this secondary call doesn't immediately compete with the
+  // main response on the same key — reduces back-to-back 429s
+  await sleep(1_500);
   let apiKey = "";
   try {
     apiKey = getApiKey();
@@ -1587,7 +1603,7 @@ export const generateFollowUpSuggestions = async (
     const isShopping = /shop|shopping|ecommerce|buy|purchase|order|cart|checkout|product|deal|discount|price|amazon|flipkart|ebay|walmart/i.test(intent + " " + lastMsg);
     const extra = isShopping ? "\nIf relevant, suggest images, videos, or links for the product." : "";
     const response = await ai.models.generateContent({
-      model:    MODELS.FLASH,
+      model:    MODELS.FLASH_LITE,   // lightweight model — saves quota for main responses
       contents: `Given this AI response about "${intent}", suggest 3 very short follow-up questions (6 words or less each). Return a JSON array of strings only — no markdown, no preamble.${extra}\n\n"${trimmed}"`,
       config:   { maxOutputTokens: 128 },
     });
@@ -1612,7 +1628,7 @@ export const generateChatTitle = async (firstMessage: string): Promise<string> =
     const ai      = new GoogleGenAI({ apiKey });
     const trimmed = firstMessage.slice(0, 1_000);
     const response = await ai.models.generateContent({
-      model:    MODELS.FLASH,
+      model:    MODELS.FLASH_LITE,   // trivial task — no need to burn FLASH quota
       contents: `Summarize this message as a professional 3–5 word chat title. Return ONLY the title text. No quotes. No period.\n\n"${trimmed}"`,
       config:   { maxOutputTokens: 32 },
     });

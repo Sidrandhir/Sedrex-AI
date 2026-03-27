@@ -14,8 +14,8 @@ interface SidebarProps {
   activeSessionId: string;
   onNewChat: () => void;
   onSelectSession: (id: string) => void;
-  view: 'chat' | 'dashboard' | 'admin' | 'pricing' | 'billing' | 'library' | 'artifacts';
-  onSetView: (view: 'chat' | 'dashboard' | 'admin' | 'pricing' | 'billing' | 'library' | 'artifacts') => void;
+  view: 'chat' | 'dashboard' | 'pricing' | 'billing' | 'library' | 'artifacts';
+  onSetView: (view: 'chat' | 'dashboard' | 'pricing' | 'billing' | 'library' | 'artifacts') => void;
   stats: UserStats | null;
   onDeleteSession: (id: string) => void;
   onRenameSession: (id: string, newTitle: string) => void;
@@ -580,7 +580,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             aria-label="New chat"
           >
             <Icons.Plus />
-            {isOpen && <span className="sb-new-chat-label">New Chat</span>}
+            {isOpen && <span className="sb-new-chat-label">New chat</span>}
           </button>
 
           {/* Ctrl+K hint (icon mode) */}
@@ -721,7 +721,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => setChatsCollapsed(c => !c)}
             aria-expanded={!chatsCollapsed as unknown as boolean}
           >
-            <span>Chats</span>
+            <span>Recents</span>
             <svg
               className={`sb-chats-arrow${chatsCollapsed ? ' sb-chats-arrow--collapsed' : ''}`}
               viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8"
