@@ -1742,13 +1742,13 @@ export const generateChatTitle = async (firstMessage: string): Promise<string> =
     apiKey = getApiKey();
     const ai      = new GoogleGenAI({ apiKey });
     const trimmed = firstMessage.slice(0, 1_000);
-    const titlePrompt = `Summarize this message as a professional 3–5 word chat title. Return ONLY the title text. No quotes. No period.\n\n"${trimmed}"`;
+    const titlePrompt = `Generate a concise, descriptive chat title for this message — exactly like ChatGPT and Claude do it. 4 to 6 words. Title case. No quotes. No period. Make it specific to the topic, not generic.\n\nExamples of good titles:\n- Build React Auth System\n- Fix Navbar Responsive Bug\n- Explain Async Await JavaScript\n- Sort Algorithm TypeScript File\n- Landing Page Hero Section\n\nMessage: "${trimmed}"\n\nTitle:`;
     const response = await ai.models.generateContent({
       model:    MODELS.FLASH,
       contents: [{ role: 'user', parts: [{ text: titlePrompt }] }],
-      config:   { maxOutputTokens: 32, temperature: 0.3 },
+      config:   { maxOutputTokens: 64, temperature: 0.4 },
     });
-    const title = (response.text ?? "").trim().replace(/['"]/g, "").replace(/\.$/, "") || "New Session";
+    const title = (response.text ?? "").trim().replace(/^Title:\s*/i, "").replace(/['"]/g, "").replace(/\.$/, "") || "New Session";
     markApiKeySuccess(apiKey);
     return title;
   } catch { markApiKeyFailure(apiKey); return "New Session"; }
