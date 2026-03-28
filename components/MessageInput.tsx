@@ -597,7 +597,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
           <textarea
             ref={textareaRef}
             className="mi-textarea"
-            placeholder={isDisabled ? 'SEDREX is thinking…' : 'Message SEDREX… (/ for commands)'}
+            placeholder={isDisabled ? 'SEDREX is thinking…' : 'Ask Sedrex...'}
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
