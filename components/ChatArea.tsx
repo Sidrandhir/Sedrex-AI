@@ -1172,7 +1172,7 @@ const MessageItem = memo(
                 onClick={() => window.open('https://forms.gle/SB93bLtFPjvJnRNRA', '_blank')}
                 title="Send feedback"
               >
-                Feedback
+                <Icons.Flag className="icon-14" />
               </button>
               <div className="message-action-divider" />
               <button
@@ -1193,9 +1193,6 @@ const MessageItem = memo(
                 <Icons.ThumbsDown className="icon-14" />
                 <span className="action-btn-label">Bad</span>
               </button>
-              {!isStreaming && msg.content && (
-                <span className="generated-badge" aria-label="Output complete">✓ Done</span>
-              )}
             </div>
 
             {/* Generated Image Logic */}

@@ -43,13 +43,13 @@ import { verifyResponse } from "./agents/verificationAgent";
 import { getCodebaseContextForQuery } from "./codebaseContext";
 
 const MODELS = {
-  FLASH:           "gemini-2.0-flash",              // Primary: 15 RPM free tier
-  FLASH_LITE:      "gemini-1.5-flash",
-  PRO:             "gemini-2.5-pro-preview-03-25",
-  IMAGEN:          "imagen-4.0-generate-001",
-  GEMINI_IMAGE:    "gemini-2.0-flash-preview-image-generation",
+  FLASH:           "gemini-2.5-flash",              // Primary: 15 RPM free tier
+  FLASH_LITE:      "gemini-2.5-flash-lite",         // Free tier, but much weaker — used when FLASH hits 429
+  PRO:             "gemini-3.1-pro",                // Paid tier, 120 RPM, used for high-confidence technical queries when available
+  IMAGEN:          "imagen-3.0-generate-002",
+  GEMINI_IMAGE:    "gemini-2.5-flash",
   // Stable fallback — broader availability, used when primary hits 429
-  STABLE_FLASH:    "gemini-1.5-flash",
+  STABLE_FLASH:    "gemini-1.5-flash-latest",
 } as const;
 
 const MAX_RETRIES  = 4;

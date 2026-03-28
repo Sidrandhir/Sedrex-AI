@@ -562,8 +562,8 @@
 
 .message-action-btn {
   display: flex; align-items: center; justify-content: center;
-  flex-direction: column; gap: 2px;
-  width: 38px; min-height: 38px; height: auto;
+  flex-direction: row;
+  width: 26px; height: 26px; min-height: 0;
   border-radius: var(--sx-radius-sm); border: none; background: transparent;
   color: var(--text-secondary); cursor: pointer;
   transition: color var(--sx-transition), background var(--sx-transition);
@@ -579,28 +579,17 @@
   animation: pulse-speak 1.8s ease-in-out infinite;
 }
 .message-action-btn.feedback-form-btn {
-  flex-direction: row;
-  width: auto; padding: 4px 10px; height: auto; min-height: 0;
-  font-size: 11px; font-weight: 700;
-  font-family: 'IBM Plex Mono', monospace;
-  letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--accent, #10B981);
-  border: 1px solid rgba(16, 185, 129, 0.25);
-  background: rgba(16, 185, 129, 0.05); border-radius: 6px;
+  border: none; background: transparent;
 }
 .message-action-btn.feedback-form-btn:hover {
-  color: #020408; background: var(--accent, #10B981);
+  color: var(--accent, #10B981); background: rgba(16, 185, 129, 0.06);
 }
 .message-action-divider { width: 1px; height: 14px; background: var(--border); margin: 0 4px; align-self: center; }
 @keyframes pulse-speak { 0%,100%{opacity:1;} 50%{opacity:0.45;} }
 
-/* Icon label below action buttons */
-.action-btn-label {
-  font-size: 9px; font-weight: 500; line-height: 1;
-  letter-spacing: 0.02em; color: var(--text-secondary);
-  -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
-}
-.message-action-btn:hover .action-btn-label { color: var(--accent, #10B981); }
+/* Icon label below action buttons — hidden (icon-only mode) */
+.action-btn-label { display: none; }
 
 /* Generated / output-complete badge */
 .generated-badge {
@@ -929,8 +918,8 @@
 
   /* Bigger tap targets for message actions on touch */
   .message-action-btn {
-    width: 34px;
-    height: 34px;
+    width: 28px;
+    height: 28px;
   }
 
   /* CodeRunner panel — compact on small screens */
@@ -955,8 +944,8 @@
     gap: 1px;
   }
   .message-action-btn {
-    width: 30px;
-    height: 30px;
+    width: 26px;
+    height: 26px;
   }
   /* Hide the feedback form button on very small screens to prevent overflow */
   .message-action-btn.feedback-form-btn {
