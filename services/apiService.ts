@@ -43,6 +43,10 @@ import {
 } from './queryOptimizer';
 import { persistenceService } from './persistenceService';
 
+// Bypass in-memory cache once on app startup so the first getMessages()
+// call always fetches fresh data from the DB (not stale cache from a prior session).
+let _appJustStarted = true;
+
 const API_ERROR_MESSAGES = {
   NO_DB:          'Cloud Connectivity not established.',
   NO_USER:        'User ID not found',
@@ -277,7 +281,8 @@ export const api = {
       const cacheKey = `msgs:${conversationId}:${limit}:${metadataOnly ? 'meta' : 'full'}`;
 
       const cached = MessageCache.get(cacheKey) as Message[] | null;
-      if (cached && Array.isArray(cached)) return cached;
+      if (cached && Array.isArray(cached) && !_appJustStarted) return cached;
+      _appJustStarted = false;
 
       return await MessageDeduplicator.deduplicate(cacheKey, async () => {
         const data = await getMessagesByConversationId(conversationId, limit, metadataOnly);

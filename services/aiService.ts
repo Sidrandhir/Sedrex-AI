@@ -55,7 +55,7 @@ const MODELS = {
 } as const;
 
 const MAX_RETRIES  = 4;
-const MAX_MSG_LEN  = 8_000;
+const MAX_MSG_LEN  = 24_000;
 const MAX_HISTORY: Record<string, number> = {
   technical:  12,
   analytical: 16,
@@ -815,7 +815,8 @@ function buildHistory(history: Message[], intent: SedrexIntent): any[] {
     if (msg.role === 'assistant') {
       text = text.replace(/\[ARTIFACT:[^\]]+\]/g, '[code artifact generated]');
     }
-    if (text.length > MAX_MSG_LEN) {
+    // Only truncate user messages — never assistant messages (they may be large code artifacts)
+    if (msg.role !== 'assistant' && text.length > MAX_MSG_LEN) {
       text = text.slice(0, MAX_MSG_LEN) + '\n\n[...truncated for context efficiency]';
     }
     return {
@@ -1321,6 +1322,7 @@ async function processRequest(
 
   const isCodeRequest =
     sedrexIntent === 'technical' ||
+    /```html|landing page|full page|complete html|html page/i.test(prompt) ||
     /```|\.tsx?|\.jsx?|\.py|\.rs|\.go|\.java|\.kt|\.css|\.html|\.sql/i.test(prompt) ||
     /\b(function|class|component|service|module|hook|util|helper|controller|route|model|schema|interface|type|enum)\b/i.test(prompt) ||
     /\b(write|build|create|generate|implement|code|refactor|fix|debug|update)\b.{0,30}\b(file|code|script|app|page|component|api|endpoint|function|class)\b/i.test(prompt) ||
@@ -1329,7 +1331,7 @@ async function processRequest(
   let dynamicMaxTokens = isEditIntent
     ? 8192
     : isCodeRequest
-    ? 32000
+    ? 65536
     : isTablePrompt
     ? Math.max(genConfig.maxTokens, 8192)
     : Math.max(genConfig.maxTokens, 4096);
@@ -1712,7 +1714,7 @@ export const generateFollowUpSuggestions = async (
     const extra = isShopping ? "\nIf relevant, suggest images, videos, or links for the product." : "";
     const followUpPrompt = `Given this AI response about "${intent}", suggest 3 very short follow-up questions (6 words or less each). Return a JSON array of strings only — no markdown, no preamble.${extra}\n\n"${trimmed}"`;
     const response = await ai.models.generateContent({
-      model:    MODELS.FLASH_LITE,   // lightweight model — saves quota for main responses
+      model:    MODELS.FLASH,
       contents: [{ role: 'user', parts: [{ text: followUpPrompt }] }],
       config:   { maxOutputTokens: 128, temperature: 0.4 },
     });
@@ -1738,7 +1740,7 @@ export const generateChatTitle = async (firstMessage: string): Promise<string> =
     const trimmed = firstMessage.slice(0, 1_000);
     const titlePrompt = `Summarize this message as a professional 3–5 word chat title. Return ONLY the title text. No quotes. No period.\n\n"${trimmed}"`;
     const response = await ai.models.generateContent({
-      model:    MODELS.FLASH_LITE,   // trivial task — no need to burn FLASH quota
+      model:    MODELS.FLASH,
       contents: [{ role: 'user', parts: [{ text: titlePrompt }] }],
       config:   { maxOutputTokens: 32, temperature: 0.3 },
     });

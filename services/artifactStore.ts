@@ -207,6 +207,21 @@ export function extractArtifactFromResponse(
     }
   }
 
+  if (!best) {
+    // Fallback: opening fence with no closing fence (streaming cut-off or large response).
+    // Take everything after the opening ``` as the code body.
+    const openMatch = /^```(\w+)[ \t]*\r?\n([\s\S]*)/m.exec(response);
+    if (openMatch) {
+      const lang  = openMatch[1].toLowerCase().trim() || 'text';
+      const code  = openMatch[2];
+      const lines = code.split('\n').length;
+      if (!EXCLUDED_LANGUAGES.has(lang) && lines >= MIN_LINES_FOR_ARTIFACT) {
+        best      = { lang, code, full: openMatch[0] };
+        bestLines = lines;
+      }
+    }
+  }
+
   if (!best) return null;
 
   let lang     = best.lang;

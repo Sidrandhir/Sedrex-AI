@@ -445,6 +445,17 @@ const CodeViewer = memo(({ artifact }: { artifact: Artifact }) => {
 // FIX: Detects empty content (metadataOnly load) and fetches full
 // content before rendering. Shows spinner during fetch.
 
+// ── Lucide icon name fixer ────────────────────────────────────────
+// Some icon names changed between lucide versions. Fix known renames
+// and pin unpkg to a stable version to avoid future breakage.
+function fixLucideIcons(html: string): string {
+  return html
+    .replace(/data-lucide="twitter"/g,  'data-lucide="x"')
+    .replace(/data-lucide="github"/g,   'data-lucide="code-2"')
+    .replace(/data-lucide="linkedin"/g, 'data-lucide="briefcase"')
+    .replace(/https:\/\/unpkg\.com\/lucide@latest/g, 'https://unpkg.com/lucide@0.263.1');
+}
+
 // ── CDN script cache — fetched in parent, injected inline ────────
 // Brave browser blocks CDN scripts inside srcdoc iframes.
 // Fetch in parent page context (allowed), then inject as inline text.
@@ -564,15 +575,15 @@ const PreviewPane = memo(({ artifact }: { artifact: Artifact }) => {
             fetchScript(CDN.babel), fetchScript(CDN.tailwind),
           ]);
           if (iframeRef.current)
-            iframeRef.current.srcdoc = buildSrcdocInline(
+            iframeRef.current.srcdoc = fixLucideIcons(buildSrcdocInline(
               { ...artifact, content: fullContent }, rTxt, rdTxt, bTxt, twTxt
-            );
+            ));
         } catch (e: any) { setErrMsg(e.message || 'Preview failed'); }
       })();
     } else {
       try {
         if (iframeRef.current)
-          iframeRef.current.srcdoc = buildSrcdoc({ ...artifact, content: fullContent });
+          iframeRef.current.srcdoc = fixLucideIcons(buildSrcdoc({ ...artifact, content: fullContent }));
       } catch (e: any) { setErrMsg(e.message || 'Preview failed'); }
     }
   }, [fullContent, fetching, artifact.language, artifact.type]);
@@ -583,7 +594,7 @@ const PreviewPane = memo(({ artifact }: { artifact: Artifact }) => {
   const isEmpty = !fetching && fullContent.trim() === '';
 
   return (
-    <div className="ap-preview-container">
+    <div className="ap-preview-container" style={{ flex: 1, overflow: 'hidden', height: '100%', minHeight: 0 }}>
       {(fetching || !loaded) && (
         <div className="ap-preview-loading">
           <div className="ap-spinner" />
@@ -599,11 +610,15 @@ const PreviewPane = memo(({ artifact }: { artifact: Artifact }) => {
           <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>No content available</span>
         </div>
       )}
-      <iframe ref={iframeRef} className={`ap-preview-iframe${loaded ? ' ap-preview-iframe--visible' : ''}`}
-        sandbox="allow-scripts allow-popups allow-forms" title="Live preview"
+      <iframe
+        key={artifact.id}
+        ref={iframeRef}
+        className={`ap-preview-iframe${loaded ? ' ap-preview-iframe--visible' : ''}`}
+        sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals allow-pointer-lock"
+        title={artifact.title}
         onLoad={() => setTimeout(() => setLoaded(true), 50)}
         onError={() => setErrMsg('Failed to load preview')}
-        style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} />
+        style={{ width: '100%', height: '100%', border: 'none', display: 'block', backgroundColor: '#0a0a0f' }} />
     </div>
   );
 });

@@ -508,11 +508,12 @@
   flex: 1;
   min-height: 0;
   /* ← CRITICAL */
+  height: 100%;
   display: flex;
   flex-direction: column;
   position: relative;
   overflow: hidden;
-  background: #ffffff;
+  background: #0a0a0f;
 }
 
 .ap-preview-loading {
@@ -556,7 +557,7 @@
   display: block;
   opacity: 0;
   transition: opacity 300ms ease;
-  background: #ffffff;
+  background: #0a0a0f;
 }
 
 .ap-preview-iframe--visible {
@@ -750,5 +751,5 @@
 }
 
 .ap-preview-container {
-  background: #000 !important;
+  background: #0a0a0f !important;
 }

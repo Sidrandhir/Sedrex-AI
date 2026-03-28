@@ -272,48 +272,28 @@ const App: React.FC = () => {
             }
           });
 
-          // Skip DB fetch if local cache already has enough messages — avoids startup timeout
-          const needsDbFetch = localMsgs.length < 5;
-          if (needsDbFetch) {
-            setIsLoading(true);
-            api.getMessages(restoreId, 40).then(dbMsgs => {
-              if (isMounted) {
-                if (dbMsgs.length > 0) {
-                  startTransition(() =>
-                    setSessions(prev =>
-                      prev.map(s => s.id === restoreId ? { ...s, messages: dbMsgs } : s)
-                    )
-                  );
-                  dbMsgs.forEach(msg => {
-                    if (msg.generatedImageUrl) {
-                      const label = msg.content?.slice(0, 40) || 'Generated Image';
-                      addImageFromMessage(msg.id, restoreId, user.id, label, msg.generatedImageUrl, msg.timestamp);
-                    }
-                  });
+          // Always fetch from DB immediately — local cache is only a fast initial placeholder.
+          // Without this, 5+ cached messages caused DB fetch to be skipped entirely,
+          // showing stale messages from old sessions after reload.
+          setIsLoading(true);
+          api.getMessages(restoreId, 40).then(dbMsgs => {
+            if (!isMounted) return;
+            if (dbMsgs.length > 0) {
+              startTransition(() =>
+                setSessions(prev =>
+                  prev.map(s => s.id === restoreId ? { ...s, messages: dbMsgs } : s)
+                )
+              );
+              persistenceService.saveMessages(restoreId, dbMsgs);
+              dbMsgs.forEach(msg => {
+                if (msg.generatedImageUrl) {
+                  const label = msg.content?.slice(0, 40) || 'Generated Image';
+                  addImageFromMessage(msg.id, restoreId, user.id, label, msg.generatedImageUrl, msg.timestamp);
                 }
-                setIsLoading(false);
-              }
-            }).catch(() => { setIsLoading(false); });
-          } else {
-            // Sync in background after a delay — don't block startup
-            setTimeout(() => {
-              if (!isMounted) return;
-              api.getMessages(restoreId, 40).then(dbMsgs => {
-                if (!isMounted || dbMsgs.length === 0) return;
-                startTransition(() =>
-                  setSessions(prev =>
-                    prev.map(s => s.id === restoreId ? { ...s, messages: dbMsgs } : s)
-                  )
-                );
-                dbMsgs.forEach(msg => {
-                  if (msg.generatedImageUrl) {
-                    const label = msg.content?.slice(0, 40) || 'Generated Image';
-                    addImageFromMessage(msg.id, restoreId, user.id, label, msg.generatedImageUrl, msg.timestamp);
-                  }
-                });
-              }).catch(() => {});
-            }, 2000);
-          }
+              });
+            }
+            setIsLoading(false);
+          }).catch(() => { setIsLoading(false); });
         }
 
         // Short yield to let React render the cached UI before hitting DB
@@ -598,16 +578,22 @@ const App: React.FC = () => {
         generatedImageUrl: response.generatedImageUrl,
       });
 
-      setSessions(prev => prev.map(s => s.id === sessionId ? {
-        ...s,
-        messages: s.messages.map(m => m.id === assistantId ? {
-          ...savedMsg,
-          generatedImageUrl: response.generatedImageUrl || savedMsg.generatedImageUrl,
-          // Preserve verification + thinking data that isn't stored in the DB
-          confidence: response.confidence,
-          thinkingContent: response.thinkingContent,
-        } : m),
-      } : s));
+      setSessions(prev => {
+        const next = prev.map(s => s.id === sessionId ? {
+          ...s,
+          messages: s.messages.map(m => m.id === assistantId ? {
+            ...savedMsg,
+            generatedImageUrl: response.generatedImageUrl || savedMsg.generatedImageUrl,
+            // Preserve verification + thinking data that isn't stored in the DB
+            confidence: response.confidence,
+            thinkingContent: response.thinkingContent,
+          } : m),
+        } : s);
+        // Keep local cache current so next reload shows latest messages immediately
+        const updatedSession = next.find(s => s.id === sessionId);
+        if (updatedSession) persistenceService.saveMessages(sessionId, updatedSession.messages);
+        return next;
+      });
 
       suggestionsPromise.then(suggestions => {
         if (suggestions.length > 0) {
