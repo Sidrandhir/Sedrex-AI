@@ -307,9 +307,27 @@ const DiagramViewer = memo(({ artifact }: { artifact: Artifact }) => {
     (async () => {
       try {
         const mermaid = (await import('mermaid')).default;
-        mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'strict' });
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: 'dark',
+          securityLevel: 'loose',
+          maxTextSize: 500000,
+          flowchart: {
+            htmlLabels: true,
+            useMaxWidth: true,
+            rankSpacing: 50,
+            nodeSpacing: 30,
+          },
+          maxEdges: 500,
+        });
         const id = 'ap-' + Math.random().toString(36).slice(2, 9);
-        const { svg: rendered } = await mermaid.render(id, fullContent);
+        const sanitized = fullContent
+          .split('\n')
+          .filter((line: string) => !line.trim().startsWith('//') && !line.trim().startsWith('#'))
+          .join('\n')
+          .replace(/^[\w./\-]+\.mmd\s*\n/m, '')
+          .trim();
+        const { svg: rendered } = await mermaid.render(id, sanitized);
         if (!cancelled) setSvg(rendered);
       } catch (e: any) {
         if (!cancelled) setError(e.message || 'Invalid diagram syntax');

@@ -153,10 +153,10 @@ async function callClaude(
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST', signal,
     headers: {
-      'Content-Type':              'application/json',
-      'x-api-key':                 key,
-      'anthropic-version':         '2023-06-01',
-      'dangerously-allow-browser': 'true',
+      'Content-Type':                              'application/json',
+      'x-api-key':                                 key,
+      'anthropic-version':                         '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({
       model,
@@ -296,7 +296,7 @@ export async function callReasoningAgent(
         maxTokens, temperature, onStreamChunk, signal, intentHint,
       );
     } catch (err) {
-      console.warn('[SEDREX ReasoningAgent] OpenAI failed, trying Claude:', err);
+      console.warn('[SEDREX Reasoning] Primary failed, trying secondary engine:', err);
     }
   }
 
@@ -308,7 +308,7 @@ export async function callReasoningAgent(
         maxTokens, temperature, onStreamChunk, signal,
       );
     } catch (err) {
-      console.warn('[SEDREX ReasoningAgent] Claude failed, trying DeepSeek R1:', err);
+      console.warn('[SEDREX Reasoning] Secondary failed, trying tertiary engine:', err);
     }
   }
 
@@ -320,15 +320,15 @@ export async function callReasoningAgent(
         maxTokens, onStreamChunk, signal,
       );
     } catch (err) {
-      console.warn('[SEDREX ReasoningAgent] DeepSeek R1 failed, falling back to Gemini:', err);
+      console.warn('[SEDREX Reasoning] External engines exhausted, using core engine:', err);
     }
   }
 
   // Final: Gemini Pro fallback
-  console.log('[SEDREX ReasoningAgent] No external keys — Gemini Pro handles reasoning');
+  console.log('[SEDREX Reasoning] Core engine active');
   return {
     text: '', inputTokens: 0, outputTokens: 0,
-    provider: 'gemini-fallback', model: MODELS.GEMINI_PRO, label: 'Gemini 3.1 Pro',
+    provider: 'gemini-fallback', model: MODELS.GEMINI_PRO, label: 'Gemini 2.5 Pro',
     isFallback: true, agentType: 'reasoning',
   };
 }

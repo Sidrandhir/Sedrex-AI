@@ -84,9 +84,10 @@ async function runGeminiVerification(
   const { GoogleGenAI } = await import("@google/genai");
   const ai = new GoogleGenAI({ apiKey });
 
+  const verifyText = buildVerificationPrompt(prompt, responseSnippet, intent);
   const result = await ai.models.generateContent({
     model:    "gemini-2.5-flash",
-    contents: buildVerificationPrompt(prompt, responseSnippet, intent),
+    contents: [{ role: 'user', parts: [{ text: verifyText }] }],
     config:   { maxOutputTokens: 128, temperature: 0.1 },
   });
 

@@ -569,6 +569,11 @@ const App: React.FC = () => {
         }
       }
 
+      // If image generation was requested but no image came back, show user-friendly error
+      if (previewRoute.intent === 'image_generation' && !response.generatedImageUrl) {
+        finalContent = "Image generation is currently unavailable. This usually means your API key doesn't have access to image generation models in Google AI Studio. Please check that your key has Imagen and Gemini image generation enabled at aistudio.google.com.";
+      }
+
       // Store Generated Image (always, regardless of isDiff)
       if (response.generatedImageUrl && user) {
         const safePrompt = userMsg.content.replace(/[^a-zA-Z0-9\s]/g, '').trim();

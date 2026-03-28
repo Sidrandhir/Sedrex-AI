@@ -22,11 +22,16 @@ const _env = (typeof import.meta !== 'undefined' && import.meta.env)
 
 export const MODELS = {
   // ── Google Gemini ────────────────────────────────────────────────
-  GEMINI_FLASH:        'gemini-2.0-flash',               // Primary — fast general queries (15 RPM free tier)
-  GEMINI_FLASH_LITE:   'gemini-1.5-flash', // Ultra-lightweight — prompt expansion, classification
-  GEMINI_PRO:          'gemini-2.5-pro-preview-03-25',   // Deep reasoning, long context, science
-  GEMINI_FLASH_IMAGE:  'gemini-2.0-flash-preview-image-generation', // Image generation fallback
-  IMAGEN:              'imagen-4.0-generate-001',        // Primary image generation
+  GEMINI_FLASH:        'gemini-3-flash-preview',                   // Primary — 1K RPM, 10K/day
+  GEMINI_FLASH_LITE:   'gemini-3.1-flash-lite-preview',            // Lightweight — titles, follow-ups
+  GEMINI_PRO:          'gemini-3.1-pro-preview',                   // Best quality — 25 RPM, 250/day limit
+  GEMINI_STABLE:       'gemini-2.5-flash',                         // Stable fallback — after rate-limit
+  GEMINI_LAST_RESORT:  'gemini-2.0-flash',                         // Absolute last resort
+  GEMINI_IMAGE:        'nano-banana-pro-preview',                  // Image fallback 1 — 20 RPM, 250/day
+  GEMINI_IMAGE2:       'gemini-3.1-flash-image-preview',           // Image fallback 2
+  GEMINI_IMAGE3:       'gemini-2.5-flash-image',                   // Image fallback 3 — budget
+  IMAGEN:              'imagen-4.0-generate-001',                  // Imagen 4 — 10 RPM, 70/day
+  IMAGEN_FAST:         'imagen-4.0-fast-generate-001',             // Imagen 4 Fast
 
   // ── Anthropic Claude ─────────────────────────────────────────────
   CLAUDE_SONNET:       'claude-sonnet-4-6',             // Best code + writing at Sonnet price
@@ -34,26 +39,26 @@ export const MODELS = {
   CLAUDE_OPUS:         'claude-opus-4-6',               // Max quality — reserved for critical tasks
 
   // ── OpenAI ───────────────────────────────────────────────────────
-  GPT_FAST:            'gpt-5-mini',                    // Fast OpenAI — 83.8% MMLU, very cheap
-  GPT_BALANCED:        'gpt-5.2',                       // Balanced — 81.4% MMLU, $0.88/$7 per 1M
-  GPT_REASONING:       'o4-mini',                       // Math + logic specialist — 85.9% coding
-  GPT_CODE:            'gpt-5.1-codex',                 // Agentic coding — 84.9% SWE-bench
+  GPT_FAST:            'gpt-4o-mini',                   // Fast OpenAI — cheap, capable
+  GPT_BALANCED:        'gpt-4o',                        // Balanced — strong general reasoning
+  GPT_REASONING:       'o4-mini',                       // Math + logic specialist
+  GPT_CODE:            'gpt-4o',                        // Code tasks — broad capability
 
   // ── xAI Grok ─────────────────────────────────────────────────────
-  GROK_FAST:           'grok-4.1-fast',                 // Cheapest frontier — $0.20/$0.50, 2M context
-  GROK_PRO:            'grok-4',                        // Top SWE-bench — real-time X data
+  GROK_FAST:           'grok-3-fast',                   // Fast Grok — low latency
+  GROK_PRO:            'grok-3',                        // Full Grok — real-time X data
 
   // ── DeepSeek ─────────────────────────────────────────────────────
-  DEEPSEEK_CHAT:       'deepseek-chat',                 // V4 — GPT-5 class at $0.30/$0.50 per 1M
+  DEEPSEEK_CHAT:       'deepseek-chat',                 // V3 — excellent value
   DEEPSEEK_REASONING:  'deepseek-reasoner',             // R1 — matches o1 at 96% lower cost
 
   // ── Mistral ──────────────────────────────────────────────────────
-  MISTRAL_FAST:        'mistral-small-3.1-24b-instruct',// Budget mid-tier — $0.03/$0.11
+  MISTRAL_FAST:        'mistral-small-latest',          // Budget mid-tier
   MISTRAL_PRO:         'mistral-large-latest',          // EU data sovereignty
 
-  // ── Meta Llama (via Fireworks/Together) ──────────────────────────
-  LLAMA_FAST:          'meta-llama/llama-4-scout',      // 10M context, very cheap
-  LLAMA_PRO:           'meta-llama/llama-4-maverick',   // Best open-source general
+  // ── Meta Llama (via Fireworks) ────────────────────────────────────
+  LLAMA_FAST:          'accounts/fireworks/models/llama-v3p1-8b-instruct',  // 8B — very cheap
+  LLAMA_PRO:           'accounts/fireworks/models/llama-v3p1-70b-instruct', // 70B — best open-source
 } as const;
 
 export type ModelName = typeof MODELS[keyof typeof MODELS];
@@ -142,33 +147,35 @@ export const INTENT_ROUTING: Record<string, ProviderRoute> = {
 
   // ── Code: write, fix, debug, rewrite ─────────────────────────────
   // Claude Sonnet 4.6 is the best code model at this price point.
-  // DeepSeek V4 is GPT-5 class at 1/10th cost — excellent fallback.
   technical: {
     provider:  'claude',
     model:     MODELS.CLAUDE_SONNET,
     label:     'Claude Sonnet 4.6',
     fallbacks: [
-      { provider: 'deepseek', model: MODELS.DEEPSEEK_CHAT,    label: 'DeepSeek V4'       },
-      { provider: 'openai',   model: MODELS.GPT_CODE,         label: 'GPT-5.1 Codex'     },
-      { provider: 'grok',     model: MODELS.GROK_FAST,        label: 'Grok 4.1 Fast'     },
-      { provider: 'gemini',   model: MODELS.GEMINI_PRO,       label: 'Gemini 2.5 Pro'    },
-      { provider: 'gemini',   model: MODELS.GEMINI_FLASH,     label: 'Gemini 2.0 Flash'    },
+      { provider: 'deepseek', model: MODELS.DEEPSEEK_CHAT,      label: 'DeepSeek V3'          },
+      { provider: 'openai',   model: MODELS.GPT_CODE,           label: 'GPT-4o'               },
+      { provider: 'grok',     model: MODELS.GROK_FAST,          label: 'Grok 3 Fast'          },
+      { provider: 'gemini',   model: MODELS.GEMINI_PRO,         label: 'Gemini 3.1 Pro'       },
+      { provider: 'gemini',   model: MODELS.GEMINI_FLASH,       label: 'Gemini 3 Flash'       },
+      { provider: 'gemini',   model: MODELS.GEMINI_STABLE,      label: 'Gemini 2.5 Flash'     },
+      { provider: 'gemini',   model: MODELS.GEMINI_LAST_RESORT, label: 'Gemini 2.0 Flash'     },
     ],
   },
 
   // ── Analysis: compare, evaluate, architect, trade-offs ───────────
-  // o4-mini for math/logic. GPT-5.2 for structured analysis.
-  // Claude Sonnet as close second (excellent reasoning).
+  // GPT-4o for structured analysis. Claude Sonnet as close second.
   analytical: {
     provider:  'openai',
     model:     MODELS.GPT_BALANCED,
-    label:     'GPT-5.2',
+    label:     'GPT-4o',
     fallbacks: [
-      { provider: 'claude',   model: MODELS.CLAUDE_SONNET,    label: 'Claude Sonnet 4.6' },
-      { provider: 'deepseek', model: MODELS.DEEPSEEK_REASONING,label: 'DeepSeek R1'      },
-      { provider: 'grok',     model: MODELS.GROK_PRO,         label: 'Grok 4'            },
-      { provider: 'gemini',   model: MODELS.GEMINI_PRO,       label: 'Gemini 2.5 Pro'    },
-      { provider: 'gemini',   model: MODELS.GEMINI_FLASH,     label: 'Gemini 2.0 Flash'    },
+      { provider: 'claude',   model: MODELS.CLAUDE_SONNET,      label: 'Claude Sonnet 4.6'    },
+      { provider: 'deepseek', model: MODELS.DEEPSEEK_REASONING, label: 'DeepSeek R1'          },
+      { provider: 'grok',     model: MODELS.GROK_PRO,           label: 'Grok 3'               },
+      { provider: 'gemini',   model: MODELS.GEMINI_PRO,         label: 'Gemini 3.1 Pro'       },
+      { provider: 'gemini',   model: MODELS.GEMINI_FLASH,       label: 'Gemini 3 Flash'       },
+      { provider: 'gemini',   model: MODELS.GEMINI_STABLE,      label: 'Gemini 2.5 Flash'     },
+      { provider: 'gemini',   model: MODELS.GEMINI_LAST_RESORT, label: 'Gemini 2.0 Flash'     },
     ],
   },
 
@@ -179,76 +186,83 @@ export const INTENT_ROUTING: Record<string, ProviderRoute> = {
     model:     MODELS.GPT_REASONING,
     label:     'o4-mini',
     fallbacks: [
-      { provider: 'deepseek', model: MODELS.DEEPSEEK_REASONING,label: 'DeepSeek R1'      },
-      { provider: 'claude',   model: MODELS.CLAUDE_SONNET,    label: 'Claude Sonnet 4.6' },
-      { provider: 'gemini',   model: MODELS.GEMINI_PRO,       label: 'Gemini 2.5 Pro'    },
-      { provider: 'gemini',   model: MODELS.GEMINI_FLASH,     label: 'Gemini 2.0 Flash'    },
+      { provider: 'deepseek', model: MODELS.DEEPSEEK_REASONING, label: 'DeepSeek R1'          },
+      { provider: 'claude',   model: MODELS.CLAUDE_SONNET,      label: 'Claude Sonnet 4.6'    },
+      { provider: 'gemini',   model: MODELS.GEMINI_PRO,         label: 'Gemini 3.1 Pro'       },
+      { provider: 'gemini',   model: MODELS.GEMINI_FLASH,       label: 'Gemini 3 Flash'       },
+      { provider: 'gemini',   model: MODELS.GEMINI_STABLE,      label: 'Gemini 2.5 Flash'     },
+      { provider: 'gemini',   model: MODELS.GEMINI_LAST_RESORT, label: 'Gemini 2.0 Flash'     },
     ],
   },
 
   // ── Live / Real-time / Search ─────────────────────────────────────
   // Gemini is the ONLY option with native Google Search grounding.
-  // Grok 4 has real-time X/Twitter data — useful for social trends.
   live: {
     provider:  'gemini',
     model:     MODELS.GEMINI_FLASH,
     label:     'Gemini 3 Flash + Search',
     fallbacks: [
-      { provider: 'grok',   model: MODELS.GROK_FAST,          label: 'Grok 4.1 Fast'     },
-      { provider: 'gemini', model: MODELS.GEMINI_PRO,         label: 'Gemini 2.5 Pro'    },
+      { provider: 'grok',   model: MODELS.GROK_FAST,            label: 'Grok 3 Fast'          },
+      { provider: 'gemini', model: MODELS.GEMINI_PRO,           label: 'Gemini 3.1 Pro'       },
+      { provider: 'gemini', model: MODELS.GEMINI_STABLE,        label: 'Gemini 2.5 Flash'     },
+      { provider: 'gemini', model: MODELS.GEMINI_LAST_RESORT,   label: 'Gemini 2.0 Flash'     },
     ],
   },
 
   // ── General / Conversational ──────────────────────────────────────
-  // Gemini Flash: fast, cheap, excellent for everyday queries.
-  // Grok 4.1 Fast: $0.20/$0.50 — extraordinary value at frontier quality.
+  // Gemini 3 Flash: 1K RPM, fast, excellent for everyday queries.
   general: {
     provider:  'gemini',
     model:     MODELS.GEMINI_FLASH,
     label:     'Gemini 3 Flash',
     fallbacks: [
-      { provider: 'grok',     model: MODELS.GROK_FAST,        label: 'Grok 4.1 Fast'     },
-      { provider: 'deepseek', model: MODELS.DEEPSEEK_CHAT,    label: 'DeepSeek V4'       },
-      { provider: 'openai',   model: MODELS.GPT_FAST,         label: 'GPT-5 Mini'        },
-      { provider: 'gemini',   model: MODELS.GEMINI_FLASH,     label: 'Gemini 2.0 Flash'    },
+      { provider: 'grok',     model: MODELS.GROK_FAST,          label: 'Grok 3 Fast'          },
+      { provider: 'deepseek', model: MODELS.DEEPSEEK_CHAT,      label: 'DeepSeek V3'          },
+      { provider: 'openai',   model: MODELS.GPT_FAST,           label: 'GPT-4o Mini'          },
+      { provider: 'gemini',   model: MODELS.GEMINI_STABLE,      label: 'Gemini 2.5 Flash'     },
+      { provider: 'gemini',   model: MODELS.GEMINI_LAST_RESORT, label: 'Gemini 2.0 Flash'     },
     ],
   },
 
   // ── Image Generation ─────────────────────────────────────────────
-  // Imagen 4 is the best Google image model. Always Gemini.
+  // Imagen 4 primary (10 RPM / 70/day). Triple Gemini fallback chain.
   image_generation: {
     provider:  'gemini',
     model:     MODELS.IMAGEN,
-    label:     'Imagen 4.0',
+    label:     'Imagen 4',
     fallbacks: [
-      { provider: 'gemini', model: MODELS.GEMINI_FLASH_IMAGE, label: 'Gemini Flash Image' },
+      { provider: 'gemini', model: MODELS.GEMINI_IMAGE,  label: 'Nano Banana Pro'      },
+      { provider: 'gemini', model: MODELS.GEMINI_IMAGE2, label: 'Nano Banana 2'        },
+      { provider: 'gemini', model: MODELS.GEMINI_IMAGE3, label: 'Nano Banana Budget'   },
     ],
   },
 
   // ── Prompt Expansion (internal — not user-facing) ─────────────────
-  // Ultra-lightweight. Just needs to expand a short prompt.
-  // Use the cheapest capable model available.
+  // Ultra-lightweight. Gemini 3.1 Flash Lite: 4K RPM, unlimited daily.
   prompt_expansion: {
     provider:  'gemini',
     model:     MODELS.GEMINI_FLASH_LITE,
-    label:     'Gemini Flash Lite',
+    label:     'Gemini 3.1 Flash Lite',
     fallbacks: [
-      { provider: 'deepseek', model: MODELS.DEEPSEEK_CHAT,    label: 'DeepSeek V4'       },
-      { provider: 'mistral',  model: MODELS.MISTRAL_FAST,     label: 'Mistral Small'     },
-      { provider: 'gemini',   model: MODELS.GEMINI_FLASH,     label: 'Gemini 2.0 Flash'    },
+      { provider: 'deepseek', model: MODELS.DEEPSEEK_CHAT,      label: 'DeepSeek V3'          },
+      { provider: 'mistral',  model: MODELS.MISTRAL_FAST,       label: 'Mistral Small'        },
+      { provider: 'gemini',   model: MODELS.GEMINI_FLASH,       label: 'Gemini 3 Flash'       },
+      { provider: 'gemini',   model: MODELS.GEMINI_STABLE,      label: 'Gemini 2.5 Flash'     },
     ],
   },
 
   // ── Long Context / Document Analysis ─────────────────────────────
-  // Gemini Pro: 1M context. Llama 4 Scout: 10M context (if available).
+  // Gemini 3.1 Pro: 1M context. Use sparingly (250/day limit).
   long_context: {
     provider:  'gemini',
     model:     MODELS.GEMINI_PRO,
     label:     'Gemini 3.1 Pro',
     fallbacks: [
-      { provider: 'fireworks', model: MODELS.LLAMA_FAST,      label: 'Llama 4 Scout 10M' },
-      { provider: 'claude',    model: MODELS.CLAUDE_SONNET,   label: 'Claude Sonnet 4.6' },
-      { provider: 'gemini',    model: MODELS.GEMINI_FLASH,    label: 'Gemini 2.0 Flash'    },
+      { provider: 'fireworks', model: MODELS.LLAMA_FAST,        label: 'Llama 70B'            },
+      { provider: 'claude',    model: MODELS.CLAUDE_SONNET,     label: 'Claude Sonnet 4.6'    },
+      { provider: 'gemini',    model: MODELS.GEMINI_FLASH,      label: 'Gemini 3 Flash'       },
+      { provider: 'gemini',    model: MODELS.GEMINI_STABLE,     label: 'Gemini 2.5 Flash'     },
+      { provider: 'gemini',    model: MODELS.GEMINI_LAST_RESORT,label: 'Gemini 2.0 Flash'     },
     ],
   },
 };
@@ -277,7 +291,7 @@ export function resolveRoute(intent: string): ResolvedRoute {
     : (idealProvider as any).key ?? '';
 
   if (idealProvider.available && idealKey) {
-    console.log(`[SEDREX Router] ${intent} → ${route.label} (${route.model})`);
+    console.log(`[SEDREX Router] ${intent} → ${route.label}`);
     return {
       provider:   route.provider,
       model:      route.model,
@@ -297,7 +311,7 @@ export function resolveRoute(intent: string): ResolvedRoute {
 
     if (fb.available && fbKey) {
       console.log(
-        `[SEDREX Router] ${intent} → ${fallback.label} (${fallback.model})` +
+        `[SEDREX Router] ${intent} → ${fallback.label}` +
         ` [fallback from ${idealLabel} — key not set]`
       );
       return {
@@ -311,9 +325,9 @@ export function resolveRoute(intent: string): ResolvedRoute {
     }
   }
 
-  // Final safety net — Gemini Flash (should never reach here in beta)
+  // Final safety net — Gemini 3 Flash (should never reach here in normal operation)
   const geminiKey = PROVIDERS.gemini.keys[0] ?? '';
-  console.warn(`[SEDREX Router] ${intent} → Gemini Flash (emergency fallback — check keys)`);
+  console.warn(`[SEDREX Router] ${intent} → Core engine (emergency fallback — check keys)`);
   return {
     provider:   'gemini',
     model:      MODELS.GEMINI_FLASH,
@@ -339,7 +353,7 @@ export function getProviderStatus(): Record<string, ProviderStatus> {
       name:      'Google Gemini',
       available: PROVIDERS.gemini.available,
       keySet:    PROVIDERS.gemini.keys.length > 0,
-      models:    [MODELS.GEMINI_FLASH, MODELS.GEMINI_PRO, MODELS.GEMINI_FLASH_LITE],
+      models:    [MODELS.GEMINI_FLASH, MODELS.GEMINI_PRO, MODELS.GEMINI_FLASH_LITE, MODELS.GEMINI_STABLE, MODELS.GEMINI_LAST_RESORT],
     },
     claude: {
       name:      'Anthropic Claude',

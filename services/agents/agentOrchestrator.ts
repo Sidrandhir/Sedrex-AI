@@ -54,7 +54,7 @@ function geminiDirectResult(
     agentType,
     provider:             'gemini-fallback',
     model:                MODELS.GEMINI_FLASH,
-    label:                'Gemini 3 Flash',
+    label:                'Gemini 2.0 Flash',
     isFallback:           false,   // not a fallback — this IS the intended provider in beta
     overrideSystemPrompt,
   };
@@ -109,6 +109,15 @@ export async function dispatch(
   const intent    = (routing.intent as string) ?? 'general';
   const agentType = intentToAgentType(intent);
 
+  // Image generation must never go through agent dispatch — aiService handles it directly.
+  if (routing.intent === 'image_generation') {
+    return {
+      text: '', provider: 'none', agentType: 'general',
+      inputTokens: 0, outputTokens: 0, isFallback: false,
+      overrideSystemPrompt: null, model: '', label: '',
+    };
+  }
+
   // SESSION 7: Fast-path — if no external provider keys exist, skip ALL
   // agent dispatch and let aiService handle with Gemini directly.
   // This eliminates the 2-8s latency from sequential failed fetch() calls.
@@ -120,7 +129,7 @@ export async function dispatch(
           sessionContext: sessionContext || undefined,
         })),
         provider: 'gemini-search',
-        label:    'Gemini 3 Flash + Search',
+        label:    'Gemini 2.0 Flash + Search',
       };
     }
 
@@ -144,7 +153,7 @@ export async function dispatch(
     }
 
     // General — let aiService use its own system prompt
-    console.log(`[SEDREX Orchestrator] No external keys — ${intent} → Gemini direct (fast-path)`);
+    console.log(`[SEDREX Orchestrator] ${intent} → Core engine (fast-path)`);
     return geminiDirectResult('general', null);
   }
 
@@ -154,7 +163,7 @@ export async function dispatch(
 
   console.log(
     `[SEDREX Orchestrator] intent=${intent} → agent=${agentType}` +
-    ` → ${resolved.label} (${resolved.model})` +
+    ` → ${resolved.label}` +
     (resolved.isFallback ? ` [fallback from ${resolved.idealLabel}]` : '')
   );
 
@@ -256,7 +265,7 @@ export async function dispatch(
       agentType:            'rag',
       provider:             result.provider,
       model:                MODELS.GEMINI_FLASH,
-      label:                'Gemini 3 Flash + Search',
+      label:                'Gemini 2.0 Flash + Search',
       isFallback:           false,
       overrideSystemPrompt: buildAgentSystemPrompt('live', {
         sessionContext: sessionContext || undefined,

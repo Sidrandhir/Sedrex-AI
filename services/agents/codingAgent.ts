@@ -79,7 +79,7 @@ async function callClaude(
         'Content-Type':              'application/json',
         'x-api-key':                 key,
         'anthropic-version':         '2023-06-01',
-        'dangerously-allow-browser': 'true',
+        'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
         model,
@@ -125,10 +125,10 @@ async function callClaude(
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST', signal,
     headers: {
-      'Content-Type':              'application/json',
-      'x-api-key':                 key,
-      'anthropic-version':         '2023-06-01',
-      'dangerously-allow-browser': 'true',
+      'Content-Type':                              'application/json',
+      'x-api-key':                                 key,
+      'anthropic-version':                         '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({
       model,
@@ -305,7 +305,7 @@ export async function callCodingAgent(
         maxTokens, temperature, onStreamChunk, signal,
       );
     } catch (err) {
-      console.warn('[SEDREX CodingAgent] Claude failed, trying DeepSeek:', err);
+      console.warn('[SEDREX Code] Primary failed, trying secondary engine:', err);
     }
   }
 
@@ -317,7 +317,7 @@ export async function callCodingAgent(
         maxTokens, temperature, onStreamChunk, signal,
       );
     } catch (err) {
-      console.warn('[SEDREX CodingAgent] DeepSeek failed, trying OpenAI:', err);
+      console.warn('[SEDREX Code] Secondary failed, trying tertiary engine:', err);
     }
   }
 
@@ -329,15 +329,15 @@ export async function callCodingAgent(
         maxTokens, temperature, onStreamChunk, signal,
       );
     } catch (err) {
-      console.warn('[SEDREX CodingAgent] OpenAI failed, falling back to Gemini:', err);
+      console.warn('[SEDREX Code] External engines exhausted, using core engine:', err);
     }
   }
 
   // Final: Gemini fallback (aiService handles this)
-  console.log('[SEDREX CodingAgent] No external keys — Gemini Pro handles coding');
+  console.log('[SEDREX Code] Core engine active');
   return {
     text: '', inputTokens: 0, outputTokens: 0,
-    provider: 'gemini-fallback', model: MODELS.GEMINI_PRO, label: 'Gemini 3.1 Pro',
+    provider: 'gemini-fallback', model: MODELS.GEMINI_PRO, label: 'Gemini 2.5 Pro',
     isFallback: true, agentType: 'coding',
   };
 }

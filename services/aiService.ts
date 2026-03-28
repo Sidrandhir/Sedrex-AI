@@ -43,13 +43,15 @@ import { verifyResponse } from "./agents/verificationAgent";
 import { getCodebaseContextForQuery } from "./codebaseContext";
 
 const MODELS = {
-  FLASH:           "gemini-2.5-flash",              // Primary: 15 RPM free tier
-  FLASH_LITE:      "gemini-2.5-flash-lite",         // Free tier, but much weaker — used when FLASH hits 429
-  PRO:             "gemini-3.1-pro",                // Paid tier, 120 RPM, used for high-confidence technical queries when available
-  IMAGEN:          "imagen-3.0-generate-002",
-  GEMINI_IMAGE:    "gemini-2.5-flash",
-  // Stable fallback — broader availability, used when primary hits 429
-  STABLE_FLASH:    "gemini-1.5-flash-latest",
+  FLASH:         "gemini-3-flash-preview",             // Primary — fastest general queries
+  FLASH_LITE:    "gemini-3.1-flash-lite-preview",      // Lightweight — titles, follow-ups, expansion
+  PRO:           "gemini-3.1-pro-preview",             // Heavy tasks — most advanced reasoning (250/day limit)
+  IMAGEN:        "imagen-4.0-generate-001",            // Image — Imagen 4 photorealistic
+  IMAGEN_FAST:   "imagen-4.0-fast-generate-001",       // Image — Imagen 4 Fast
+  GEMINI_IMAGE:  "nano-banana-pro-preview",            // Image fallback 1 — Nano Banana Pro
+  GEMINI_IMAGE2: "gemini-3.1-flash-image-preview",     // Image fallback 2 — Nano Banana 2
+  STABLE_FLASH:  "gemini-2.5-flash",                  // Stable fallback — after rate-limit/429
+  LAST_RESORT:   "gemini-2.0-flash",                  // Circuit breaker — absolute last resort
 } as const;
 
 const MAX_RETRIES  = 4;
@@ -280,9 +282,9 @@ const apiKeyPool = [
   return true;
 });
 
-console.log("[SEDREX] Gemini key pool size:", apiKeyPool.length);
+console.log("[SEDREX] Neural key pool size:", apiKeyPool.length);
 if (apiKeyPool.length === 0) {
-  console.error("[SEDREX] ❌ No valid Gemini keys! Add VITE_GEMINI_KEY to .env.local");
+  console.error("[SEDREX] ❌ No neural keys configured. Add VITE_GEMINI_KEY to .env.local");
 }
 
 // ── Multi-provider config ─────────────────────────────────────────
@@ -296,8 +298,8 @@ const PROVIDER_CLAUDE = {
   model:     "claude-3-5-sonnet-20241022",
   available: !!(_vite.VITE_CLAUDE_KEY || _proc.ANTHROPIC_API_KEY),
 };
-console.log("[SEDREX] OpenAI:", PROVIDER_OPENAI.available ? "✅ configured" : "⏳ using Gemini fallback");
-console.log("[SEDREX] Claude:", PROVIDER_CLAUDE.available ? "✅ configured" : "⏳ using Gemini fallback");
+console.log("[SEDREX] Precision Engine:", PROVIDER_OPENAI.available ? "✅ configured" : "⏳ using core fallback");
+console.log("[SEDREX] Code Engine:", PROVIDER_CLAUDE.available ? "✅ configured" : "⏳ using core fallback");
 
 // ── Gemini key rotation ───────────────────────────────────────────
 let apiKeyIndex = 0;
@@ -373,7 +375,29 @@ function markRetryableFailure(): void {
 function markSuccess(): void { circuitState.failures = []; circuitState.openUntil = 0; }
 
 function isRetryableMessage(message: string): boolean {
-  return /429|quota|resource exhausted|rate limit|503|unavailable|overloaded|failed to fetch|network|timeout/.test(message.toLowerCase());
+  // Only retry transient errors (rate limits, server errors, network failures).
+  // 400 "INVALID_ARGUMENT" errors are malformed requests — never retryable.
+  // Key errors are handled separately by markApiKeyInvalid, not by retrying.
+  return /429|quota|resource exhausted|rate limit|503|unavailable|overloaded|failed to fetch|network error|timeout/.test(message.toLowerCase());
+}
+
+function isBadRequest(message: string): boolean {
+  // 400-class: malformed payload — retrying is pointless, fail fast.
+  return /invalid.argument|bad request|\b400\b/.test(message.toLowerCase());
+}
+
+function isKeyError(message: string): boolean {
+  return /api.?key|api_key_invalid|key expired|permission.?denied|invalid.?api|unauthorized/.test(message.toLowerCase());
+}
+
+function isModelNotFound(message: string): boolean {
+  return /not.?found|\b404\b|not supported for generate|call listmodels|no longer available/i.test(message);
+}
+
+function markApiKeyInvalid(key: string): void {
+  if (!key) return;
+  // 24h cooldown for expired/invalid keys — effectively removes them from rotation
+  apiKeyCooling.set(key, Date.now() + 24 * 60 * 60 * 1000);
 }
 
 function hashString(input: string): string {
@@ -398,6 +422,21 @@ function buildFingerprint(
 
 function buildSafeModeContent(intent: QueryIntent, prompt: string, reason: string): string {
   const clipped = prompt.trim().replace(/\s+/g, " ").slice(0, 220);
+
+  const humanReason = (() => {
+    if (/api.?key|expired|invalid|api_key/i.test(reason))
+      return "API key issue — renew at aistudio.google.com/apikey";
+    if (/not.?found|404|listmodels|no longer available/i.test(reason))
+      return "Model temporarily unavailable — will retry with fallback on next request";
+    if (/quota|429|rate.?limit/i.test(reason))
+      return "Rate limit reached — please wait 30 seconds and retry";
+    try {
+      const p = JSON.parse(reason);
+      return (p?.error?.message ?? p?.message ?? reason).slice(0, 150);
+    } catch { /* not JSON */ }
+    return reason.replace(/[{}"[\]]/g, "").trim().slice(0, 150) || reason;
+  })();
+
   if (intent === "coding") {
     return [
       "SEDREX is in safe mode due to high traffic.",
@@ -407,7 +446,7 @@ function buildSafeModeContent(intent: QueryIntent, prompt: string, reason: strin
       "2. Capture exact error text and stack trace.",
       "3. Isolate one likely fault area and test it with a minimal case.",
       "4. Apply one fix at a time, then re-run tests.",
-      "", `**System note:** ${reason}`,
+      "", `**System note:** ${humanReason}`,
     ].join("\n");
   }
   return [
@@ -417,7 +456,7 @@ function buildSafeModeContent(intent: QueryIntent, prompt: string, reason: strin
     "1. Break the request into one specific objective.",
     "2. Ask for one decision/output at a time for highest accuracy.",
     "3. Regenerate once traffic settles for a full long-form answer.",
-    "", `**System note:** ${reason}`,
+    "", `**System note:** ${humanReason}`,
   ].join("\n");
 }
 
@@ -464,8 +503,8 @@ export function setAnalyticsHandler(fn: (event: SedrexEvent) => void): void {
 function emit(event: SedrexEvent): void {
   if (_analyticsHandler) { try { _analyticsHandler(event); } catch { /* never crash */ } }
   if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production") {
-    console.log(`[SEDREX] ${event.event}`, {
-      intent: event.intent, engine: event.engine,
+    console.log(`[SEDREX Analytics] ${event.event}`, {
+      intent: event.intent,
       latency: `${event.latency_ms}ms`, tokens: event.total_tokens, confidence: event.confidence,
     });
   }
@@ -770,7 +809,8 @@ function buildHistory(history: Message[], intent: SedrexIntent): any[] {
   const max = MAX_HISTORY[intent] ?? 6;
   const safeHistory = sanitizeConversationHistory(history)
     .filter((msg) => msg.content != null && msg.content !== '');
-  return safeHistory.slice(-max).map((msg) => {
+
+  const raw = safeHistory.slice(-max).map((msg) => {
     let text = msg.content ?? '';
     if (msg.role === 'assistant') {
       text = text.replace(/\[ARTIFACT:[^\]]+\]/g, '[code artifact generated]');
@@ -783,6 +823,27 @@ function buildHistory(history: Message[], intent: SedrexIntent): any[] {
       parts: [{ text }],
     };
   });
+
+  // ── Gemini contents MUST: (1) start with 'user', (2) strictly alternate ──
+  // Enforce this by:
+  //   a) Dropping any leading 'model' turns (can't start mid-conversation)
+  //   b) Merging consecutive same-role turns (append text with separator)
+  const normalized: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+  for (const item of raw) {
+    if (normalized.length === 0) {
+      if (item.role !== 'user') continue; // skip leading model turns
+      normalized.push({ role: item.role, parts: [{ text: item.parts[0].text }] });
+    } else {
+      const last = normalized[normalized.length - 1];
+      if (last.role === item.role) {
+        // Merge: append text to last turn so roles keep alternating
+        last.parts[0].text += '\n\n' + item.parts[0].text;
+      } else {
+        normalized.push({ role: item.role, parts: [{ text: item.parts[0].text }] });
+      }
+    }
+  }
+  return normalized;
 }
 
 // ── Post-processing ───────────────────────────────────────────────
@@ -1186,7 +1247,7 @@ async function processRequest(
     /^\s*(build|create|make|write)\s*(a\s+)?table\s*$/i.test(prompt.trim());
   const isGenuinelyLive   = intent === "live" && !TABLE_PATTERNS.test(prompt) && !isTablePrompt;
   const useSearch         = isGenuinelyLive || freshnessSignals.test(prompt);
-  const useProModel       = (sedrexIntent === "technical" || sedrexIntent === "analytical" || sedrexIntent === "math") && routing.complexity > 0.65;
+  const useProModel       = (sedrexIntent === "technical" || sedrexIntent === "analytical" || sedrexIntent === "math") && routing.complexity > 0.45;
   let engine: string      = useProModel ? MODELS.PRO : MODELS.FLASH;
 
   if (isCircuitOpen()) {
@@ -1246,16 +1307,11 @@ async function processRequest(
     });
   }
 
-  const baseModelConfig: any = {
-    systemInstruction,
-    temperature: genConfig.temperature,
-    ...(useSearch && { tools: [{ googleSearch: {} }] }),
-    ...(genConfig.useThinking && engine === MODELS.PRO && {
-      thinkingConfig: {
-        thinkingBudget: Math.min(Math.round(genConfig.maxTokens * 0.35), 4096),
-      },
-    }),
-  };
+  // NOTE: geminiModelConfig is built INSIDE the retry loop below so that
+  // thinkingConfig is gated on the CURRENT value of `engine` — not the
+  // outer-scope initial value.  If a 429 switches engine to STABLE_FLASH,
+  // we must not send thinkingConfig to that model (it doesn't support it).
+  // baseModelConfig is intentionally removed for this reason.
 
   if (apiKeyPool.length === 0 && !PROVIDER_OPENAI.available && !PROVIDER_CLAUDE.available) {
     throw new Error("No AI provider keys configured. Add VITE_GEMINI_KEY to .env.local");
@@ -1280,11 +1336,12 @@ async function processRequest(
 
   const fprint = buildFingerprint(prompt, history, manualModel, documents);
   const key    = getApiKey();
+  let lastAttemptedKey = key;
 
   // ── IMAGE GENERATION BRANCH ──────────────────────────────────────
   if (routing.intent === "image_generation") {
     try {
-      const imgResult = await generateImage(flatPrompt, key);
+      const imgResult = await generateImage(flatPrompt);
       const usedEngine = imgResult.engine;
       const response: SedrexResponse = {
         content:      imgResult.text,
@@ -1311,6 +1368,17 @@ async function processRequest(
       return response;
     } catch (err) {
       console.error("[SEDREX] Image generation failed completely:", err);
+      // Return a user-friendly response — do NOT fall through to the text retry loop
+      const failResponse: SedrexResponse = {
+        content: "Image generation is currently unavailable. This usually means your API key doesn't have access to image generation models in Google AI Studio. Please check that your key has Imagen and Gemini image generation enabled at aistudio.google.com.",
+        model:        routing.model,
+        tokens:       0,
+        inputTokens:  0,
+        outputTokens: 0,
+        confidence:   computeConfidence("image_generation", routing.complexity, false),
+        routingContext: { ...routing, engine: MODELS.IMAGEN, thinking: false },
+      };
+      return failResponse;
     }
   }
 
@@ -1364,9 +1432,9 @@ async function processRequest(
                   dallePrompt = parsed.action_input.prompt;
                 }
               }
-              console.log('[SEDREX] Caught GPT-4 image intent via JSON payload. Redirecting to native Imagen engine.');
+              console.log('[SEDREX Visual] Image intent detected — redirecting to visual engine.');
               try {
-                const imgResult = await generateImage(dallePrompt, key);
+                const imgResult = await generateImage(dallePrompt);
                 const response: SedrexResponse = {
                   content:      imgResult.text,
                   model:        routing.model,
@@ -1393,14 +1461,26 @@ async function processRequest(
         const geminiSystemInstruction = agentResult.overrideSystemPrompt
           ?? systemInstruction;
 
-        const geminiModelConfig = {
-          ...baseModelConfig,
-          systemInstruction: geminiSystemInstruction,
+        // Build config HERE so thinkingConfig is gated on the CURRENT engine.
+        // After a 429 falls back to STABLE_FLASH, we must not send thinkingConfig.
+        // systemInstruction MUST be a Content object — raw strings can cause 400s
+        // on some SDK versions when the string is very long or contains special chars.
+        const geminiModelConfig: Record<string, unknown> = {
+          systemInstruction: { parts: [{ text: geminiSystemInstruction }] },
+          temperature:       genConfig.temperature,
           maxOutputTokens:   dynamicMaxTokens,
+          ...(useSearch && { tools: [{ googleSearch: {} }] }),
+          ...(genConfig.useThinking && engine === MODELS.PRO && {
+            thinkingConfig: {
+              includeThoughts: true,   // required for thinking tokens to be returned
+              thinkingBudget:  Math.min(Math.round(dynamicMaxTokens * 0.35), 8192),
+            },
+          }),
         };
 
         const currentApiKey = getApiKey();
         if (!currentApiKey) throw new Error("Gemini API key not configured.");
+        lastAttemptedKey = currentApiKey;
         const ai = new GoogleGenAI({ apiKey: currentApiKey });
 
         if (onStreamChunk) {
@@ -1529,33 +1609,62 @@ async function processRequest(
 
     } catch (err: unknown) {
       lastError = err;
-      const msgRaw     = ((err as Error).message ?? "");
-      const msg        = msgRaw.toLowerCase();
-      const isRetryable = isRetryableMessage(msg);
+      const msgRaw       = ((err as Error).message ?? "");
+      const msg          = msgRaw.toLowerCase();
+      const isRetryable  = isRetryableMessage(msg);
+      const isBadReq     = isBadRequest(msg);
+      const isKeyErr     = isKeyError(msg);
+      const isNotFound   = isModelNotFound(msgRaw);
 
-      if (isRetryable) {
-        const currentKey = getApiKey();
-        if (currentKey) markApiKeyFailure(currentKey);
+      // 1. AbortError — rethrow immediately, never suppress
+      if ((err as any)?.name === "AbortError") throw err;
 
-        // After 2 failed attempts on a preview model (429/rate-limit), switch to the
-        // stable fallback which has higher quotas. Keeps retrying with remaining keys.
+      // 2. KEY ERROR — rotate to next key and retry (never safe mode for one bad key).
+      // Checked BEFORE isBadReq: key errors carry status INVALID_ARGUMENT which
+      // also matches isBadReq, causing premature safe mode if order is wrong.
+      if (isKeyErr) {
+        console.warn(`[SEDREX] Key error on attempt ${attempt + 1} — rotating key:`, msgRaw.slice(0, 120));
+        if (lastAttemptedKey) markApiKeyInvalid(lastAttemptedKey);
+        if (attempt < MAX_RETRIES - 1) continue;
+        // All keys exhausted — fall through to safe mode
+      }
+
+      // 3. MODEL NOT FOUND (404) — switch to stable engine and retry
+      else if (isNotFound) {
+        console.warn(`[SEDREX] Model not found on attempt ${attempt + 1} — switching to stable engine:`, engine);
+        engine = MODELS.STABLE_FLASH;
+        if (attempt < MAX_RETRIES - 1) continue;
+      }
+
+      // 4. 400 BAD REQUEST (not a key error) — payload is malformed; fail fast
+      else if (isBadReq) {
+        console.error(`[SEDREX] 400 Bad Request — payload issue (not retrying):`, msgRaw);
+        if (lastAttemptedKey) markApiKeySuccess(lastAttemptedKey);
+        logError(msg, true, routing.model);
+        return buildSafeModeResponse(prompt, routing, normalizeErrorMessage(err));
+      }
+
+      // 5. RETRYABLE (429, 503, network) — backoff then retry
+      else if (isRetryable) {
+        if (lastAttemptedKey) markApiKeyFailure(lastAttemptedKey);
+
         const is429 = /429|resource exhausted|rate limit|quota/.test(msg);
         if (is429 && attempt >= 1 && engine !== MODELS.STABLE_FLASH) {
-          console.warn(`[SEDREX] Rate-limited on ${engine} after ${attempt + 1} attempts — switching to ${MODELS.STABLE_FLASH}`);
+          console.warn(`[SEDREX] Rate-limited after ${attempt + 1} attempts — switching to stable engine`);
           engine = MODELS.STABLE_FLASH;
         }
       }
 
       if (isRetryable && attempt < MAX_RETRIES - 1) {
-        // 429 = quota exhausted — not a server failure; don't trip the circuit breaker
         const is429ForCircuit = /429|resource exhausted|rate limit|quota/.test(msg);
-        if ((err as any)?.name !== "AbortError" && !is429ForCircuit) markRetryableFailure();
+        if (!is429ForCircuit) markRetryableFailure();
         const backoff = Math.min(1500 * 2 ** attempt, 20_000);
         console.warn(`[SEDREX] Retryable error (attempt ${attempt + 1}/${MAX_RETRIES}). Retry in ${backoff}ms…`);
         await sleep(backoff);
         continue;
       }
 
+      // 6. All retries exhausted — emit, log, return safe mode
       emit({
         event:         "query_error",
         intent,
@@ -1570,9 +1679,8 @@ async function processRequest(
       });
 
       logError(msg, true, routing.model);
-      if ((err as any)?.name === "AbortError") throw err;
       const is429Final = /429|resource exhausted|rate limit|quota/.test(msg);
-      if (isRetryable && (err as any)?.name !== "AbortError" && !is429Final) markRetryableFailure();
+      if (isRetryable && !is429Final) markRetryableFailure();
       return buildSafeModeResponse(prompt, routing, normalizeErrorMessage(err));
     }
   }
@@ -1602,10 +1710,11 @@ export const generateFollowUpSuggestions = async (
     const trimmed = lastMsg.slice(0, 800);
     const isShopping = /shop|shopping|ecommerce|buy|purchase|order|cart|checkout|product|deal|discount|price|amazon|flipkart|ebay|walmart/i.test(intent + " " + lastMsg);
     const extra = isShopping ? "\nIf relevant, suggest images, videos, or links for the product." : "";
+    const followUpPrompt = `Given this AI response about "${intent}", suggest 3 very short follow-up questions (6 words or less each). Return a JSON array of strings only — no markdown, no preamble.${extra}\n\n"${trimmed}"`;
     const response = await ai.models.generateContent({
       model:    MODELS.FLASH_LITE,   // lightweight model — saves quota for main responses
-      contents: `Given this AI response about "${intent}", suggest 3 very short follow-up questions (6 words or less each). Return a JSON array of strings only — no markdown, no preamble.${extra}\n\n"${trimmed}"`,
-      config:   { maxOutputTokens: 128 },
+      contents: [{ role: 'user', parts: [{ text: followUpPrompt }] }],
+      config:   { maxOutputTokens: 128, temperature: 0.4 },
     });
     const raw = (response.text ?? "").replace(/```json|```/g, "").trim();
     try {
@@ -1627,10 +1736,11 @@ export const generateChatTitle = async (firstMessage: string): Promise<string> =
     apiKey = getApiKey();
     const ai      = new GoogleGenAI({ apiKey });
     const trimmed = firstMessage.slice(0, 1_000);
+    const titlePrompt = `Summarize this message as a professional 3–5 word chat title. Return ONLY the title text. No quotes. No period.\n\n"${trimmed}"`;
     const response = await ai.models.generateContent({
       model:    MODELS.FLASH_LITE,   // trivial task — no need to burn FLASH quota
-      contents: `Summarize this message as a professional 3–5 word chat title. Return ONLY the title text. No quotes. No period.\n\n"${trimmed}"`,
-      config:   { maxOutputTokens: 32 },
+      contents: [{ role: 'user', parts: [{ text: titlePrompt }] }],
+      config:   { maxOutputTokens: 32, temperature: 0.3 },
     });
     const title = (response.text ?? "").trim().replace(/['"]/g, "").replace(/\.$/, "") || "New Session";
     markApiKeySuccess(apiKey);
@@ -1670,86 +1780,58 @@ export async function decodeAudioData(
 }
 
 /**
- * Generates an image using a dual-strategy approach:
- *  1. PRIMARY: Imagen 4 via ai.models.generateImages()
- *  2. FALLBACK: Gemini Flash Image via responseModalities
+ * Generates an image using a triple-strategy approach:
+ *  1. PRIMARY:   Imagen 4 via generateImages()
+ *  2. FALLBACK1: Nano Banana Pro via generateContent() + responseModalities
+ *  3. FALLBACK2: Nano Banana 2 (gemini-3.1-flash-image-preview) via generateContent()
+ * Each strategy gets a fresh key. Key invalid → markApiKeyInvalid. 429 → markApiKeyFailure.
  */
 async function generateImage(
   prompt: string,
-  apiKey: string,
   conversationContext: string = "",
 ): Promise<{ url: string; text: string; engine: string; tokens: { input: number; output: number; total: number }; expandedPrompt?: string }> {
-  const ai = new GoogleGenAI({ apiKey });
 
+  // ── Prompt expansion (best-effort, silent on failure) ─────────────
   let expandedPrompt = prompt;
   try {
-    console.log("[SEDREX] Expanding image prompt…");
-    const expansionSystemPrompt = buildImagePromptExpansionPrompt(prompt, conversationContext);
-    const expansionResult = await ai.models.generateContent({
-      model: MODELS.FLASH_LITE,
-      contents: expansionSystemPrompt,
-      config: { maxOutputTokens: 256, temperature: 0.7 },
+    console.log("[SEDREX Visual] Expanding image prompt…");
+    const expansionKey = getApiKey();
+    const expansionAi  = new GoogleGenAI({ apiKey: expansionKey });
+    const expansionResult = await expansionAi.models.generateContent({
+      model:    MODELS.FLASH_LITE,
+      contents: [{ role: 'user', parts: [{ text: buildImagePromptExpansionPrompt(prompt, conversationContext) }] }],
+      config:   { maxOutputTokens: 256, temperature: 0.7 },
     });
     const expanded = expansionResult.text?.trim();
     if (expanded && expanded.length > 20 && !expanded.toLowerCase().includes("return only")) {
       expandedPrompt = expanded;
-      console.log("[SEDREX] Prompt expanded:", expandedPrompt.slice(0, 100) + "...");
+      console.log("[SEDREX Visual] Prompt expanded:", expandedPrompt.slice(0, 100) + "…");
     }
+    markApiKeySuccess(expansionKey);
   } catch (expansionErr) {
-    console.warn("[SEDREX] Prompt expansion failed, using original:", expansionErr);
-    expandedPrompt = prompt;
+    console.warn("[SEDREX Visual] Prompt expansion failed, using original:", expansionErr);
   }
 
-  // STRATEGY 1: Imagen 4
-  try {
-    console.log("[SEDREX] Trying Imagen 4…");
-    const response = await (ai.models as any).generateImages({
-      model: MODELS.IMAGEN,
-      prompt: expandedPrompt,
-      config: { numberOfImages: 1, outputMimeType: "image/png" },
-    });
-
-    const img = response?.generatedImages?.[0];
-    if (img?.image?.imageBytes) {
-      const mimeType = img.image.mimeType || "image/png";
-      const url = `data:${mimeType};base64,${img.image.imageBytes}`;
-      console.log("[SEDREX] ✅ Imagen 4 succeeded");
+  // ── Helper: run a generateContent image strategy ──────────────────
+  async function runGeminiImageStrategy(model: string, label: string) {
+    const key = getApiKey();
+    if (!key) throw new Error("No API key available");
+    const ai = new GoogleGenAI({ apiKey: key });
+    try {
+      const result = await ai.models.generateContent({
+        model,
+        contents: [{ role: 'user', parts: [{ text: expandedPrompt }] }],
+        config:   { responseModalities: ["TEXT", "IMAGE"], temperature: 0.7, maxOutputTokens: 1024 },
+      });
+      const parts     = result.candidates?.[0]?.content?.parts ?? [];
+      const imagePart = parts.find((p: any) => p.inlineData?.mimeType?.startsWith("image/"));
+      const textPart  = parts.find((p: any) => p.text);
+      if (!imagePart?.inlineData?.data) throw new Error(`${label} returned no image data`);
+      markApiKeySuccess(key);
       return {
-        url,
-        text: `Image generated from: "${expandedPrompt.slice(0, 120)}${expandedPrompt.length > 120 ? '…' : ''}"`,
-        engine: MODELS.IMAGEN,
-        tokens: { input: 0, output: 0, total: 0 },
-        expandedPrompt,
-      };
-    }
-    throw new Error("Imagen 4 returned no image data");
-  } catch (imagenError: any) {
-    console.warn("[SEDREX] Imagen 4 failed, trying Gemini Flash Image…", imagenError.message);
-  }
-
-  // STRATEGY 2: Gemini Flash Image
-  try {
-    console.log("[SEDREX] Trying Gemini Flash Image…");
-    const result = await ai.models.generateContent({
-      model: MODELS.GEMINI_IMAGE,
-      contents: prompt,
-      config: {
-        // @ts-ignore
-        responseModalities: ["TEXT", "IMAGE"],
-      },
-    });
-
-    const parts = result.candidates?.[0]?.content?.parts ?? [];
-    const imagePart = parts.find((p: any) => p.inlineData?.mimeType?.startsWith("image/"));
-    const textPart  = parts.find((p: any) => p.text);
-
-    if (imagePart?.inlineData?.data) {
-      const url = `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
-      console.log("[SEDREX] ✅ Gemini Flash Image succeeded");
-      return {
-        url,
-        text: textPart?.text || `Image generated from: "${expandedPrompt.slice(0, 120)}${expandedPrompt.length > 120 ? '…' : ''}"`,
-        engine: MODELS.GEMINI_IMAGE,
+        url:    `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`,
+        text:   textPart?.text || `Image generated from: "${expandedPrompt.slice(0, 120)}${expandedPrompt.length > 120 ? '…' : ''}"`,
+        engine: model,
         expandedPrompt,
         tokens: {
           input:  (result.usageMetadata as any)?.promptTokenCount ?? 0,
@@ -1757,13 +1839,62 @@ async function generateImage(
           total:  (result.usageMetadata as any)?.totalTokenCount ?? 0,
         },
       };
+    } catch (e: any) {
+      if (isKeyError(e?.message ?? "")) markApiKeyInvalid(key);
+      else if (isRetryableMessage(e?.message ?? "")) markApiKeyFailure(key);
+      throw e;
     }
-    throw new Error("Gemini Flash Image returned no image data");
-  } catch (geminiError: any) {
-    console.error("[SEDREX] ❌ Both image strategies failed.", geminiError.message);
+  }
+
+  // ── STRATEGY 1: Imagen 4 (predict) ───────────────────────────────
+  try {
+    console.log("[SEDREX Visual] Strategy 1: Imagen 4…");
+    const key = getApiKey();
+    if (!key) throw new Error("No API key available");
+    const ai = new GoogleGenAI({ apiKey: key });
+    const response = await (ai.models as any).generateImages({
+      model:  MODELS.IMAGEN,
+      prompt: expandedPrompt,
+      config: { numberOfImages: 1, outputMimeType: "image/png" },
+    });
+    const img = response?.generatedImages?.[0];
+    if (!img?.image?.imageBytes) throw new Error("Imagen 4 returned no image data");
+    markApiKeySuccess(key);
+    console.log("[SEDREX Visual] ✅ Strategy 1 succeeded (Imagen 4)");
+    return {
+      url:    `data:${img.image.mimeType || "image/png"};base64,${img.image.imageBytes}`,
+      text:   `Image generated from: "${expandedPrompt.slice(0, 120)}${expandedPrompt.length > 120 ? '…' : ''}"`,
+      engine: MODELS.IMAGEN,
+      tokens: { input: 0, output: 0, total: 0 },
+      expandedPrompt,
+    };
+  } catch (e1: any) {
+    if (isKeyError(e1?.message ?? "")) markApiKeyInvalid(getApiKey());
+    console.warn("[SEDREX Visual] Strategy 1 failed:", e1?.message ?? e1);
+  }
+
+  // ── STRATEGY 2: Nano Banana Pro ───────────────────────────────────
+  try {
+    console.log("[SEDREX Visual] Strategy 2: Nano Banana Pro…");
+    const result = await runGeminiImageStrategy(MODELS.GEMINI_IMAGE, "Nano Banana Pro");
+    console.log("[SEDREX Visual] ✅ Strategy 2 succeeded (Nano Banana Pro)");
+    return result;
+  } catch (e2: any) {
+    console.warn("[SEDREX Visual] Strategy 2 failed:", e2?.message ?? e2);
+  }
+
+  // ── STRATEGY 3: Nano Banana 2 ─────────────────────────────────────
+  try {
+    console.log("[SEDREX Visual] Strategy 3: Nano Banana 2…");
+    const result = await runGeminiImageStrategy(MODELS.GEMINI_IMAGE2, "Nano Banana 2");
+    console.log("[SEDREX Visual] ✅ Strategy 3 succeeded (Nano Banana 2)");
+    return result;
+  } catch (e3: any) {
+    console.error("[SEDREX Visual] ❌ All 3 image strategies failed:", e3?.message ?? e3);
     throw new Error(
-      `Image generation failed. Imagen: ${(geminiError as any)?.message}. ` +
-      `Please verify your API key has access to image generation models in Google AI Studio.`
+      "Image generation failed on all 3 engines. " +
+      "Verify your API key has access to Imagen 4 and Nano Banana models in Google AI Studio. " +
+      `Last error: ${e3?.message ?? "unknown"}`
     );
   }
 }

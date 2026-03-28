@@ -39,7 +39,7 @@ export const callClaude = async (
         "Content-Type": "application/json",
         "x-api-key": ANTHROPIC_API_KEY,
         "anthropic-version": "2023-06-01",
-        "dangerously-allow-browser": "true",
+        "anthropic-dangerous-direct-browser-access": "true",
       },
       body: JSON.stringify({
         model: "claude-3-5-sonnet-20240620",

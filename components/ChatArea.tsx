@@ -240,7 +240,13 @@ const MAX_MERMAID_EDGES = 200;   // raised — Notion/Claude safely render 150-3
 const MERMAID_WARN_EDGES = 120;   // soft-warn above this, still render
 
 function sanitizeMermaid(raw: string): string {
-  let code = raw;
+  // Strip comment lines (// and #) and filepath headers (.mmd lines)
+  let code = raw
+    .split('\n')
+    .filter(line => !line.trim().startsWith('//') && !line.trim().startsWith('#'))
+    .join('\n')
+    .replace(/^[\w./\-]+\.mmd\s*\n/m, '')
+    .trim();
 
   // Fix: subgraph Frontend (Client-side) → subgraph "Frontend (Client-side)"
   code = code.replace(
@@ -248,15 +254,23 @@ function sanitizeMermaid(raw: string): string {
     (_match, name, paren) => `subgraph "${name.trim()} (${paren.trim()})"`
   );
 
-  // Fix: node labels with parentheses that break parser
-  // e.g.  A[Label (detail)] → A["Label (detail)"]
+  // Fix: node labels with parentheses that break the parser.
+  // Covers all three node shapes:
+  //   A[Label (detail)]      → A["Label (detail)"]   (rectangle)
+  //   A(Label (detail))      → A("Label (detail)")   (rounded)
+  //   A{Generator (LLM)}     → A{"Generator (LLM)"}  (diamond) ← was missing
+  // Only quote labels that aren't already quoted and contain ()
   code = code.replace(
-    /(\b[\w]+)\[([^\]"]*\([^\]]*\)[^\]"]*)\]/g,
+    /(\b\w+)\[([^\]"]*\([^\]]*\)[^\]"]*)\]/g,
     (_m, id, label) => `${id}["${label}"]`
   );
   code = code.replace(
-    /(\b[\w]+)\(([^)"]*\([^)]*\)[^)"]*)\)/g,
+    /(\b\w+)\(([^)"]*\([^)]*\)[^)"]*)\)/g,
     (_m, id, label) => `${id}("${label}")`
+  );
+  code = code.replace(
+    /(\b\w+)\{([^}"]*\([^}]*\)[^}"]*)\}/g,
+    (_m, id, label) => `${id}{"${label}"}`
   );
 
   // Fix: subgraph id [label] -> subgraph id ["label"] (sensitive to special chars)
@@ -307,13 +321,23 @@ const MermaidBlock = memo(({ code }: { code: string }) => {
         setLoading(true);
         const mermaid = (await import('mermaid')).default;
 
-        // Initialize only once globally for the session
+        // Initialize once per page load.
+        // 'antiscript' removes onclick/onerror handlers but keeps all SVG
+        // features that Mermaid needs. 'strict' (old value) strips too much
+        // and was breaking diagram rendering.
         if (!(window as any).__MERMAID_READY__) {
           mermaid.initialize({
             startOnLoad: false,
             theme: 'dark',
-            securityLevel: 'strict',
-            fontFamily: 'Inter, system-ui, sans-serif'
+            securityLevel: 'loose',
+            maxTextSize: 500000,
+            flowchart: {
+              htmlLabels: true,
+              useMaxWidth: true,
+              rankSpacing: 50,
+              nodeSpacing: 30,
+            },
+            maxEdges: 500,
           });
           (window as any).__MERMAID_READY__ = true;
         }

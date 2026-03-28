@@ -37,7 +37,7 @@ export async function callRAGAgent(
   // Gemini + Google Search grounding is active today — no extra key needed.
   // Returns empty text → orchestrator injects RAG system prompt into
   // Gemini call in aiService.ts, which has tools: [{ googleSearch: {} }]
-  console.log("[SEDREX Agent] RAG → Gemini 2.5 + Google Search grounding");
+  console.log("[SEDREX Live] Web grounding active");
   return {
     text: "", inputTokens: 0, outputTokens: 0,
     groundingChunks: [], provider: "gemini-search", agentType: "rag",
