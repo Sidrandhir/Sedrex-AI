@@ -1,5 +1,5 @@
 ﻿SEDREX AI - FULL SOURCE EXPORT
-Generated: 2026-03-28 17:19:34
+Generated: 2026-03-28 19:22:03
 Total files: 137
 ================================================================================
 
@@ -3028,7 +3028,7 @@ export default ArtifactCard;
 
 ================================================================================
 FILE: components\ArtifactPanel.css
-MODIFIED: 2026-03-28 17:02  SIZE: 16187 bytes
+MODIFIED: 2026-03-28 17:29  SIZE: 16207 bytes
 ================================================================================
 
 /* ================================================================
@@ -3541,11 +3541,12 @@ MODIFIED: 2026-03-28 17:02  SIZE: 16187 bytes
   flex: 1;
   min-height: 0;
   /* ← CRITICAL */
+  height: 100%;
   display: flex;
   flex-direction: column;
   position: relative;
   overflow: hidden;
-  background: #ffffff;
+  background: #0a0a0f;
 }
 
 .ap-preview-loading {
@@ -3783,7 +3784,7 @@ MODIFIED: 2026-03-28 17:02  SIZE: 16187 bytes
 }
 
 .ap-preview-container {
-  background: #000 !important;
+  background: #0a0a0f !important;
 }
 
 ================================================================================
@@ -7678,7 +7679,7 @@ MODIFIED: 2026-03-28 12:25  SIZE: 57419 bytes
 
 ================================================================================
 FILE: components\ChatArea.tsx
-MODIFIED: 2026-03-28 15:30  SIZE: 65667 bytes
+MODIFIED: 2026-03-28 19:03  SIZE: 69359 bytes
 ================================================================================
 
 import React, {
@@ -7697,7 +7698,7 @@ import { ConfidenceBadge } from './ConfidenceBadge';
 import type { ConfidenceSignal } from '../services/aiService';
 import ArtifactCard from './ArtifactCard';
 import { RunButton, CodeRunner } from './CodeRunner';
-import { getArtifacts } from '../services/artifactStore';
+import { getArtifacts, extractArtifactFromResponse } from '../services/artifactStore';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   BarChart, Bar, LineChart, Line,
@@ -7786,6 +7787,40 @@ function preprocessMarkdown(raw: string): string {
   );
 
   return result;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// FIX 2 — SANITIZE MESSAGE CONTENT
+// After artifact extraction, raw code fragments can still leak into
+// the bubble if the extractor missed secondary blocks or orphaned lines.
+// This strips them when [ARTIFACT:] is already present.
+// Only applied to completed (non-streaming) assistant messages.
+// ══════════════════════════════════════════════════════════════════
+function sanitizeMessageContent(content: string): string {
+  if (!content.includes('[ARTIFACT:')) return content;
+
+  return content
+    .split('\n')
+    .filter(line => {
+      const t = line.trim();
+      if (!t) return true;
+      // Always keep markdown structure lines
+      if (t.startsWith('#') || t.startsWith('*') ||
+          t.startsWith('-') || t.startsWith('>')) return true;
+      // Always keep artifact placeholders
+      if (t.startsWith('[ARTIFACT:')) return true;
+      // Drop lines that are clearly raw code fragments
+      const isCodeLine =
+        /^(function|const|let|var|class|export|import|return|if|while|for)\s/.test(t) ||
+        /^[\w<>[\]]+\s*[=:({]/.test(t) ||  // assignments, type annotations, calls
+        /^[});\]]+$/.test(t) ||              // closing braces / semicolons alone
+        /\/\//.test(t) ||                    // inline or standalone comments
+        /^\s{4,}/.test(line);               // heavily indented (4+ spaces = code indent)
+      return !isCodeLine;
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -8659,10 +8694,45 @@ const MessageItem = memo(
       if (isStreaming) return content;
       const cacheKey = djb2(content);
       if (markdownCache.has(cacheKey)) return markdownCache.get(cacheKey)!;
-      const result = preprocessMarkdown(content);
+
+      // FIX 3: If msg.content still has a raw code fence but no artifact marker
+      // (e.g. setSessions race or historical message), extract and use reducedResponse
+      // so the code block doesn't bleed into the chat bubble.
+      let displayContent = content;
+      if (!(msg as any).isDiff && !content.includes('[ARTIFACT:') && content.includes('```')) {
+        const extracted = extractArtifactFromResponse(content);
+        if (extracted) displayContent = extracted.reducedResponse;
+      }
+
+      // FIX 2: Strip any raw code fragments that still leaked through after extraction
+      displayContent = sanitizeMessageContent(displayContent);
+
+      const result = preprocessMarkdown(displayContent);
       setMarkdownCache(cacheKey, result);
       return result;
     }, [msg.content, isStreaming]);
+
+    // FIX 2: When the processed content already contains an [ARTIFACT:] marker,
+    // the code block is rendered by the artifact panel — suppress any duplicate
+    // large code blocks that ReactMarkdown would otherwise render inline.
+    const hasArtifact = !isStreaming && processedMarkdown.includes('[ARTIFACT:');
+    const localMdComponents = useMemo(() => {
+      if (!hasArtifact) return mdComponents;
+      return {
+        ...mdComponents,
+        pre: ({ children }: any) => {
+          const child = React.Children.only(children) as React.ReactElement<any> | null;
+          if (child?.props) {
+            const codeStr = String(child.props.children ?? '').replace(/\n$/, '');
+            // Suppress code blocks that meet the artifact threshold — they belong
+            // in the artifact panel, not inline in the chat bubble.
+            if (codeStr.split('\n').length >= 20) return null;
+            return <CodeBlock className={child.props.className}>{child.props.children}</CodeBlock>;
+          }
+          return <CodeBlock>{children}</CodeBlock>;
+        },
+      };
+    }, [hasArtifact, mdComponents]);
 
     return (
       <div className={`message-group message-enter ${isUser ? 'message-user' : 'message-assistant'}`}>
@@ -8788,14 +8858,14 @@ const MessageItem = memo(
                     return <span className="streaming-raw">{c}</span>;
                   }
                   return (
-                    <ReactMarkdown remarkPlugins={remarkPlugins} components={mdComponents}>
+                    <ReactMarkdown remarkPlugins={remarkPlugins} components={localMdComponents}>
                       {processedMarkdown}
                     </ReactMarkdown>
                   );
                 })() : (
                   // FIX 1: Use renderWithArtifacts for completed messages —
                   // splits [ARTIFACT:title] markers into ArtifactCard components
-                  <>{renderWithArtifacts(processedMarkdown, remarkPlugins, mdComponents, msg.timestamp)}</>
+                  <>{renderWithArtifacts(processedMarkdown, remarkPlugins, localMdComponents, msg.timestamp)}</>
                 )}
               </div>
             )}
@@ -38918,7 +38988,7 @@ export async function verifyResponse(
 
 ================================================================================
 FILE: services\aiService.ts
-MODIFIED: 2026-03-28 17:02  SIZE: 83262 bytes
+MODIFIED: 2026-03-28 18:28  SIZE: 83517 bytes
 ================================================================================
 
 // src/services/aiService.ts
@@ -38983,8 +39053,8 @@ const MAX_HISTORY: Record<string, number> = {
   technical:  12,
   analytical: 16,
   live:        6,
-  general:    10,
-  math:       10,
+  general:    16,
+  math:       20,
 };
 
 // ── SESSION 7 FIX: Cache is now 30s for non-live intents ──────────
@@ -40072,16 +40142,20 @@ export const getAIResponse = async (
     return buildSafeModeResponse(prompt, limitedRoute, "You sent too many requests. Please wait a few seconds.");
   }
 
+  // Detect image_generation intent early so cache/inflight bypasses work correctly
+  const previewRoute      = routePrompt(prompt, !!(images?.length), documents.length > 0);
+  const isImageGenRequest = previewRoute.intent === 'image_generation';
+
   const fingerprint = buildFingerprint(prompt, history, manualModel, documents);
   const now         = Date.now();
   const cached      = responseCache.get(fingerprint);
-  if (!isTablePrompt && cached && cached.expiresAt > now) {
+  if (!isTablePrompt && !isImageGenRequest && cached && cached.expiresAt > now) {
     onRouting?.(cached.value.routingContext);
     return cached.value;
   }
 
   const inFlight = inFlightByFingerprint.get(fingerprint);
-  if (inFlight && !isTablePrompt) return inFlight;
+  if (inFlight && !isTablePrompt && !isImageGenRequest) return inFlight;
 
   const effectiveQueueKey = isTablePrompt
     ? `${queueKey}:tbl:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 7)}`
@@ -40096,8 +40170,8 @@ export const getAIResponse = async (
       effectiveQueueKey,
     )
     .then((res) => {
-      // Don't cache diff responses — they are context-specific
-      if (res.routingContext.intent !== "live" && !isTablePrompt && !res.isDiff) {
+      // Don't cache diff or image responses — they are context-specific / always unique
+      if (res.routingContext.intent !== "live" && res.routingContext.intent !== "image_generation" && !isTablePrompt && !res.isDiff) {
         responseCache.set(fingerprint, {
           value:     res,
           expiresAt: Date.now() + RESPONSE_CACHE_TTL_MS,
@@ -40637,7 +40711,7 @@ export const generateFollowUpSuggestions = async (
     const extra = isShopping ? "\nIf relevant, suggest images, videos, or links for the product." : "";
     const followUpPrompt = `Given this AI response about "${intent}", suggest 3 very short follow-up questions (6 words or less each). Return a JSON array of strings only — no markdown, no preamble.${extra}\n\n"${trimmed}"`;
     const response = await ai.models.generateContent({
-      model:    MODELS.FLASH_LITE,   // lightweight model — saves quota for main responses
+      model:    MODELS.FLASH,
       contents: [{ role: 'user', parts: [{ text: followUpPrompt }] }],
       config:   { maxOutputTokens: 128, temperature: 0.4 },
     });
@@ -40663,7 +40737,7 @@ export const generateChatTitle = async (firstMessage: string): Promise<string> =
     const trimmed = firstMessage.slice(0, 1_000);
     const titlePrompt = `Summarize this message as a professional 3–5 word chat title. Return ONLY the title text. No quotes. No period.\n\n"${trimmed}"`;
     const response = await ai.models.generateContent({
-      model:    MODELS.FLASH_LITE,   // trivial task — no need to burn FLASH quota
+      model:    MODELS.FLASH,
       contents: [{ role: 'user', parts: [{ text: titlePrompt }] }],
       config:   { maxOutputTokens: 32, temperature: 0.3 },
     });
@@ -41227,7 +41301,7 @@ export const callClaude = async (
 
 ================================================================================
 FILE: services\apiService.ts
-MODIFIED: 2026-03-27 11:10  SIZE: 21115 bytes
+MODIFIED: 2026-03-28 17:29  SIZE: 21359 bytes
 ================================================================================
 
 // services/apiService.ts
@@ -41274,6 +41348,10 @@ import {
   getUserPreferences,
 } from './queryOptimizer';
 import { persistenceService } from './persistenceService';
+
+// Bypass in-memory cache once on app startup so the first getMessages()
+// call always fetches fresh data from the DB (not stale cache from a prior session).
+let _appJustStarted = true;
 
 const API_ERROR_MESSAGES = {
   NO_DB:          'Cloud Connectivity not established.',
@@ -41509,7 +41587,8 @@ export const api = {
       const cacheKey = `msgs:${conversationId}:${limit}:${metadataOnly ? 'meta' : 'full'}`;
 
       const cached = MessageCache.get(cacheKey) as Message[] | null;
-      if (cached && Array.isArray(cached)) return cached;
+      if (cached && Array.isArray(cached) && !_appJustStarted) return cached;
+      _appJustStarted = false;
 
       return await MessageDeduplicator.deduplicate(cacheKey, async () => {
         const data = await getMessagesByConversationId(conversationId, limit, metadataOnly);
@@ -41783,7 +41862,7 @@ export const api = {
 
 ================================================================================
 FILE: services\artifactStore.ts
-MODIFIED: 2026-03-28 17:01  SIZE: 28340 bytes
+MODIFIED: 2026-03-28 19:03  SIZE: 29804 bytes
 ================================================================================
 
 // src/services/artifactStore.ts
@@ -41982,16 +42061,35 @@ export function extractArtifactFromResponse(
   let bestLines = 0;
   let match: RegExpExecArray | null;
 
-  while ((match = FENCE_RE.exec(response)) !== null) {
-    const lang  = match[1].toLowerCase().trim() || 'text';
-    const code  = match[2];
+  // Priority 1: block whose first line is a file-path comment (// src/... etc.)
+  // This is always the complete file — grab it before the non-greedy FENCE_RE loop
+  // can match a smaller inner block (e.g. a helper function) instead.
+  const filePathMatch = response.match(
+    /^```(\w+)[ \t]*\r?\n(\/\/\s*[\w./\-]+\.\w+[\s\S]*?)^```[ \t]*$/m
+  );
+  if (filePathMatch) {
+    const lang  = filePathMatch[1].toLowerCase();
+    const code  = filePathMatch[2];
     const lines = code.split('\n').length;
-
-    if (EXCLUDED_LANGUAGES.has(lang)) continue;
-
-    if (lines >= MIN_LINES_FOR_ARTIFACT && lines > bestLines) {
-      best      = { lang, code, full: match[0] };
+    if (!EXCLUDED_LANGUAGES.has(lang) && lines >= MIN_LINES_FOR_ARTIFACT) {
+      best      = { lang, code, full: filePathMatch[0] };
       bestLines = lines;
+    }
+  }
+
+  // Priority 2: no file-path block — fall back to the largest fenced block
+  if (!best) {
+    while ((match = FENCE_RE.exec(response)) !== null) {
+      const lang  = match[1].toLowerCase().trim() || 'text';
+      const code  = match[2];
+      const lines = code.split('\n').length;
+
+      if (EXCLUDED_LANGUAGES.has(lang)) continue;
+
+      if (lines >= MIN_LINES_FOR_ARTIFACT && lines > bestLines) {
+        best      = { lang, code, full: match[0] };
+        bestLines = lines;
+      }
     }
   }
 
@@ -42048,17 +42146,24 @@ export function extractArtifactFromResponse(
 
   let reducedResponse = response.replace(best.full, `\n\n[ARTIFACT:${title}]\n`);
 
-  const STRIP_RE = /^```(\w*)[ \t]*\r?\n([\s\S]*?)^```[ \t]*$/gm;
+  // PART B: Remove ALL remaining large code fences — they are secondary blocks
+  // from the same file that weren't selected as "best" but still bleed into the bubble.
+  const STRIP_ALL_LARGE = /^```(\w*)[ \t]*\r?\n([\s\S]*?)^```[ \t]*$/gm;
   reducedResponse = reducedResponse.replace(
-    STRIP_RE, (_m: string, l: string, c: string) => {
-      const lo = (l || '').toLowerCase();
+    STRIP_ALL_LARGE, (_m: string, lang: string, code: string) => {
+      const lo = (lang || '').toLowerCase();
       if (EXCLUDED_LANGUAGES.has(lo)) return _m;
-      if (c.split('\n').length >= MIN_LINES_FOR_ARTIFACT) return '';
+      if (code.split('\n').length >= MIN_LINES_FOR_ARTIFACT) return '';
       return _m;
     }
   );
   reducedResponse = reducedResponse
+    .replace(/^```\w+[ \t]*\r?\n[\s\S]*$/m, '')       // unclosed fence at end (cut-off large file)
+    .replace(/^\/\/\s*src\/[^\n]+\n/gm, '')            // orphaned file-path comments
+    .replace(/^\/\*\*[\s\S]*?\*\/\n/gm, '')             // orphaned JSDoc blocks
+    .replace(/^(function|const|let|var|class|export|import)\s+\w/gm, '') // orphaned code lines
     .replace(/^```[ \t]*$/gm, '')
+    .replace(/^(here is|here's|the following|below is|this is)\b[^\n]*:\s*\n/gim, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 

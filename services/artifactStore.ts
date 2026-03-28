@@ -194,16 +194,35 @@ export function extractArtifactFromResponse(
   let bestLines = 0;
   let match: RegExpExecArray | null;
 
-  while ((match = FENCE_RE.exec(response)) !== null) {
-    const lang  = match[1].toLowerCase().trim() || 'text';
-    const code  = match[2];
+  // Priority 1: block whose first line is a file-path comment (// src/... etc.)
+  // This is always the complete file — grab it before the non-greedy FENCE_RE loop
+  // can match a smaller inner block (e.g. a helper function) instead.
+  const filePathMatch = response.match(
+    /^```(\w+)[ \t]*\r?\n(\/\/\s*[\w./\-]+\.\w+[\s\S]*?)^```[ \t]*$/m
+  );
+  if (filePathMatch) {
+    const lang  = filePathMatch[1].toLowerCase();
+    const code  = filePathMatch[2];
     const lines = code.split('\n').length;
-
-    if (EXCLUDED_LANGUAGES.has(lang)) continue;
-
-    if (lines >= MIN_LINES_FOR_ARTIFACT && lines > bestLines) {
-      best      = { lang, code, full: match[0] };
+    if (!EXCLUDED_LANGUAGES.has(lang) && lines >= MIN_LINES_FOR_ARTIFACT) {
+      best      = { lang, code, full: filePathMatch[0] };
       bestLines = lines;
+    }
+  }
+
+  // Priority 2: no file-path block — fall back to the largest fenced block
+  if (!best) {
+    while ((match = FENCE_RE.exec(response)) !== null) {
+      const lang  = match[1].toLowerCase().trim() || 'text';
+      const code  = match[2];
+      const lines = code.split('\n').length;
+
+      if (EXCLUDED_LANGUAGES.has(lang)) continue;
+
+      if (lines >= MIN_LINES_FOR_ARTIFACT && lines > bestLines) {
+        best      = { lang, code, full: match[0] };
+        bestLines = lines;
+      }
     }
   }
 
@@ -260,17 +279,24 @@ export function extractArtifactFromResponse(
 
   let reducedResponse = response.replace(best.full, `\n\n[ARTIFACT:${title}]\n`);
 
-  const STRIP_RE = /^```(\w*)[ \t]*\r?\n([\s\S]*?)^```[ \t]*$/gm;
+  // PART B: Remove ALL remaining large code fences — they are secondary blocks
+  // from the same file that weren't selected as "best" but still bleed into the bubble.
+  const STRIP_ALL_LARGE = /^```(\w*)[ \t]*\r?\n([\s\S]*?)^```[ \t]*$/gm;
   reducedResponse = reducedResponse.replace(
-    STRIP_RE, (_m: string, l: string, c: string) => {
-      const lo = (l || '').toLowerCase();
+    STRIP_ALL_LARGE, (_m: string, lang: string, code: string) => {
+      const lo = (lang || '').toLowerCase();
       if (EXCLUDED_LANGUAGES.has(lo)) return _m;
-      if (c.split('\n').length >= MIN_LINES_FOR_ARTIFACT) return '';
+      if (code.split('\n').length >= MIN_LINES_FOR_ARTIFACT) return '';
       return _m;
     }
   );
   reducedResponse = reducedResponse
+    .replace(/^```\w+[ \t]*\r?\n[\s\S]*$/m, '')       // unclosed fence at end (cut-off large file)
+    .replace(/^\/\/\s*src\/[^\n]+\n/gm, '')            // orphaned file-path comments
+    .replace(/^\/\*\*[\s\S]*?\*\/\n/gm, '')             // orphaned JSDoc blocks
+    .replace(/^(function|const|let|var|class|export|import)\s+\w[^\n]*/gm, '') // SESSION 9 FIX: [^\n]* strips ENTIRE line not just keyword prefix
     .replace(/^```[ \t]*$/gm, '')
+    .replace(/^(here is|here's|the following|below is|this is)\b[^\n]*:\s*\n/gim, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
@@ -286,6 +312,43 @@ export function extractDiagramsFromResponse(response: string): string[] {
     if (code) codes.push(code);
   }
   return codes;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SESSION 9: registerEphemeralArtifact
+//
+// Re-hydrates [ARTIFACT:] markers in historical/cached messages that
+// were stored before artifact extraction ran (e.g. page reload where
+// setSessions race left raw code in msg.content).
+//
+// Called by ChatArea FIX 3 path after extractArtifactFromResponse()
+// so the [ARTIFACT:title] marker in reducedResponse resolves to a
+// real ArtifactCard instead of the dead "pending" placeholder.
+//
+// Does NOT hit the DB — in-memory only, ephemeral across page loads.
+// ══════════════════════════════════════════════════════════════════
+export function registerEphemeralArtifact(extracted: ExtractedArtifact): Artifact {
+  // Deduplicate by title — if already in store from a prior render, return it
+  const alreadyExists = _artifacts.find(a => a.title === extracted.title);
+  if (alreadyExists) return alreadyExists;
+
+  const artifact: Artifact = {
+    id:        crypto.randomUUID(),
+    sessionId: 'ephemeral',
+    userId:    'ephemeral',
+    title:     extracted.title,
+    language:  extracted.language,
+    content:   extracted.content,
+    type:      extracted.type,
+    filePath:  extracted.filePath,
+    lineCount: extracted.lineCount,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  _artifacts = [artifact, ..._artifacts];
+  notify();
+  return artifact;
 }
 
 export async function storeDiagram(input: ArtifactCreateInput): Promise<Artifact> {

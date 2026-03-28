@@ -60,8 +60,8 @@ const MAX_HISTORY: Record<string, number> = {
   technical:  12,
   analytical: 16,
   live:        6,
-  general:    10,
-  math:       10,
+  general:    16,
+  math:       20,
 };
 
 // ── SESSION 7 FIX: Cache is now 30s for non-live intents ──────────
@@ -1149,16 +1149,20 @@ export const getAIResponse = async (
     return buildSafeModeResponse(prompt, limitedRoute, "You sent too many requests. Please wait a few seconds.");
   }
 
+  // Detect image_generation intent early so cache/inflight bypasses work correctly
+  const previewRoute      = routePrompt(prompt, !!(images?.length), documents.length > 0);
+  const isImageGenRequest = previewRoute.intent === 'image_generation';
+
   const fingerprint = buildFingerprint(prompt, history, manualModel, documents);
   const now         = Date.now();
   const cached      = responseCache.get(fingerprint);
-  if (!isTablePrompt && cached && cached.expiresAt > now) {
+  if (!isTablePrompt && !isImageGenRequest && cached && cached.expiresAt > now) {
     onRouting?.(cached.value.routingContext);
     return cached.value;
   }
 
   const inFlight = inFlightByFingerprint.get(fingerprint);
-  if (inFlight && !isTablePrompt) return inFlight;
+  if (inFlight && !isTablePrompt && !isImageGenRequest) return inFlight;
 
   const effectiveQueueKey = isTablePrompt
     ? `${queueKey}:tbl:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 7)}`
@@ -1173,8 +1177,8 @@ export const getAIResponse = async (
       effectiveQueueKey,
     )
     .then((res) => {
-      // Don't cache diff responses — they are context-specific
-      if (res.routingContext.intent !== "live" && !isTablePrompt && !res.isDiff) {
+      // Don't cache diff or image responses — they are context-specific / always unique
+      if (res.routingContext.intent !== "live" && res.routingContext.intent !== "image_generation" && !isTablePrompt && !res.isDiff) {
         responseCache.set(fingerprint, {
           value:     res,
           expiresAt: Date.now() + RESPONSE_CACHE_TTL_MS,

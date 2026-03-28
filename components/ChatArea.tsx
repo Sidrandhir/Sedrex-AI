@@ -14,7 +14,7 @@ import { ConfidenceBadge } from './ConfidenceBadge';
 import type { ConfidenceSignal } from '../services/aiService';
 import ArtifactCard from './ArtifactCard';
 import { RunButton, CodeRunner } from './CodeRunner';
-import { getArtifacts } from '../services/artifactStore';
+import { getArtifacts, extractArtifactFromResponse, registerEphemeralArtifact } from '../services/artifactStore';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   BarChart, Bar, LineChart, Line,
@@ -103,6 +103,40 @@ function preprocessMarkdown(raw: string): string {
   );
 
   return result;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// FIX 2 — SANITIZE MESSAGE CONTENT
+// After artifact extraction, raw code fragments can still leak into
+// the bubble if the extractor missed secondary blocks or orphaned lines.
+// This strips them when [ARTIFACT:] is already present.
+// Only applied to completed (non-streaming) assistant messages.
+// ══════════════════════════════════════════════════════════════════
+function sanitizeMessageContent(content: string): string {
+  if (!content.includes('[ARTIFACT:')) return content;
+
+  return content
+    .split('\n')
+    .filter(line => {
+      const t = line.trim();
+      if (!t) return true;
+      // Always keep markdown structure lines
+      if (t.startsWith('#') || t.startsWith('*') ||
+          t.startsWith('-') || t.startsWith('>')) return true;
+      // Always keep artifact placeholders
+      if (t.startsWith('[ARTIFACT:')) return true;
+      // Drop lines that are clearly raw code fragments
+      const isCodeLine =
+        /^(function|const|let|var|class|export|import|return|if|while|for)\s/.test(t) ||
+        /^[\w<>[\]]+\s*[=:({]/.test(t) ||  // assignments, type annotations, calls
+        /^[});\]]+$/.test(t) ||              // closing braces / semicolons alone
+        /^\s*\/\//.test(t) ||               // SESSION 9 FIX: standalone comment lines only (was /\/\// which also dropped prose lines containing URLs or // in text)
+        /^\s{4,}/.test(line);               // heavily indented (4+ spaces = code indent)
+      return !isCodeLine;
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -976,10 +1010,52 @@ const MessageItem = memo(
       if (isStreaming) return content;
       const cacheKey = djb2(content);
       if (markdownCache.has(cacheKey)) return markdownCache.get(cacheKey)!;
-      const result = preprocessMarkdown(content);
+
+      // FIX 3: If msg.content still has a raw code fence but no artifact marker
+      // (e.g. setSessions race or historical message), extract and use reducedResponse
+      // so the code block doesn't bleed into the chat bubble.
+      let displayContent = content;
+      if (!(msg as any).isDiff && !content.includes('[ARTIFACT:') && content.includes('```')) {
+        const extracted = extractArtifactFromResponse(content);
+        if (extracted) {
+          displayContent = extracted.reducedResponse;
+          // SESSION 9 FIX: Register in artifact store so [ARTIFACT:] marker
+          // resolves to a real ArtifactCard instead of a dead placeholder.
+          // Previously this path only fixed display content but never populated
+          // the store — clicking the marker showed a grey "pending" chip.
+          registerEphemeralArtifact(extracted);
+        }
+      }
+
+      // FIX 2: Strip any raw code fragments that still leaked through after extraction
+      displayContent = sanitizeMessageContent(displayContent);
+
+      const result = preprocessMarkdown(displayContent);
       setMarkdownCache(cacheKey, result);
       return result;
     }, [msg.content, isStreaming]);
+
+    // FIX 2: When the processed content already contains an [ARTIFACT:] marker,
+    // the code block is rendered by the artifact panel — suppress any duplicate
+    // large code blocks that ReactMarkdown would otherwise render inline.
+    const hasArtifact = !isStreaming && processedMarkdown.includes('[ARTIFACT:');
+    const localMdComponents = useMemo(() => {
+      if (!hasArtifact) return mdComponents;
+      return {
+        ...mdComponents,
+        pre: ({ children }: any) => {
+          const child = React.Children.only(children) as React.ReactElement<any> | null;
+          if (child?.props) {
+            const codeStr = String(child.props.children ?? '').replace(/\n$/, '');
+            // Suppress code blocks that meet the artifact threshold — they belong
+            // in the artifact panel, not inline in the chat bubble.
+            if (codeStr.split('\n').length >= 20) return null;
+            return <CodeBlock className={child.props.className}>{child.props.children}</CodeBlock>;
+          }
+          return <CodeBlock>{children}</CodeBlock>;
+        },
+      };
+    }, [hasArtifact, mdComponents]);
 
     return (
       <div className={`message-group message-enter ${isUser ? 'message-user' : 'message-assistant'}`}>
@@ -1105,14 +1181,14 @@ const MessageItem = memo(
                     return <span className="streaming-raw">{c}</span>;
                   }
                   return (
-                    <ReactMarkdown remarkPlugins={remarkPlugins} components={mdComponents}>
+                    <ReactMarkdown remarkPlugins={remarkPlugins} components={localMdComponents}>
                       {processedMarkdown}
                     </ReactMarkdown>
                   );
                 })() : (
                   // FIX 1: Use renderWithArtifacts for completed messages —
                   // splits [ARTIFACT:title] markers into ArtifactCard components
-                  <>{renderWithArtifacts(processedMarkdown, remarkPlugins, mdComponents, msg.timestamp)}</>
+                  <>{renderWithArtifacts(processedMarkdown, remarkPlugins, localMdComponents, msg.timestamp)}</>
                 )}
               </div>
             )}
