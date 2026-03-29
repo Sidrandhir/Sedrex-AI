@@ -716,7 +716,8 @@ function buildSystemInstruction(
   personification: string,
   isProductQuery: boolean,
   isEditIntent = false,
-): string {
+  userPrompt = '',           // SESSION 9 FIX: was missing — caused prompt to be undefined
+): string {                  //   in buildAgentSystemPrompt, so isProductQuestion() never fired
   const domainMap: Record<SedrexIntent, 'coding' | 'reasoning' | 'live' | 'general' | 'image'> = {
     technical:        'coding',
     analytical:       'reasoning',
@@ -742,6 +743,7 @@ and prefer Indian retailers if user mentions INR, Flipkart, Croma, etc.`.trim();
 
   const agentPrompt = buildAgentSystemPrompt(domain, {
     sessionContext: personification?.trim() || undefined,
+    userPrompt:     userPrompt || undefined,  // SESSION 9 FIX: use the actual param, not undefined `prompt`
   });
 
   const extras = [
@@ -1270,6 +1272,7 @@ async function processRequest(
     personification + workspaceContext,
     isProductQuery,
     isEditIntent,
+    prompt,                  // SESSION 9 FIX: pass prompt so isProductQuestion() receives it
   );
 
   const genConfig = getGenerationConfig(sedrexIntent, routing.complexity, prompt);

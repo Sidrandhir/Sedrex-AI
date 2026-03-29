@@ -8,7 +8,7 @@
 
 import { Message, AttachedDocument }                            from '../../types';
 import { buildAgentSystemPrompt, sanitizeConversationHistory }  from '../SedrexsystemPrompt';
-import { resolveRoute, PROVIDERS, MODELS }                      from '../providerRegistry';
+import { PROVIDERS, MODELS }                                    from '../providerRegistry';
 
 // ── Result type ───────────────────────────────────────────────────
 
@@ -45,8 +45,8 @@ function buildPromptWithDocs(prompt: string, documents: AttachedDocument[]): str
   return `${ctx}\n\nTask: ${prompt}`;
 }
 
-function buildSystemPrompt(sessionContext?: string, hasLongContext = false): string {
-  return buildAgentSystemPrompt('coding', { sessionContext, hasLongContext });
+function buildSystemPrompt(sessionContext?: string, hasLongContext = false, userPrompt?: string): string {
+  return buildAgentSystemPrompt('coding', { sessionContext, hasLongContext, userPrompt });
 }
 
 // ── Claude call ───────────────────────────────────────────────────
@@ -62,7 +62,7 @@ async function callClaude(
   signal:        AbortSignal | undefined,
 ): Promise<CodingAgentResult> {
   const { key, model } = { key: PROVIDERS.claude.key, model: MODELS.CLAUDE_SONNET };
-  const systemPrompt   = buildSystemPrompt(sessionContext, documents.length > 0);
+  const systemPrompt   = buildSystemPrompt(sessionContext, documents.length > 0, prompt);
   const enrichedPrompt = buildPromptWithDocs(prompt, documents);
   const messages       = [
     ...flattenHistory(history),

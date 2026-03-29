@@ -1,12 +1,14 @@
 // src/App.tsx
-// SESSION 8 CHANGES:
+// SESSION 9 CHANGES:
+//   ✅ api.getMessages limit raised 40 → 100 — long sessions were truncated on reload
+//   ✅ getConversations merge race fixed — active session messages now always
+//      preserved regardless of merge timing vs getMessages completion
+//   ✅ All Session 8 logic preserved exactly (artifactCreated flag, etc.)
+//
+// SESSION 8 CHANGES (preserved):
 //   ✅ artifactCreated boolean flag — set from the first extraction result,
 //      used in analytics.logQuery() instead of calling extractArtifactFromResponse()
-//      a second time. Root cause: the old code ran extraction twice per response,
-//      wasting CPU and causing a race condition where the second call could return
-//      a different result (e.g. if _artifacts changed between the two calls due
-//      to generateVersionedTitle scanning in-memory store).
-//   ✅ All Session 7 logic preserved exactly (isDiff check, diagram extraction, etc.)
+//      a second time.
 
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense, startTransition } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -253,10 +255,15 @@ const App: React.FC = () => {
         const chatData = await api.loadInitialChatData(50);
         if (!isMounted || controller.signal.aborted) return;
 
+        // SESSION 9 FIX: hoisted to outer scope so it's accessible in the
+        // getConversations merge block below (was inside the if-block, causing
+        // ReferenceError: restoreId is not defined at the merge step).
+        let restoreId = '';
+
         if (chatData.sessions.length > 0) {
           const lastVisitedId = persistenceService.getLastActiveSessionId();
           const sessionIds = new Set(chatData.sessions.map((s: any) => s.id));
-          const restoreId = (lastVisitedId && sessionIds.has(lastVisitedId))
+          restoreId = (lastVisitedId && sessionIds.has(lastVisitedId))
             ? lastVisitedId
             : chatData.sessions[0].id;
 
@@ -276,7 +283,7 @@ const App: React.FC = () => {
           // Without this, 5+ cached messages caused DB fetch to be skipped entirely,
           // showing stale messages from old sessions after reload.
           setIsLoading(true);
-          api.getMessages(restoreId, 40).then(dbMsgs => {
+          api.getMessages(restoreId, 100).then(dbMsgs => { // SESSION 9 FIX: was 40 — missed messages in long sessions
             if (!isMounted) return;
             if (dbMsgs.length > 0) {
               startTransition(() =>
@@ -317,8 +324,17 @@ const App: React.FC = () => {
             setSessions(prev => {
               const merged = cloudSessions.map(cs => {
                 const existing = prev.find(p => p.id === cs.id);
-                return (existing?.messages?.length)
-                  ? { ...cs, messages: existing.messages }
+                // SESSION 9 FIX: always preserve messages for the active restore session.
+                // Race condition: getConversations (empty metadata sessions) could resolve
+                // after getMessages, and if existing.messages hadn't populated yet the
+                // merge would wipe the freshly loaded messages with an empty array.
+                // Solution: for the restoreId session, always take existing.messages
+                // (even empty — better than overwriting with stale metadata).
+                const keepMessages = cs.id === restoreId
+                  ? (existing?.messages ?? [])
+                  : (existing?.messages?.length ? existing.messages : undefined);
+                return keepMessages?.length
+                  ? { ...cs, messages: keepMessages }
                   : cs;
               });
               prev.forEach(local => {

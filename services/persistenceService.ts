@@ -1,4 +1,3 @@
-
 import { ChatSession, Message } from '../types';
 import { Artifact } from './artifactStore';
 
@@ -49,7 +48,7 @@ export const persistenceService = {
     if (!sessionId) return;
     try {
       // Keep most recent 50 messages per session locally
-      const tail = messages.slice(-50);
+      const tail = messages.slice(-100); // SESSION 9 FIX: was 50 — truncated long sessions on reload
       localStorage.setItem(`${CACHE_KEYS.MESSAGES}${sessionId}`, JSON.stringify(tail));
       localStorage.setItem(CACHE_KEYS.ACTIVE_ID, sessionId);
     } catch (e) {

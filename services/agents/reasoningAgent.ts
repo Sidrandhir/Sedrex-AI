@@ -47,8 +47,9 @@ function buildPromptWithDocs(prompt: string, documents: AttachedDocument[]): str
 function buildSystemPrompt(
   sessionContext?: string,
   hasLongContext  = false,
+  userPrompt?:    string,
 ): string {
-  return buildAgentSystemPrompt('reasoning', { sessionContext, hasLongContext });
+  return buildAgentSystemPrompt('reasoning', { sessionContext, hasLongContext, userPrompt });
 }
 
 // ── OpenAI call (GPT-5.2 for analysis, o4-mini for math) ─────────
