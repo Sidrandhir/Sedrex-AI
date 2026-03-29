@@ -718,15 +718,18 @@
   border: 1px solid rgba(16, 185, 129, 0.18); margin-bottom: 1rem;
 }
 
-/* Top-right controls */
+/* Top-right controls
+   SESSION 9.1 FIX: was position:fixed which broke in production build.
+   Fixed elements inside a position:relative + overflow:hidden ancestor
+   (chat-root) create a stacking context that traps them — behavour differs
+   between dev (no transform optimisations) and Vite production build
+   (applies will-change/transform on animated ancestors) causing the
+   buttons to render over the artifact panel instead of inside the chat header.
+   Fix: position:absolute relative to chat-root. The duplicate definition
+   at the bottom of this file (already correct) now wins consistently. */
 .chat-controls {
-  position: fixed; top: 16px; right: 20px; z-index: 40;
+  position: absolute; top: 14px; right: 16px; z-index: 10;
   display: flex; align-items: center; gap: 4px;
-  padding: 5px 8px;
-  background: rgba(2,4,8,0.85);
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border); border-radius: var(--sx-radius-xl);
-  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
 }
 @media (max-width: 640px) { .chat-controls { display: none; } }
 .chat-ctrl-btn {
