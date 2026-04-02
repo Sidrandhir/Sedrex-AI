@@ -1,22 +1,24 @@
 ﻿SEDREX AI - FULL SOURCE EXPORT
-Generated: 2026-03-29 14:34:44
+Generated: 2026-04-01 14:00:25
 Total files: 137
 ================================================================================
 
 ================================================================================
 FILE: App.tsx
-MODIFIED: 2026-03-28 16:10  SIZE: 44153 bytes
+MODIFIED: 2026-03-29 14:55  SIZE: 45162 bytes
 ================================================================================
 
 // src/App.tsx
-// SESSION 8 CHANGES:
+// SESSION 9 CHANGES:
+//   ✅ api.getMessages limit raised 40 → 100 — long sessions were truncated on reload
+//   ✅ getConversations merge race fixed — active session messages now always
+//      preserved regardless of merge timing vs getMessages completion
+//   ✅ All Session 8 logic preserved exactly (artifactCreated flag, etc.)
+//
+// SESSION 8 CHANGES (preserved):
 //   ✅ artifactCreated boolean flag — set from the first extraction result,
 //      used in analytics.logQuery() instead of calling extractArtifactFromResponse()
-//      a second time. Root cause: the old code ran extraction twice per response,
-//      wasting CPU and causing a race condition where the second call could return
-//      a different result (e.g. if _artifacts changed between the two calls due
-//      to generateVersionedTitle scanning in-memory store).
-//   ✅ All Session 7 logic preserved exactly (isDiff check, diagram extraction, etc.)
+//      a second time.
 
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense, startTransition } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -263,10 +265,15 @@ const App: React.FC = () => {
         const chatData = await api.loadInitialChatData(50);
         if (!isMounted || controller.signal.aborted) return;
 
+        // SESSION 9 FIX: hoisted to outer scope so it's accessible in the
+        // getConversations merge block below (was inside the if-block, causing
+        // ReferenceError: restoreId is not defined at the merge step).
+        let restoreId = '';
+
         if (chatData.sessions.length > 0) {
           const lastVisitedId = persistenceService.getLastActiveSessionId();
           const sessionIds = new Set(chatData.sessions.map((s: any) => s.id));
-          const restoreId = (lastVisitedId && sessionIds.has(lastVisitedId))
+          restoreId = (lastVisitedId && sessionIds.has(lastVisitedId))
             ? lastVisitedId
             : chatData.sessions[0].id;
 
@@ -286,7 +293,7 @@ const App: React.FC = () => {
           // Without this, 5+ cached messages caused DB fetch to be skipped entirely,
           // showing stale messages from old sessions after reload.
           setIsLoading(true);
-          api.getMessages(restoreId, 40).then(dbMsgs => {
+          api.getMessages(restoreId, 100).then(dbMsgs => { // SESSION 9 FIX: was 40 — missed messages in long sessions
             if (!isMounted) return;
             if (dbMsgs.length > 0) {
               startTransition(() =>
@@ -327,8 +334,17 @@ const App: React.FC = () => {
             setSessions(prev => {
               const merged = cloudSessions.map(cs => {
                 const existing = prev.find(p => p.id === cs.id);
-                return (existing?.messages?.length)
-                  ? { ...cs, messages: existing.messages }
+                // SESSION 9 FIX: always preserve messages for the active restore session.
+                // Race condition: getConversations (empty metadata sessions) could resolve
+                // after getMessages, and if existing.messages hadn't populated yet the
+                // merge would wipe the freshly loaded messages with an empty array.
+                // Solution: for the restoreId session, always take existing.messages
+                // (even empty — better than overwriting with stale metadata).
+                const keepMessages = cs.id === restoreId
+                  ? (existing?.messages ?? [])
+                  : (existing?.messages?.length ? existing.messages : undefined);
+                return keepMessages?.length
+                  ? { ...cs, messages: keepMessages }
                   : cs;
               });
               prev.forEach(local => {
@@ -6137,7 +6153,7 @@ export default Billing;
 
 ================================================================================
 FILE: components\ChatArea.css
-MODIFIED: 2026-03-28 12:25  SIZE: 57419 bytes
+MODIFIED: 2026-03-29 17:59  SIZE: 57778 bytes
 ================================================================================
 
 /* === Custom classes for inline style migration === */
@@ -6860,15 +6876,18 @@ MODIFIED: 2026-03-28 12:25  SIZE: 57419 bytes
   border: 1px solid rgba(16, 185, 129, 0.18); margin-bottom: 1rem;
 }
 
-/* Top-right controls */
+/* Top-right controls
+   SESSION 9.1 FIX: was position:fixed which broke in production build.
+   Fixed elements inside a position:relative + overflow:hidden ancestor
+   (chat-root) create a stacking context that traps them — behavour differs
+   between dev (no transform optimisations) and Vite production build
+   (applies will-change/transform on animated ancestors) causing the
+   buttons to render over the artifact panel instead of inside the chat header.
+   Fix: position:absolute relative to chat-root. The duplicate definition
+   at the bottom of this file (already correct) now wins consistently. */
 .chat-controls {
-  position: fixed; top: 16px; right: 20px; z-index: 40;
+  position: absolute; top: 14px; right: 16px; z-index: 10;
   display: flex; align-items: center; gap: 4px;
-  padding: 5px 8px;
-  background: rgba(2,4,8,0.85);
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border); border-radius: var(--sx-radius-xl);
-  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
 }
 @media (max-width: 640px) { .chat-controls { display: none; } }
 .chat-ctrl-btn {
@@ -13299,13 +13318,17 @@ export default Dashboard;
 
 ================================================================================
 FILE: components\EmptyState.css
-MODIFIED: 2026-03-24 19:45  SIZE: 5383 bytes
+MODIFIED: 2026-03-29 17:42  SIZE: 5841 bytes
 ================================================================================
 
 /* ================================================================
-   SEDREX — EmptyState.css
-   Animated suggestion cards + welcome heading
+   SEDREX — EmptyState.css v2.0
+   SESSION 9.1 REDESIGN
    ================================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap');
+
+/* ── Root ───────────────────────────────────────────────────── */
 
 .es-root {
   display: flex;
@@ -13313,156 +13336,160 @@ MODIFIED: 2026-03-24 19:45  SIZE: 5383 bytes
   align-items: center;
   justify-content: center;
   width: 100%;
-  padding: 2rem 1rem 1rem;
+  padding: 2.5rem 1.5rem 1.5rem;
   gap: 2rem;
-  animation: es-fade-in 500ms ease both;
+  animation: es-fade-in 400ms ease both;
 }
 
 @keyframes es-fade-in {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Welcome heading ─────────────────────────────────────── */
+/* ── Heading ────────────────────────────────────────────────── */
+
 .es-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
   text-align: center;
-  animation: es-slide-up 480ms cubic-bezier(0.22,1,0.36,1) both;
-}
-
-@keyframes es-slide-up {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
 }
 
 .es-logo-wrap {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0.25rem;
 }
 
 .es-logo-ring {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(16, 185, 129, 0.08);
-  border: 1px solid rgba(16, 185, 129, 0.22);
-  box-shadow: 0 0 32px rgba(16, 185, 129, 0.08);
-  animation: es-pulse-ring 3s ease-in-out infinite;
+  border: 1px solid rgba(16, 185, 129, 0.18);
+  animation: es-pulse 3.5s ease-in-out infinite;
 }
 
-@keyframes es-pulse-ring {
-  0%, 100% { box-shadow: 0 0 32px rgba(16, 185, 129, 0.08); }
-  50%       { box-shadow: 0 0 48px rgba(16, 185, 129, 0.18); }
+@keyframes es-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  50%       { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.06); }
 }
 
 .es-title {
-  font-family: 'IBM Plex Sans', sans-serif;
-  font-size: clamp(1.5rem, 4vw, 2rem);
-  font-weight: 700;
-  letter-spacing: -0.025em;
+  font-size: clamp(1.35rem, 3.5vw, 1.75rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
   color: var(--text-primary);
   line-height: 1.2;
-  margin: 0 0 0.4rem;
-}
-
-.es-title-gold {
-  color: var(--accent, #10B981);
-}
-
-.es-subtitle {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-weight: 600;
-  opacity: 0.55;
   margin: 0;
 }
 
-/* ── Suggestion grid ─────────────────────────────────────── */
+.es-title-accent {
+  color: #10B981;
+}
+
+.es-subtitle {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  margin: 0;
+  font-weight: 400;
+}
+
+/* ── Grid ───────────────────────────────────────────────────── */
+
 .es-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  max-width: 680px;
+  max-width: 640px;
 }
 
-@media (max-width: 520px) {
+@media (max-width: 500px) {
   .es-grid {
     grid-template-columns: 1fr;
   }
 }
 
-/* ── Card ────────────────────────────────────────────────── */
+/* ── Card ───────────────────────────────────────────────────── */
+
 .es-card {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 14px;
-  border: 1px solid var(--border);
+  align-items: center;
+  gap: 11px;
+  padding: 13px 15px;
+  border-radius: 11px;
+  border: 0.5px solid var(--border);
   background: transparent;
   cursor: pointer;
   text-align: left;
-  transition: border-color 160ms ease,
-              background 160ms ease,
-              transform 160ms cubic-bezier(0.34,1.56,0.64,1),
-              box-shadow 160ms ease;
+  transition:
+    border-color 140ms ease,
+    background   140ms ease,
+    transform    160ms cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* Staggered entrance */
   opacity: 0;
-  transform: translateY(16px);
-  animation: es-card-in 420ms cubic-bezier(0.22,1,0.36,1) forwards;
+  transform: translateY(12px);
+  animation: es-card-in 360ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 @keyframes es-card-in {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Stagger delays */
-.es-card:nth-child(1) { animation-delay: 80ms;  }
-.es-card:nth-child(2) { animation-delay: 140ms; }
-.es-card:nth-child(3) { animation-delay: 200ms; }
-.es-card:nth-child(4) { animation-delay: 260ms; }
-.es-card:nth-child(5) { animation-delay: 320ms; }
-.es-card:nth-child(6) { animation-delay: 380ms; }
+.es-card:nth-child(1) { animation-delay:  60ms; }
+.es-card:nth-child(2) { animation-delay: 110ms; }
+.es-card:nth-child(3) { animation-delay: 160ms; }
+.es-card:nth-child(4) { animation-delay: 210ms; }
+.es-card:nth-child(5) { animation-delay: 260ms; }
+.es-card:nth-child(6) { animation-delay: 310ms; }
 
 .es-card:hover {
   border-color: rgba(16, 185, 129, 0.3);
   background: rgba(16, 185, 129, 0.04);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+  transform: translateY(-1px);
 }
 
 .es-card:active {
   transform: scale(0.97);
+  transition-duration: 80ms;
 }
 
 [data-theme='light'] .es-card:hover {
-  background: rgba(16, 185, 129, 0.04);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+  background: rgba(16, 185, 129, 0.05);
 }
 
-/* Card icon */
+/* ── Card icon ──────────────────────────────────────────────── */
+
 .es-card-icon {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
   flex-shrink: 0;
-  background: rgba(16, 185, 129, 0.08);
-  border: 1px solid rgba(16, 185, 129, 0.15);
+  background: var(--bg-secondary, rgba(255,255,255,0.04));
+  color: #10B981;
 }
 
-/* Card text */
+.es-card-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ── Card text ──────────────────────────────────────────────── */
+
 .es-card-body {
   flex: 1;
   min-width: 0;
@@ -13470,95 +13497,160 @@ MODIFIED: 2026-03-24 19:45  SIZE: 5383 bytes
 
 .es-card-title {
   font-size: 0.8125rem;
-  font-weight: 650;
+  font-weight: 600;
   color: var(--text-primary);
-  line-height: 1.35;
+  line-height: 1.3;
   margin: 0 0 2px;
-  letter-spacing: -0.005em;
+  letter-spacing: -0.01em;
 }
 
 .es-card-sub {
-  font-size: 0.75rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
   color: var(--text-secondary);
-  opacity: 0.65;
+  opacity: 0.55;
   line-height: 1.4;
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: 0.01em;
 }
 
-/* ── Arrow hint ──────────────────────────────────────────── */
-.es-card-arrow {
+/* ── Footer ─────────────────────────────────────────────────── */
+
+.es-footer {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
   color: var(--text-secondary);
-  opacity: 0;
-  transition: opacity 140ms ease, transform 140ms ease;
-  flex-shrink: 0;
-  align-self: center;
+  opacity: 0.4;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  letter-spacing: 0.03em;
 }
 
-.es-card:hover .es-card-arrow {
-  opacity: 0.45;
-  transform: translateX(2px);
+.es-footer-dot {
+  opacity: 0.5;
 }
 
-/* ── Reduced motion ──────────────────────────────────────── */
+/* ── Reduced motion ─────────────────────────────────────────── */
+
 @media (prefers-reduced-motion: reduce) {
-  .es-root, .es-heading, .es-card,
-  .es-logo-ring { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .es-root,
+  .es-card,
+  .es-logo-ring {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }
 
 ================================================================================
 FILE: components\EmptyState.tsx
-MODIFIED: 2026-03-24 19:45  SIZE: 3457 bytes
+MODIFIED: 2026-03-29 17:42  SIZE: 6387 bytes
 ================================================================================
+
+// components/EmptyState.tsx
+// ══════════════════════════════════════════════════════════════════
+// SEDREX — EmptyState v2.0
+//
+// SESSION 9.1 REDESIGN:
+//   ✅ Headline: "What are you building?" — developer-first framing
+//   ✅ Tagline: "Multi-model AI for developers" — replaces
+//      "Verification-First Intelligence" (contradicted system prompt)
+//   ✅ Cards rewritten around Sedrex-specific capabilities with
+//      monospace subtitles in "type · outcome" format
+//   ✅ SVG icons replace emoji — cleaner at small sizes
+//   ✅ DM Mono for subtitles and footer — technical, distinct
+//   ✅ Footer: keyboard shortcut + routing hint
+// ══════════════════════════════════════════════════════════════════
 
 import React, { memo } from 'react';
 import './EmptyState.css';
 
 interface Suggestion {
-  icon: string;
+  icon: React.ReactNode;
   title: string;
   sub: string;
   prompt: string;
 }
 
+const IconCode = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M16 18l6-6-6-6M8 6L2 12l6 6"/>
+  </svg>
+);
+
+const IconBug = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/>
+    <path d="M12 8v4M12 16h.01"/>
+  </svg>
+);
+
+const IconCompare = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 20V10M12 20V4M6 20v-6"/>
+  </svg>
+);
+
+const IconRefactor = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+  </svg>
+);
+
+const IconSearch = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+  </svg>
+);
+
+const IconExplain = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <path d="M12 16v-4M12 8h.01"/>
+  </svg>
+);
+
 const SUGGESTIONS: Suggestion[] = [
   {
-    icon: '📊',
-    title: 'Compare two things',
-    sub: 'Side-by-side table with verdict',
-    prompt: 'Compare React vs Vue for a large-scale production app — full breakdown table',
+    icon: <IconCode />,
+    title: 'Write full code',
+    sub: 'complete file · no placeholders',
+    prompt: 'Write a complete TypeScript Express JWT auth middleware at src/middleware/auth.ts — full file with all imports, types, and error handling',
   },
   {
-    icon: '🔧',
+    icon: <IconBug />,
     title: 'Debug my code',
-    sub: 'Root cause + fixed version',
-    prompt: 'Debug this code and explain the root cause:',
+    sub: 'root cause · fixed version',
+    prompt: 'Debug this code and explain the exact root cause:\n\n[paste your code and error here]',
   },
   {
-    icon: '🔍',
+    icon: <IconCompare />,
+    title: 'Compare & decide',
+    sub: 'table · verdict · winner named',
+    prompt: 'Compare React Query vs SWR for data fetching in Next.js 14 — full breakdown table, then pick a winner',
+  },
+  {
+    icon: <IconRefactor />,
+    title: 'Refactor a file',
+    sub: 'full rewrite · explain changes',
+    prompt: 'Refactor this file — provide the complete rewritten version with a summary of what changed:\n\n[paste your file here]',
+  },
+  {
+    icon: <IconSearch />,
     title: 'Research a topic',
-    sub: 'Deep analysis with evidence',
-    prompt: 'Research and analyse the current state of AI regulation globally',
+    sub: 'live web · sources cited',
+    prompt: 'Research and explain with current sources: ',
   },
   {
-    icon: '📋',
-    title: 'Build a plan',
-    sub: 'Step-by-step structured output',
-    prompt: 'Build a detailed 30-day launch plan for a SaaS product',
-  },
-  {
-    icon: '💡',
+    icon: <IconExplain />,
     title: 'Explain a concept',
-    sub: 'Clear, no-fluff explanation',
-    prompt: 'Explain how transformers work in LLMs, from attention to inference',
-  },
-  {
-    icon: '✍️',
-    title: 'Write something',
-    sub: 'Docs, emails, or long-form',
-    prompt: 'Write a concise technical design doc for a URL shortener service',
+    sub: 'no fluff · mental model first',
+    prompt: 'Explain how this works with a clear mental model and a practical code example: ',
   },
 ];
 
@@ -13568,17 +13660,18 @@ interface EmptyStateProps {
 }
 
 const EmptyState: React.FC<EmptyStateProps> = memo(({ onSuggestionClick, userName }) => {
-  const greeting = userName
-    ? `Hey ${userName.split('@')[0].split('.')[0]},`
-    : 'Ask anything.';
+  const name = userName
+    ? userName.split('@')[0].split('.')[0]
+    : null;
 
   return (
     <div className="es-root">
-      {/* Heading */}
+
+      {/* ── Header ─────────────────────────────────────────── */}
       <div className="es-heading">
         <div className="es-logo-wrap">
           <div className="es-logo-ring">
-            <svg viewBox="0 0 28 28" fill="none" width="28" height="28">
+            <svg viewBox="0 0 28 28" fill="none" width="22" height="22">
               <path
                 d="M19 8H11C9.3 8 8 9.3 8 11V12.5C8 14.2 9.3 15.5 11 15.5H17C18.7 15.5 20 16.8 20 18.5V20C20 21.7 18.7 23 17 23H8"
                 stroke="#10B981"
@@ -13589,13 +13682,13 @@ const EmptyState: React.FC<EmptyStateProps> = memo(({ onSuggestionClick, userNam
           </div>
         </div>
         <h1 className="es-title">
-          {greeting} What do you want to{' '}
-          <span className="es-title-gold">verify?</span>
+          {name ? `Hey ${name} — ` : ''}What are you{' '}
+          <span className="es-title-accent">building?</span>
         </h1>
-        <p className="es-subtitle">SEDREX · Verification-First Intelligence</p>
+        <p className="es-subtitle">SEDREX · Multi-model AI for developers</p>
       </div>
 
-      {/* Suggestion cards */}
+      {/* ── Suggestion cards ───────────────────────────────── */}
       <div className="es-grid">
         {SUGGESTIONS.map((s, i) => (
           <button
@@ -13604,27 +13697,24 @@ const EmptyState: React.FC<EmptyStateProps> = memo(({ onSuggestionClick, userNam
             onClick={() => onSuggestionClick(s.prompt)}
             type="button"
           >
-            <div className="es-card-icon">{s.icon}</div>
+            <div className="es-card-icon">
+              {s.icon}
+            </div>
             <div className="es-card-body">
               <p className="es-card-title">{s.title}</p>
               <p className="es-card-sub">{s.sub}</p>
             </div>
-            <svg
-              className="es-card-arrow"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M5 12h14M12 5l7 7-7 7" />
-            </svg>
           </button>
         ))}
       </div>
+
+      {/* ── Footer hint ────────────────────────────────────── */}
+      <p className="es-footer">
+        <span>Ctrl+K to search</span>
+        <span className="es-footer-dot">·</span>
+        <span>Auto routes to the best model</span>
+      </p>
+
     </div>
   );
 });
@@ -38996,7 +39086,7 @@ export async function verifyResponse(
 
 ================================================================================
 FILE: services\aiService.ts
-MODIFIED: 2026-03-29 13:19  SIZE: 83854 bytes
+MODIFIED: 2026-03-29 14:53  SIZE: 84208 bytes
 ================================================================================
 
 // src/services/aiService.ts
@@ -39717,7 +39807,8 @@ function buildSystemInstruction(
   personification: string,
   isProductQuery: boolean,
   isEditIntent = false,
-): string {
+  userPrompt = '',           // SESSION 9 FIX: was missing — caused prompt to be undefined
+): string {                  //   in buildAgentSystemPrompt, so isProductQuestion() never fired
   const domainMap: Record<SedrexIntent, 'coding' | 'reasoning' | 'live' | 'general' | 'image'> = {
     technical:        'coding',
     analytical:       'reasoning',
@@ -39743,7 +39834,7 @@ and prefer Indian retailers if user mentions INR, Flipkart, Croma, etc.`.trim();
 
   const agentPrompt = buildAgentSystemPrompt(domain, {
     sessionContext: personification?.trim() || undefined,
-    userPrompt:     prompt,
+    userPrompt:     userPrompt || undefined,  // SESSION 9 FIX: use the actual param, not undefined `prompt`
   });
 
   const extras = [
@@ -40272,6 +40363,7 @@ async function processRequest(
     personification + workspaceContext,
     isProductQuery,
     isEditIntent,
+    prompt,                  // SESSION 9 FIX: pass prompt so isProductQuestion() receives it
   );
 
   const genConfig = getGenerationConfig(sedrexIntent, routing.complexity, prompt);
@@ -45407,9 +45499,8 @@ console.log('[PERF] Performance monitoring initialized');
 
 ================================================================================
 FILE: services\persistenceService.ts
-MODIFIED: 2026-03-27 13:38  SIZE: 3737 bytes
+MODIFIED: 2026-03-29 14:53  SIZE: 3799 bytes
 ================================================================================
-
 
 import { ChatSession, Message } from '../types';
 import { Artifact } from './artifactStore';
@@ -45461,7 +45552,7 @@ export const persistenceService = {
     if (!sessionId) return;
     try {
       // Keep most recent 50 messages per session locally
-      const tail = messages.slice(-50);
+      const tail = messages.slice(-100); // SESSION 9 FIX: was 50 — truncated long sessions on reload
       localStorage.setItem(`${CACHE_KEYS.MESSAGES}${sessionId}`, JSON.stringify(tail));
       localStorage.setItem(CACHE_KEYS.ACTIVE_ID, sessionId);
     } catch (e) {
@@ -45523,7 +45614,6 @@ export const persistenceService = {
     });
   }
 };
-
 
 ================================================================================
 FILE: services\posthogService.ts
@@ -46749,12 +46839,27 @@ console.log('[QUERY] Query optimization service initialized');
 
 ================================================================================
 FILE: services\SedrexsystemPrompt.ts
-MODIFIED: 2026-03-29 14:14  SIZE: 38451 bytes
+MODIFIED: 2026-03-29 15:24  SIZE: 40071 bytes
 ================================================================================
 
 // services/SedrexsystemPrompt.ts
 // ══════════════════════════════════════════════════════════════════
-// SEDREX AI — Elite System Prompt Engine v9.0
+// SEDREX AI — Elite System Prompt Engine v9.1
+//
+// SESSION 9.1 CHANGES:
+//   ✅ SEDREX_PRODUCT_KNOWLEDGE — pricing rewritten as declarative prose.
+//      Model was seeing bold header format and still hedging with
+//      "I don't have current pricing details". Declarative sentences
+//      force a direct committed answer.
+//   ✅ SEDREX_PRODUCT_KNOWLEDGE — removed all "Built by the Sedrex AI team"
+//      attribution lines. They leaked into every product-question response
+//      as a closing sign-off (15+ times per session). Identity is already
+//      locked in SEDREX_IDENTITY_CORE — no need to repeat in knowledge doc.
+//   ✅ SEDREX_PRODUCT_KNOWLEDGE — Free vs Pro differences corrected to match
+//      actual Pricing component. Removed invented differences (context window
+//      tiers, model lock on Free, enhanced code execution on Pro).
+//      Real differences: file upload size, conversation history, codebase indexing.
+//   ✅ All v9.0 logic preserved exactly.
 // ══════════════════════════════════════════════════════════════════
 
 // ── Identity lock — MUST be first in every prompt ─────────────────
@@ -47262,16 +47367,25 @@ What "better" means in practice:
 
 
 // ══════════════════════════════════════════════════════════════════
-// SEDREX PRODUCT KNOWLEDGE — v9.0
+// SEDREX PRODUCT KNOWLEDGE — v9.1
 //
-// Every fact here is verified against the actual Sedrex codebase.
-// Nothing invented. Injected ONLY when isProductQuestion() is true.
+// SESSION 9.1 CHANGES:
+//   ✅ Pricing written as declarative prose sentences (not bold headers)
+//      so the model commits to the number instead of hedging.
+//   ✅ Removed all attribution lines ("Built by the Sedrex AI team")
+//      that were causing repetitive sign-offs on every product answer.
+//   ✅ Free vs Pro corrected: actual differences are file upload size
+//      (10MB vs 50MB), conversation history (50 vs unlimited), and
+//      codebase indexing. All three models available on both plans.
+//
+// Every fact verified against the actual Sedrex codebase.
+// Injected ONLY when isProductQuestion() is true.
 // ══════════════════════════════════════════════════════════════════
 
 export const SEDREX_PRODUCT_KNOWLEDGE = `
 ## What Sedrex Is
 
-Sedrex is a multi-model AI system built for developers, founders, and researchers. Currently in Beta. Built by the Sedrex AI team. It is not a general-purpose chatbot — it routes each query to the best model for that specific task and returns complete, production-ready outputs. No truncation, no placeholders.
+Sedrex is a multi-model AI system built for developers, founders, and researchers. Currently in Beta. It is not a general-purpose chatbot — it routes each query to the best model for that specific task and returns complete, production-ready outputs. No truncation, no placeholders.
 
 ## Models & Routing
 
@@ -47283,7 +47397,7 @@ Auto mode is the default. Sedrex classifies the intent of each message and route
 - Image generation → Imagen model. Requires an API key with Imagen access enabled at aistudio.google.com.
 - General queries → balanced intelligence engine.
 
-Users can override Auto and select a model manually from the selector in the chat input bar. Available models: Claude (Anthropic), Gemini (Google), GPT-4 (OpenAI) — all three on every plan.
+Users can override Auto and select a model manually from the selector in the chat input bar. All three models — Claude (Anthropic), Gemini (Google), GPT-4 (OpenAI) — are available on every plan including Free.
 
 ## Features
 
@@ -47303,7 +47417,7 @@ Users can override Auto and select a model manually from the selector in the cha
 
 **Export Chat:** Download any conversation as a Markdown file from the chat header.
 
-**Follow-up Suggestions:** After each response, Sedrex suggests 3 relevant next questions. Click any to send immediately.
+**Follow-up Suggestions:** After each response, Sedrex suggests relevant next questions. Click any to send immediately.
 
 **Theme Toggle:** Light and dark mode. Toggle in the top-right of the chat area.
 
@@ -47311,13 +47425,13 @@ Users can override Auto and select a model manually from the selector in the cha
 
 ## Plans & Pricing
 
-**Free — $0/month:** All three AI models, verification loop, thinking mode, code execution, 10 MB file uploads, last 50 conversations.
+Free is $0 per month. It includes all three AI models, verification loop, thinking mode, code execution, 10 MB file uploads, and the last 50 conversations.
 
-**Pro — $29/month** (or $23/month billed annually — save 20%): Everything in Free plus unlimited conversation history, 50 MB file uploads, codebase indexing, priority model access, early beta features, custom system prompt.
+Pro costs $29 per month, or $23 per month when billed annually — a 20% saving. Pro includes everything in Free plus: unlimited conversation history, 50 MB file uploads, codebase indexing (RAG), priority model access, early beta features, and a custom system prompt.
 
-**Enterprise — custom pricing:** Everything in Pro plus team and org-wide access, 99.9% SLA uptime, dedicated API capacity, private hosting option, API access, Slack support, dedicated customer success manager.
+Enterprise is custom pricing. It includes everything in Pro plus: team and org-wide access, 99.9% SLA uptime guarantee, dedicated API capacity, private hosting option, API access, Slack support, and a dedicated customer success manager. Contact via the in-app support option for pricing.
 
-Payments via Stripe. Cancel Pro anytime from your billing page — access continues until end of billing period.
+Payments are processed via Stripe. Pro can be cancelled anytime from the billing page — access continues until the end of the billing period.
 
 ## Prompting Guide
 
