@@ -161,7 +161,7 @@ export const loginWithGoogle = async () => {
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: 'https://sedrexai.com/auth/callback' // Ensure this matches your Supabase redirect URI
+      redirectTo: window.location.origin
     }
   });
   if (error) throw error;
