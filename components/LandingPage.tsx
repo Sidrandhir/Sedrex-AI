@@ -104,6 +104,13 @@ const IcoClose = () => (
     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
   </svg>
 );
+const IcoRocket = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>
+    <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>
+    <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>
+  </svg>
+);
 
 /* ── Logo ──────────────────────────────────────────────────── */
 const LogoMark = ({ size = 30 }: { size?: number }) => (
@@ -116,10 +123,9 @@ const LogoMark = ({ size = 30 }: { size?: number }) => (
 
 /* ── Marquee items ─────────────────────────────────────────── */
 const MARQUEE = [
-  'Live code execution', 'Architecture diagrams', 'Deep reasoning',
-  'Image generation', 'Real-time web search', 'Codebase analysis',
-  'Artifact history', 'Instant preview', 'Data visualisation',
-  'Enterprise security', 'Context persistence', 'Smart routing',
+  'Stop prompting', 'Start executing', 'Live code execution', 'Architecture diagrams',
+  'Deep reasoning', 'Image generation', 'Real-time web search', 'No placeholders',
+  'No truncation', 'Artifact history', 'Instant preview', 'Multi-model routing',
 ];
 
 /* ══════════════════════════════════════════════════════════════
@@ -137,14 +143,13 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
 
   const PROMPTS = [
     'Build me a real-time analytics dashboard',
-    'Debug this race condition in my code',
-    'Draw an architecture diagram for my system',
+    'Debug this race condition in my async code',
+    'Draw an architecture diagram for my microservices',
     'Analyse this dataset and chart the trends',
-    'Write an auth service with refresh tokens',
-    'Create a dark-mode component library',
+    'Write a full auth service with refresh tokens',
+    'Create a dark-mode component library in React',
   ];
 
-  /* theme init */
   useEffect(() => {
     const saved = localStorage.getItem('sedrex_theme') as 'light' | 'dark' | null;
     const sys   = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -157,20 +162,17 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
     localStorage.setItem('sedrex_theme', next);
   };
 
-  /* scroll */
   useEffect(() => {
     const h = () => setScrolled(window.scrollY > 24);
     window.addEventListener('scroll', h, { passive: true });
     return () => window.removeEventListener('scroll', h);
   }, []);
 
-  /* lock body when mobile menu open */
   useEffect(() => {
     document.body.style.overflow = menuOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [menuOpen]);
 
-  /* typewriter */
   useEffect(() => {
     const prompt = PROMPTS[promptIdx];
     let i = 0;
@@ -187,7 +189,6 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
     return () => clearInterval(t);
   }, [promptIdx]);
 
-  /* scroll reveal */
   useEffect(() => {
     const obs = new IntersectionObserver(entries => {
       entries.forEach(e => {
@@ -204,7 +205,6 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
     return () => obs.disconnect();
   }, []);
 
-  /* cursor radial on caps */
   useEffect(() => {
     const h = (e: MouseEvent) => {
       document.querySelectorAll<HTMLElement>('.lp-cap').forEach(cap => {
@@ -241,25 +241,22 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
       {/* ── NAV ──────────────────────────────────────────────── */}
       <nav className={`lp-nav${scrolled ? ' lp-nav--scrolled' : ''}`} role="navigation" aria-label="Main navigation">
         <div className="lp-nav-inner">
-
           <button type="button" className="lp-nav-logo" onClick={onOpenAuth} aria-label="Go to Sedrex home">
             <LogoMark />
             <span className="lp-nav-logo-name">Sedrex</span>
           </button>
-
           <div className="lp-nav-links" role="list">
             <a href="#capabilities" className="lp-nav-link" role="listitem">Capabilities</a>
             <a href="#how-it-works" className="lp-nav-link" role="listitem">How it works</a>
             <a href="#who-its-for"  className="lp-nav-link" role="listitem">Who it's for</a>
             <Link to="/pricing"     className="lp-nav-link" role="listitem">Pricing</Link>
           </div>
-
           <div className="lp-nav-right">
             <button type="button" className="lp-nav-theme" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
               {theme === 'dark' ? <IcoSun /> : <IcoMoon />}
             </button>
             <button type="button" className="lp-nav-signin" onClick={onOpenAuth}>Sign in</button>
-            <button type="button" className="lp-nav-cta"    onClick={onOpenAuth}>Start free</button>
+            <button type="button" className="lp-nav-cta"    onClick={onOpenAuth}>Start executing →</button>
             <button type="button" className="lp-nav-hamburger" onClick={() => setMenuOpen(v => !v)} aria-label="Toggle menu" aria-expanded={menuOpen}>
               {menuOpen ? <IcoClose /> : <IcoMenu />}
             </button>
@@ -276,13 +273,13 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
           <Link to="/pricing"     className="lp-drawer-link" onClick={closeMenu}>Pricing</Link>
           <div className="lp-drawer-divider" />
           <button type="button" className="lp-drawer-signin" onClick={() => { closeMenu(); onOpenAuth(); }}>Sign in</button>
-          <button type="button" className="lp-drawer-cta"    onClick={() => { closeMenu(); onOpenAuth(); }}>Start building free →</button>
+          <button type="button" className="lp-drawer-cta"    onClick={() => { closeMenu(); onOpenAuth(); }}>Start executing free →</button>
         </div>
       </div>
       {menuOpen && <div className="lp-drawer-overlay" onClick={closeMenu} aria-hidden="true" />}
 
       {/* ══════════════════════════════════════════════════════
-          HERO
+          HERO — UPDATED COPY
           ══════════════════════════════════════════════════════ */}
       <section className="lp-hero" aria-label="Hero">
         <div className="lp-hero-ambient" aria-hidden="true" />
@@ -291,31 +288,40 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
         <div className="lp-hero-inner">
           <div className="lp-hero-left">
 
+            {/* Eyebrow */}
             <div className="lp-hero-eyebrow">
               <span className="lp-eyebrow-dot" aria-hidden="true" />
-              Every AI model. Zero tab-switching.
+              Multi-model AI · Built for people who ship
             </div>
 
+            {/* ── MAIN HOOK ─────────────────────────────────── */}
             <h1 className="lp-hero-h1">
-              One question.<br />
-              The sharpest answer.<br />
-              <em className="lp-hero-em">Every single time.</em>
+              Stop prompting.<br />
+              <em className="lp-hero-em">Start executing.</em>
             </h1>
 
+            {/* ── SUB + SUPPORT ─────────────────────────────── */}
             <p className="lp-hero-sub">
-              Sedrex reads what you need, picks the best AI for it, and delivers the output as something you can actually use — running code, a live diagram, a rendered image — right inside one workspace.
+              The multi-model AI built for people who ship.
+              <br />
+              <span style={{ color: 'var(--col-fg-3)', fontSize: '0.92em', fontStyle: 'italic' }}>
+                From thought to verified results — instantly.
+              </span>
             </p>
 
+            {/* Prompt bar */}
             <div className="lp-hero-bar-wrap">
               <div className="lp-hero-bar" onClick={onOpenAuth} role="button" tabIndex={0}
-                onKeyDown={e => e.key === 'Enter' && onOpenAuth()} aria-label="Start building">
+                onKeyDown={e => e.key === 'Enter' && onOpenAuth()} aria-label="Start executing">
                 <span className="lp-bar-typed" aria-live="polite">{typedText}<span className={`lp-bar-cursor${isTyping ? ' lp-bar-cursor--blink' : ''}`} aria-hidden="true">|</span></span>
                 <button type="button" className="lp-bar-send" onClick={e => { e.stopPropagation(); onOpenAuth(); }} aria-label="Send">
                   <IcoArrowUp />
                 </button>
               </div>
+              <p className="lp-bar-hint">No prompting guides. No model selection. Just type and execute.</p>
             </div>
 
+            {/* Chips */}
             <div className="lp-hero-chips" role="list" aria-label="Quick actions">
               {['Write code', 'Debug errors', 'Draw diagrams', 'Generate images', 'Research anything'].map(c => (
                 <button type="button" key={c} className="lp-chip" onClick={onOpenAuth} role="listitem">{c}</button>
@@ -324,18 +330,15 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
 
           </div>
 
-          {/* Product mockup */}
+          {/* Product mockup — unchanged */}
           <div className="lp-hero-mockup" aria-label="Product preview" aria-hidden="true">
             <div className="lp-mock-window">
               <div className="lp-mock-titlebar">
-                <div className="lp-mock-dots">
-                  <span /><span /><span />
-                </div>
+                <div className="lp-mock-dots"><span /><span /><span /></div>
                 <span className="lp-mock-title">Sedrex</span>
                 <span className="lp-mock-badge">● Live</span>
               </div>
               <div className="lp-mock-body">
-                {/* Chat pane */}
                 <div className="lp-mock-chat">
                   <div className="lp-mock-msg lp-mock-msg--user">Build a real-time dashboard with charts</div>
                   <div className="lp-mock-msg lp-mock-msg--ai">
@@ -348,18 +351,14 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
                     </div>
                   </div>
                   <div className="lp-mock-suggestions">
-                    <span>Add dark mode</span>
-                    <span>Export as PDF</span>
-                    <span>Add filters</span>
+                    <span>Add dark mode</span><span>Export as PDF</span><span>Add filters</span>
                   </div>
                 </div>
-                {/* Artifact pane */}
                 <div className="lp-mock-artifact">
                   <div className="lp-mock-artifact-bar">
                     <span className="lp-mock-fname">dashboard.tsx</span>
                     <div className="lp-mock-artifact-tabs">
-                      <span className="active">Code</span>
-                      <span>Preview</span>
+                      <span className="active">Code</span><span>Preview</span>
                     </div>
                   </div>
                   <div className="lp-mock-code">
@@ -390,7 +389,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
       <div className="lp-models" aria-label="What Sedrex handles">
         <div className="lp-wrap">
           <div className="lp-models-inner">
-            <span className="lp-models-label">Handles</span>
+            <span className="lp-models-label">Executes</span>
             <div className="lp-models-logos" role="list">
               {['Code & debugging', 'System design', 'Data analysis', 'Image creation', 'Live research', 'Deep reasoning', 'Writing & docs'].map(m => (
                 <span key={m} className="lp-model-tag" role="listitem">{m}</span>
@@ -425,8 +424,8 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
             </div>
             <div className="lp-stat-divider" aria-hidden="true" />
             <div className="lp-stat">
-              <div className="lp-stat-num lp-stat-num--badge">Enterprise<span className="lp-stat-unit"> ready</span></div>
-              <div className="lp-stat-label">Secure by design</div>
+              <div className="lp-stat-num lp-stat-num--badge">Zero<span className="lp-stat-unit"> placeholders</span></div>
+              <div className="lp-stat-label">Complete output, always</div>
             </div>
           </div>
         </div>
@@ -445,14 +444,14 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
       </div>
 
       {/* ══════════════════════════════════════════════════════
-          CAPABILITIES
+          CAPABILITIES — unchanged structure, updated copy
           ══════════════════════════════════════════════════════ */}
       <section className="lp-section" id="capabilities" aria-label="Capabilities">
         <div className="lp-wrap">
           <div className="lp-reveal">
-            <div className="lp-section-label">What Sedrex does</div>
+            <div className="lp-section-label">What Sedrex executes</div>
             <h2 className="lp-h2">Ask once.<br /><strong>Get it done.</strong></h2>
-            <p className="lp-h2-sub">Most tools make you think about which AI to use. Sedrex thinks for you — picks the right intelligence, runs your work, and delivers something you can actually ship.</p>
+            <p className="lp-h2-sub">Most AI tools make you think for them. Sedrex doesn't suggest — it completes. No placeholders. No truncation. No hedging. Just output you can actually ship.</p>
           </div>
 
           <div className="lp-caps">
@@ -461,8 +460,8 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
             <div className="lp-cap lp-reveal lp-d1">
               <div className="lp-cap-eyebrow"><span>01</span><div className="lp-cap-line" />Code Execution</div>
               <div className="lp-cap-icon"><IcoCode /></div>
-              <div className="lp-cap-title">Write it. Run it. Ship it.</div>
-              <div className="lp-cap-desc">Code Sedrex writes runs immediately and shows you a live preview. No copy-pasting into a terminal. No "it works on my machine." Just output, right there.</div>
+              <div className="lp-cap-title">No more <code style={{fontSize:'0.85em', background:'rgba(16,185,129,0.12)', padding:'1px 6px', borderRadius:4, color:'#10B981'}}>// TODO</code></div>
+              <div className="lp-cap-desc">Tired of AI giving you snippets? Sedrex delivers the full file. Every line. Every time. Code runs immediately with a live preview — no copy-pasting into a terminal.</div>
               <div className="lp-cap-preview">
                 <div className="lp-preview-bar">
                   <div className="lp-preview-dots" aria-hidden="true"><span/><span/><span className="lp-dot-green"/></div>
@@ -513,7 +512,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
               <div className="lp-cap-eyebrow"><span>03</span><div className="lp-cap-line" />Image Generation</div>
               <div className="lp-cap-icon"><IcoImage /></div>
               <div className="lp-cap-title">Describe it. See it.</div>
-              <div className="lp-cap-desc">Turn a text prompt into a high-quality image — UI mockups, brand visuals, photorealistic renders. Generated, refined, and ready to use without opening a single design tool.</div>
+              <div className="lp-cap-desc">Turn a text prompt into a high-quality image — UI mockups, brand visuals, photorealistic renders. Generated and ready without opening a single design tool.</div>
               <div className="lp-cap-preview">
                 <div className="lp-preview-bar">
                   <div className="lp-preview-dots" aria-hidden="true"><span/><span/><span className="lp-dot-green"/></div>
@@ -521,9 +520,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
                 </div>
                 <div className="lp-imgrid">
                   {['UI Mockup', 'Brand Asset', 'Data Viz', 'Render'].map((label, i) => (
-                    <div key={i} className={`lp-imtile lp-imtile--${i + 1}`}>
-                      <span>{label}</span>
-                    </div>
+                    <div key={i} className={`lp-imtile lp-imtile--${i + 1}`}><span>{label}</span></div>
                   ))}
                 </div>
               </div>
@@ -609,7 +606,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
       </section>
 
       {/* ══════════════════════════════════════════════════════
-          HOW IT WORKS
+          HOW IT WORKS — updated copy
           ══════════════════════════════════════════════════════ */}
       <section className="lp-how" id="how-it-works" aria-label="How it works">
         <div className="lp-wrap">
@@ -617,28 +614,24 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
             <div className="lp-section-label">How it works</div>
             <h2 className="lp-h2">Say it.<br /><strong>See it done.</strong></h2>
           </div>
-
           <div className="lp-how-steps">
             {[
               {
-                n: '01',
-                icon: <IcoZap />,
+                n: '01', icon: <IcoZap />,
                 title: 'Just say what you need',
                 desc: 'No prompting guides. No model selection menus. No configuration. Type what you want to build — Sedrex figures out the rest before you finish the sentence.',
                 detail: 'Intent detection · Complexity scoring · Smart routing',
               },
               {
-                n: '02',
-                icon: <IcoBrain />,
+                n: '02', icon: <IcoBrain />,
                 title: 'Watch it think and build',
                 desc: 'Sedrex reasons through your request and streams the result back in real time — as working code, a rendered diagram, or a live interface. Not a wall of text.',
                 detail: 'Deep reasoning · Live streaming · Parallel execution',
               },
               {
-                n: '03',
-                icon: <IcoCode />,
+                n: '03', icon: <IcoRocket />,
                 title: 'Use it immediately',
-                desc: 'What Sedrex produces is not a suggestion — it runs, it renders, it exports. Iterate on it, extend it, or hand it off. Everything stays in one place, always.',
+                desc: 'What Sedrex produces is not a suggestion — it runs, it renders, it exports. No placeholders. No truncation. Iterate on it, extend it, or hand it off. Everything in one place.',
                 detail: 'Live preview · Artifact history · One-click export',
               },
             ].map((s, i) => (
@@ -655,34 +648,33 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
       </section>
 
       {/* ══════════════════════════════════════════════════════
-          WHO IT'S FOR
+          WHO IT'S FOR — updated to 3 niches (Founders, Developers, Enterprises)
           ══════════════════════════════════════════════════════ */}
       <section className="lp-who" id="who-its-for" aria-label="Who it's for">
         <div className="lp-wrap">
           <div className="lp-reveal">
             <div className="lp-section-label">Who it's for</div>
-            <h2 className="lp-h2">For people who <strong>make things.</strong></h2>
+            <h2 className="lp-h2">For people who <strong>ship things.</strong></h2>
           </div>
-
           <div className="lp-who-grid">
             {[
               {
+                icon: <IcoRocket />,
+                title: 'Founders',
+                text: 'You shouldn\'t have to be a debugger for your AI. Sedrex goes from your idea to a working product — landing pages, backend logic, pitch decks, competitive research — without switching between twelve tools.',
+                tags: ['Rapid prototyping', 'Full stack build', 'Go-to-market'],
+              },
+              {
                 icon: <IcoCode />,
                 title: 'Developers',
-                text: 'Write code, debug it, draw the architecture, and generate the docs — without switching between four different tools. Everything lives in one workspace that remembers your context.',
-                tags: ['Code generation', 'Debug & fix', 'System design'],
+                text: 'Tired of // TODO and half-baked code? Sedrex delivers the full file. Every line. Write, debug, draw architecture, and generate docs — in one workspace that remembers your context.',
+                tags: ['Full file output', 'Debug & fix', 'System design'],
               },
               {
                 icon: <IcoBarChart />,
-                title: 'Data Scientists',
-                text: 'Upload raw data, get instant analysis, executable Python, and charts you can actually read. Ask follow-up questions without re-uploading anything.',
-                tags: ['Data analysis', 'Visualisations', 'Python execution'],
-              },
-              {
-                icon: <IcoUsers />,
-                title: 'Product Teams',
-                text: 'Turn a brief into a working prototype before standup ends. Every artifact is persistent and shareable — not buried in someone\'s private chat history.',
-                tags: ['Rapid prototyping', 'UI mockups', 'Team artifacts'],
+                title: 'Professionals',
+                text: 'Upload raw data, get instant analysis, executable Python, and charts you can actually read. Produce reports, presentations, and research without context-switching or re-uploading anything.',
+                tags: ['Data analysis', 'Research', 'Instant reports'],
               },
               {
                 icon: <IcoShield />,
@@ -705,7 +697,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
       </section>
 
       {/* ══════════════════════════════════════════════════════
-          CTA
+          CTA — updated copy
           ══════════════════════════════════════════════════════ */}
       <section className="lp-cta" aria-label="Call to action">
         <div className="lp-cta-glow" aria-hidden="true" />
@@ -713,16 +705,15 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
           <div className="lp-cta-inner lp-reveal">
             <div className="lp-section-label lp-section-label--center">Your next build</div>
             <h2 className="lp-cta-h">
-              Stop thinking about<br />
-              which AI to use.<br />
-              <em>Just build.</em>
+              Stop prompting.<br />
+              <em>Start executing.</em>
             </h2>
             <p className="lp-cta-sub">
-              Sedrex is free to start. No setup, no credit card, no twelve tabs open at once. Your next idea is one message away.
+              Sedrex is free to start. No placeholders. No truncation. No twelve tabs open at once. Your next idea is one message away — and it ships.
             </p>
             <div className="lp-cta-btns">
               <button type="button" className="lp-btn-primary" onClick={onOpenAuth}>
-                Start building free
+                Start executing free
                 <span aria-hidden="true">→</span>
               </button>
               <Link to="/pricing" className="lp-btn-secondary">
@@ -740,17 +731,16 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
         </div>
       </section>
 
-      {/* ── Footer ──────────────────────────────────────────── */}
+      {/* ── Footer — unchanged ──────────────────────────────── */}
       <footer className="lp-footer" role="contentinfo">
         <div className="lp-wrap">
           <div className="lp-footer-grid">
-
             <div className="lp-footer-brand">
               <div className="lp-footer-logo">
                 <LogoMark size={26} />
                 <span className="lp-footer-logo-name">Sedrex</span>
               </div>
-              <p className="lp-footer-tagline">The workspace where what you say becomes something you can ship.</p>
+              <p className="lp-footer-tagline">Stop prompting. Start executing. The workspace where what you say becomes something you can ship.</p>
               <div className="lp-footer-socials">
                 <a href="https://twitter.com/sedrexai" className="lp-social" aria-label="Twitter / X" rel="noopener noreferrer" target="_blank">
                   <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.253 5.622L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z"/></svg>
@@ -763,7 +753,6 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
                 </a>
               </div>
             </div>
-
             <div className="lp-footer-col">
               <div className="lp-footer-col-title">Product</div>
               <a href="#capabilities" className="lp-footer-link">Capabilities</a>
@@ -771,24 +760,20 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
               <a href="#how-it-works" className="lp-footer-link">How it works</a>
               <a href="#who-its-for"  className="lp-footer-link">Who it's for</a>
             </div>
-
             <div className="lp-footer-col">
               <div className="lp-footer-col-title">Company</div>
               <Link to="/contact"  className="lp-footer-link">Contact</Link>
               <a href="mailto:hello@sedrex.ai" className="lp-footer-link">hello@sedrex.ai</a>
             </div>
-
             <div className="lp-footer-col">
               <div className="lp-footer-col-title">Legal</div>
               <Link to="/privacy" className="lp-footer-link">Privacy Policy</Link>
               <Link to="/terms"   className="lp-footer-link">Terms of Service</Link>
             </div>
-
           </div>
-
           <div className="lp-footer-bottom">
             <span>© {new Date().getFullYear()} Sedrex. All rights reserved.</span>
-            <span className="lp-footer-made">Built for builders.</span>
+            <span className="lp-footer-made">Stop prompting. Start executing.</span>
           </div>
         </div>
       </footer>

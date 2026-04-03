@@ -1,41 +1,90 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Apple Touch Icon for iOS Home Screen -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/sedrex-logo.svg">
+  <!-- ── Apple Touch Icon ──────────────────────────────────── -->
+  <link rel="apple-touch-icon" sizes="180x180" href="/sedrex-logo.svg">
+
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="format-detection" content="telephone=no">
   <meta name="color-scheme" content="dark light">
   <meta name="referrer" content="strict-origin-when-cross-origin">
-  <title>SEDREX | Multi-Model Intelligence</title>
-  <meta name="description" content="Professional AI routing to GPT-4, Claude, and Gemini.">
-  
-  <!-- PWA & Mobile Readiness -->
+
+  <!-- ── PRIMARY META — what Google shows ─────────────────── -->
+  <title>Sedrex AI — Stop Prompting. Start Executing.</title>
+  <meta name="description" content="Stop prompting. Start executing. Sedrex is the multi-model AI built for founders, developers, and professionals who ship — no placeholders, no truncation, just verified results.">
+  <meta name="keywords" content="AI tool, multi-model AI, code execution, AI for developers, AI for founders, stop prompting start executing, Sedrex">
+  <meta name="author" content="Sedrex AI">
+
+  <!-- ── OPEN GRAPH (LinkedIn, WhatsApp, Facebook previews) ── -->
+  <meta property="og:type"        content="website">
+  <meta property="og:url"         content="https://sedrexai.com/">
+  <meta property="og:title"       content="Sedrex AI — Stop Prompting. Start Executing.">
+  <meta property="og:description" content="The multi-model AI built for people who ship. From thought to verified results — instantly. No placeholders. No truncation. Just execution.">
+  <meta property="og:image"       content="https://sedrexai.com/og-image.png">
+  <meta property="og:image:width"  content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:site_name"   content="Sedrex AI">
+  <meta property="og:locale"      content="en_US">
+
+  <!-- ── TWITTER / X CARD ─────────────────────────────────── -->
+  <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:site"        content="@sedrexai">
+  <meta name="twitter:creator"     content="@sedrexai">
+  <meta name="twitter:title"       content="Sedrex AI — Stop Prompting. Start Executing.">
+  <meta name="twitter:description" content="The multi-model AI built for people who ship. No placeholders. No truncation. Just verified results — instantly.">
+  <meta name="twitter:image"       content="https://sedrexai.com/og-image.png">
+
+  <!-- ── PWA & Mobile ─────────────────────────────────────── -->
   <link rel="icon" type="image/svg+xml" href="/sedrex-logo.svg">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0d0d0d">
+  <meta name="theme-color" content="#10B981">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="SEDREX">
-  
-  <!-- Preconnect to critical origins for faster resource loading -->
+  <meta name="apple-mobile-web-app-title" content="Sedrex">
+
+  <!-- ── Canonical ─────────────────────────────────────────── -->
+  <link rel="canonical" href="https://sedrexai.com/">
+
+  <!-- ── Structured Data (Google rich results) ─────────────── -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Sedrex AI",
+    "url": "https://sedrexai.com",
+    "description": "Stop prompting. Start executing. The multi-model AI built for founders, developers, and professionals who ship.",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Web",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "creator": {
+      "@type": "Organization",
+      "name": "Sedrex AI",
+      "url": "https://sedrexai.com"
+    }
+  }
+  </script>
+
+  <!-- ── Preconnect ────────────────────────────────────────── -->
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="dns-prefetch" href="https://esm.sh">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-  <!-- Preload critical fonts to prevent FOUT/CLS -->
+  <!-- ── Fonts ─────────────────────────────────────────────── -->
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-  <!-- Tailwind CSS is bundled via PostCSS main.tsx import; styles loaded from index.css -->
   <style>
     :root {
       --bg-primary: #171717;
       --bg-secondary: #0d0d0d;
       --bg-tertiary: #212121;
-      --text-primary: #d4d4d8; 
+      --text-primary: #d4d4d8;
       --text-secondary: #a1a1aa;
       --border: rgba(255, 255, 255, 0.08);
       --accent: #10B981;
@@ -65,39 +114,29 @@
 
     body {
       font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-      margin: 0;
-      padding: 0;
+      margin: 0; padding: 0;
       background-color: var(--bg-primary);
       color: var(--text-primary);
       font-size: 16px;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
       text-rendering: optimizeLegibility;
-        /* overscroll-behavior: none is not supported on iOS < 16, but safe for modern browsers */
-        overscroll-behavior: none;
-      height: 100vh;
-      height: 100dvh;
-      width: 100vw;
-      max-width: 100%;
-      /* Fix: Prevent all horizontal and vertical scrolling at the document level */
+      overscroll-behavior: none;
+      height: 100vh; height: 100dvh;
+      width: 100vw; max-width: 100%;
       overflow: hidden;
       -webkit-touch-callout: none;
       transition: background-color 0.3s ease, color 0.3s ease;
     }
 
     #root {
-      height: 100vh;
-      height: 100dvh;
-      width: 100vw;
-      max-width: 100%;
-      display: flex;
-      flex-direction: column;
+      height: 100vh; height: 100dvh;
+      width: 100vw; max-width: 100%;
+      display: flex; flex-direction: column;
       overflow: hidden;
-      /* CLS fix: reserve space for the main layout immediately */
       contain: layout style;
     }
 
-    /* CLS fix: prevent layout shift from auth spinner */
     #root:empty {
       display: flex;
       align-items: center;
@@ -106,83 +145,53 @@
     }
     #root:empty::after {
       content: '';
-      width: 40px;
-      height: 40px;
-      border: 3px solid rgba(16, 163, 127, 0.2);
+      width: 40px; height: 40px;
+      border: 3px solid rgba(16, 185, 129, 0.2);
       border-top-color: #10B981;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Professional Sedrex Tooltip System */
-    [data-sedrex-tooltip] {
-      position: relative;
-    }
+    [data-sedrex-tooltip] { position: relative; }
     [data-sedrex-tooltip]::after {
       content: attr(data-sedrex-tooltip);
-      position: absolute;
-      top: 100%;
-      margin-top: 4px;
-      left: 50%;
-      transform: translateX(-50%) translateY(-3px);
-      background: var(--tooltip-bg);
-      color: var(--tooltip-text);
-      padding: 3px 8px;
-      border-radius: 6px;
-      font-size: 9px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+      position: absolute; top: 100%; margin-top: 4px;
+      left: 50%; transform: translateX(-50%) translateY(-3px);
+      background: var(--tooltip-bg); color: var(--tooltip-text);
+      padding: 3px 8px; border-radius: 6px;
+      font-size: 9px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.05em;
       white-space: nowrap;
       box-shadow: 0 4px 12px -2px rgba(0,0,0,0.3);
       border: 1px solid rgba(255,255,255,0.08);
-      opacity: 0;
-      pointer-events: none;
+      opacity: 0; pointer-events: none;
       transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
       z-index: 1000;
     }
     [data-sedrex-tooltip]:hover::after {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
+      opacity: 1; transform: translateX(-50%) translateY(0);
     }
 
     .markdown-body {
-      -webkit-user-select: text;
-      user-select: text;
-      min-width: 0;
-      max-width: 100%;
-      overflow-x: hidden;
+      -webkit-user-select: text; user-select: text;
+      min-width: 0; max-width: 100%; overflow-x: hidden;
     }
 
     .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
     .pt-safe { padding-top: env(safe-area-inset-top); }
 
-    .markdown-body {
-      line-height: 1.6;
-      font-size: 1rem;
-      letter-spacing: -0.01em;
-      word-break: break-word;
-      overflow-wrap: break-word;
-    }
+    .markdown-body { line-height: 1.6; font-size: 1rem; letter-spacing: -0.01em; word-break: break-word; overflow-wrap: break-word; }
 
     @media (max-width: 640px) {
-      .markdown-body {
-        font-size: 0.9375rem;
-        line-height: 1.55;
-      }
+      .markdown-body { font-size: 0.9375rem; line-height: 1.55; }
     }
 
     .markdown-body p, .markdown-body > div { margin-bottom: 1rem; }
-
     .markdown-body h1, .markdown-body h2, .markdown-body h3 {
-      font-weight: 700;
-      color: var(--highlight);
-      margin-top: 2rem;
-      margin-bottom: 1rem;
-      letter-spacing: -0.025em;
+      font-weight: 700; color: var(--highlight);
+      margin-top: 2rem; margin-bottom: 1rem; letter-spacing: -0.025em;
     }
-
     .markdown-body h1 { font-size: 1.25rem; }
     .markdown-body h2 { font-size: 1.125rem; }
     .markdown-body h3 { font-size: 1rem; }
@@ -193,180 +202,86 @@
       .markdown-body h3 { font-size: 0.9375rem; }
     }
 
-    .markdown-body ul, .markdown-body ol {
-      padding-left: 1.5rem;
-      margin-bottom: 1.25rem;
-    }
-
-    .markdown-body li {
-      margin-bottom: 0.35rem;
-      line-height: 1.6;
-    }
-
+    .markdown-body ul, .markdown-body ol { padding-left: 1.5rem; margin-bottom: 1.25rem; }
+    .markdown-body li { margin-bottom: 0.35rem; line-height: 1.6; }
     .markdown-body strong { color: var(--highlight); }
-
     .markdown-body blockquote {
       border-left: 3px solid var(--accent);
-      padding-left: 1rem;
-      margin: 1.5rem 0;
-      color: var(--text-secondary);
-      font-style: italic;
-      background: var(--bg-tertiary);
-      border-radius: 0 8px 8px 0;
-      padding: 0.75rem 1rem;
+      padding: 0.75rem 1rem; margin: 1.5rem 0;
+      color: var(--text-secondary); font-style: italic;
+      background: var(--bg-tertiary); border-radius: 0 8px 8px 0;
     }
-
-    .markdown-body hr {
-      border: none;
-      border-top: 1px solid var(--border);
-      margin: 2rem 0;
-    }
-
-    .markdown-body ul ul, .markdown-body ol ol, .markdown-body ul ol, .markdown-body ol ul {
-      margin-top: 0.3rem;
-      margin-bottom: 0.3rem;
-    }
-
-    .markdown-body li > strong:first-child {
-      color: var(--accent);
-    }
-
-    /* highlight.js theme overrides for app consistency */
+    .markdown-body hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+    .markdown-body ul ul, .markdown-body ol ol,
+    .markdown-body ul ol, .markdown-body ol ul { margin-top: 0.3rem; margin-bottom: 0.3rem; }
+    .markdown-body li > strong:first-child { color: var(--accent); }
     .hljs { background: var(--code-bg) !important; color: var(--text-primary); }
 
-    /* Enhanced Table Styles */
     .markdown-body table {
-      width: 100%;
-      border-collapse: separate;
-      border-spacing: 0;
-      margin: 2.5rem 0;
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      overflow: hidden;
-      background: var(--bg-secondary);
+      width: 100%; border-collapse: separate; border-spacing: 0;
+      margin: 2.5rem 0; border: 1px solid var(--border);
+      border-radius: 14px; overflow: hidden; background: var(--bg-secondary);
     }
-
     .markdown-body th {
-      background: var(--code-header);
-      color: var(--highlight);
-      font-weight: 700;
-      text-align: left;
-      padding: 0.75rem 1.25rem;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.8125rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+      background: var(--code-header); color: var(--highlight);
+      font-weight: 700; text-align: left;
+      padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border);
+      font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.08em;
     }
-
     .markdown-body td {
-      padding: 0.75rem 1.25rem;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.9375rem;
-      color: var(--text-primary);
+      padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border);
+      font-size: 0.9375rem; color: var(--text-primary);
     }
 
     @media (max-width: 640px) {
-      .markdown-body th {
-        font-size: 0.75rem;
-        padding: 0.625rem 1rem;
-      }
-      .markdown-body td {
-        font-size: 0.875rem;
-        padding: 0.625rem 1rem;
-      }
+      .markdown-body th { font-size: 0.75rem; padding: 0.625rem 1rem; }
+      .markdown-body td { font-size: 0.875rem; padding: 0.625rem 1rem; }
     }
 
-    /* Technical Output Formatting */
     .markdown-body pre {
       background-color: var(--code-bg) !important;
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      min-width: -webkit-fill-available; /* Samsung Internet fallback */
-      min-width: fit-content;
-      padding: 0 !important;
-      overflow-x: auto;
-      max-width: 100%;
-      display: block;
+      border: 1px solid var(--border); border-radius: 16px;
+      min-width: fit-content; padding: 0 !important;
+      overflow-x: auto; max-width: 100%; display: block;
       box-shadow: 0 10px 30px -10px rgba(0,0,0,0.15);
     }
-
-      /* meta[name=theme-color] is not supported by Firefox, Firefox for Android, Opera */
-      /* script[type=importmap] is not supported by Safari on iOS < 16.4 */
-
     .markdown-body code {
       font-family: 'IBM Plex Mono', Menlo, Consolas, 'Courier New', monospace;
-      font-size: 0.875rem;
-      font-variant-ligatures: normal;
+      font-size: 0.875rem; font-variant-ligatures: normal;
       -webkit-font-smoothing: auto;
     }
-
-    @media (max-width: 640px) {
-      .markdown-body code {
-        font-size: 0.8125rem;
-      }
-    }
-
-    .markdown-body pre code {
-      white-space: pre;
-      word-wrap: normal;
-      display: block;
-      min-width: -webkit-fill-available; /* Samsung Internet fallback */
-      min-width: fit-content;
-      color: var(--text-primary);
-    }
-
-    /* Prevent oversized content from breaking layout on small screens */
-    .markdown-body img, .markdown-body video, .markdown-body iframe {
-      max-width: 100%;
-      height: auto;
-    }
-
+    @media (max-width: 640px) { .markdown-body code { font-size: 0.8125rem; } }
+    .markdown-body pre code { white-space: pre; word-wrap: normal; display: block; min-width: fit-content; color: var(--text-primary); }
+    .markdown-body img, .markdown-body video, .markdown-body iframe { max-width: 100%; height: auto; }
     .markdown-body :not(pre) > code {
-      background: var(--bg-tertiary);
-      color: var(--accent);
-      padding: 0.15em 0.4em;
-      border-radius: 5px;
-      font-size: 0.875em;
-      font-weight: 600;
-      border: 1px solid var(--border);
+      background: var(--bg-tertiary); color: var(--accent);
+      padding: 0.15em 0.4em; border-radius: 5px;
+      font-size: 0.875em; font-weight: 600; border: 1px solid var(--border);
     }
-
-    @media (max-width: 640px) {
-      .markdown-body :not(pre) > code {
-        font-size: 0.8125em;
-      }
-    }
+    @media (max-width: 640px) { .markdown-body :not(pre) > code { font-size: 0.8125em; } }
 
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-thumb { background: var(--text-secondary); opacity: 0.3; border-radius: 10px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    
-    .glass { 
-      background: var(--header-bg); 
-      -webkit-backdrop-filter: blur(20px) saturate(180%); 
-      backdrop-filter: blur(20px) saturate(180%); 
+
+    .glass {
+      background: var(--header-bg);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      backdrop-filter: blur(20px) saturate(180%);
       border-bottom: 1px solid var(--border);
       box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
     }
-    .sidebar-transition { 
-      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), width 0.4s cubic-bezier(0.4, 0, 0.2, 1); 
+    .sidebar-transition {
+      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    /* ── Premium Micro-interactions ───────────────────────────────────── */
-    button:active, 
-    .chat-ctrl-btn:active, 
-    .message-action-btn:active, 
-    .sidebar-nav-item:active,
-    .suggestion-chip:active {
+    button:active, .chat-ctrl-btn:active, .message-action-btn:active,
+    .sidebar-nav-item:active, .suggestion-chip:active {
       transform: scale(0.96);
       transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    /* Smooth momentum scrolling for iOS */
-    .overflow-y-auto {
-      -webkit-overflow-scrolling: touch;
-      scroll-behavior: smooth;
-    }
+    .overflow-y-auto { -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
 
     @keyframes thought-pulse {
       0%, 100% { opacity: 0.3; transform: scale(1); }
@@ -374,60 +289,32 @@
     }
     .thought-dot { animation: thought-pulse 1.5s infinite ease-in-out; }
 
-    /* Universal Caret Visibility */
-    textarea, input {
-      caret-color: var(--accent) !important;
-    }
-    
-    /* NEW: Global layout fix for horizontal jitter */
-    html, body, #root {
-      overflow-x: hidden;
-      width: 100%;
-      position: relative;
-    }
+    textarea, input { caret-color: var(--accent) !important; }
 
-    /* Performance: GPU-accelerated sidebar transition */
+    html, body, #root { overflow-x: hidden; width: 100%; position: relative; }
+
     .sidebar-transition {
-      -webkit-backface-visibility: hidden;
-      backface-visibility: hidden;
-      /* CLS fix: reserve sidebar width to prevent layout shift */
+      -webkit-backface-visibility: hidden; backface-visibility: hidden;
       contain: layout style;
     }
 
-    /* Smooth touch interactions */
     button, a, [role="button"], input, textarea, select {
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
     }
 
-    /* GPU-accelerate sidebar only */
-    .sidebar-transition {
-      will-change: transform;
-    }
+    .sidebar-transition { will-change: transform; }
+    .overflow-y-auto, .overflow-x-auto, .overflow-auto { -webkit-overflow-scrolling: touch; }
 
-    /* Optimize scrolling containers */
-    .overflow-y-auto, .overflow-x-auto, .overflow-auto {
-      -webkit-overflow-scrolling: touch;
-    }
+    .gap-12 > div { content-visibility: auto; contain-intrinsic-size: auto 120px; }
 
-    /* INP fix: off-screen messages skip rendering work */
-    .gap-12 > div {
-      content-visibility: auto;
-      contain-intrinsic-size: auto 120px;
-    }
+    header.glass { min-height: 56px; }
+    @media (min-width: 640px) { header.glass { min-height: 64px; } }
 
-    /* CLS fix: header has fixed height */
-    header.glass {
-      min-height: 56px;
-    }
-    @media (min-width: 640px) {
-      header.glass { min-height: 64px; }
-    }
-
-    /* Safe area insets for iOS notch/home indicator */
     .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
     .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
   </style>
+
 <script type="importmap">
 {
   "imports": {
@@ -455,12 +342,10 @@
 <script type="module" src="/index.tsx"></script>
 
 <script>
-  // ── Service Worker registration ───────────────────────────────
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js', { scope: '/' })
         .then((reg) => {
-          // Listen for a new SW waiting — expose to React via custom event
           reg.addEventListener('updatefound', () => {
             const newWorker = reg.installing;
             if (!newWorker) return;
@@ -473,7 +358,6 @@
         })
         .catch((err) => console.warn('[SW] Registration failed:', err));
 
-      // Reload page when a new SW takes control (after update)
       let refreshing = false;
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (!refreshing) { refreshing = true; window.location.reload(); }
@@ -481,15 +365,10 @@
     });
   }
 
-  // ── PWA shortcut action routing ──────────────────────────────
-  // When launched via app shortcuts, store the desired action
-  // so React can pick it up after mounting.
   (function () {
     const params = new URLSearchParams(window.location.search);
     const action = params.get('action');
-    if (action) {
-      sessionStorage.setItem('pwa-launch-action', action);
-    }
+    if (action) { sessionStorage.setItem('pwa-launch-action', action); }
   })();
 </script>
 </body>
