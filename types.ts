@@ -31,9 +31,15 @@ export interface MessageImage {
 }
 
 export interface AttachedDocument {
-  title: string;
-  content: string;
-  type: string;
+  title:     string;
+  content:   string;
+  type:      string;
+  /** 'text' = plain UTF-8 string | 'base64' = binary (PDF etc). Default: 'text' */
+  encoding?: 'text' | 'base64';
+  /** Canonical MIME type — used for Gemini inlineData (e.g. 'application/pdf') */
+  mimeType?: string;
+  /** File size in KB for display in attachment chips */
+  sizeKB?:   number;
 }
 
 export interface GroundingChunk {

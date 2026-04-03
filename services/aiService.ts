@@ -1283,9 +1283,22 @@ async function processRequest(
 
   const geminiContents = buildHistory(history, sedrexIntent);
   const parts: any[]   = [];
+
+  // ── FIX: Route by encoding — PDF as inlineData, text with unicode sanitization ──
   for (const doc of documents) {
-    parts.push({ text: `[DOCUMENT: ${doc.title}]\n\`\`\`\n${doc.content}\n\`\`\`\n` });
+    if (doc.encoding === 'base64' && doc.mimeType === 'application/pdf') {
+      parts.push({ inlineData: { data: doc.content, mimeType: 'application/pdf' } });
+      parts.push({ text: `[Attached PDF: ${doc.title}]` });
+    } else {
+      const safeContent = (doc.content ?? '')
+        .replace(/\x00/g, '')
+        .replace(/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+        .replace(/[\uD800-\uDFFF]/g, '')
+        .slice(0, 50_000);
+      parts.push({ text: `[DOCUMENT: ${doc.title}]\n\`\`\`\n${safeContent}\n\`\`\`\n` });
+    }
   }
+
   if (images?.length) {
     images.forEach((img: MessageImage) => {
       parts.push({ inlineData: { data: img.inlineData.data, mimeType: img.mimeType } });
@@ -1299,7 +1312,15 @@ async function processRequest(
   let flatPrompt = effectivePrompt;
   if (documents.length > 0 || codebaseContext) {
     const docContext = documents
-      .map((d) => `[DOCUMENT: ${d.title}]\n\`\`\`\n${d.content}\n\`\`\`\n`)
+      .map((d) => {
+        if (d.encoding === 'base64') return `[Attached file: ${d.title}]`;
+        const safe = (d.content ?? '')
+          .replace(/\x00/g, '')
+          .replace(/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+          .replace(/[\uD800-\uDFFF]/g, '')
+          .slice(0, 50_000);
+        return `[DOCUMENT: ${d.title}]\n\`\`\`\n${safe}\n\`\`\`\n`;
+      })
       .join("\n");
     const ctxParts = [
       codebaseContext,

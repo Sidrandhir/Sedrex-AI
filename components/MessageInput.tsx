@@ -18,6 +18,7 @@ import { ProjectUploaderMenuItem, ProjectIndexChip } from './ProjectUploader';
 import { useCodebaseIndex } from '../services/codebaseContext';
 import CodeChip, { detectPastedCode } from './CodeChip';
 import heic2any from 'heic2any';
+import { processDocumentFiles } from '../services/documentProcessingService';
 import './MessageInput.css';
 
 // ── Model definitions ─────────────────────────────────────────────
@@ -303,9 +304,23 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const handleDocFiles = useCallback(async (files: FileList | null) => {
     if (!files?.length) return;
     setIsProcessing(true);
-    const added: AttachedDocument[] = [];
-    try { for (const f of Array.from(files)) added.push({ title: f.name, content: await readText(f), type: f.type || 'text/plain' }); setAttachedDocs(p => [...p, ...added]); }
-    catch { } finally { setIsProcessing(false); if (docInputRef.current) docInputRef.current.value = ''; }
+    try {
+      const processed = await processDocumentFiles(files);
+      const added: AttachedDocument[] = processed.map(doc => ({
+        title:    doc.title,
+        content:  doc.content,
+        type:     doc.type,
+        encoding: doc.encoding,
+        mimeType: doc.mimeType,
+        sizeKB:   doc.sizeKB,
+      }));
+      setAttachedDocs(prev => [...prev, ...added]);
+    } catch (err) {
+      console.error('[Sedrex] Document processing failed:', err);
+    } finally {
+      setIsProcessing(false);
+      if (docInputRef.current) docInputRef.current.value = '';
+    }
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); }, []);
