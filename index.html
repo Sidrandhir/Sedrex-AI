@@ -1,8 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- ── Apple Touch Icon ──────────────────────────────────── -->
-  <link rel="apple-touch-icon" sizes="180x180" href="/sedrex-logo.svg">
+
+  <!-- ══════════════════════════════════════════════════════
+       SEDREX AI — Head
+       sedrex-logo.svg = existing file, untouched
+       PNG favicons = for Google search result logo
+  ══════════════════════════════════════════════════════ -->
 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
@@ -14,46 +18,59 @@
   <!-- ── PRIMARY META — what Google shows ─────────────────── -->
   <title>Sedrex AI — Stop Prompting. Start Executing.</title>
   <meta name="description" content="Stop prompting. Start executing. Sedrex is the multi-model AI built for founders, developers, and professionals who ship — no placeholders, no truncation, just verified results.">
-  <meta name="keywords" content="AI tool, multi-model AI, code execution, AI for developers, AI for founders, stop prompting start executing, Sedrex">
+  <meta name="keywords" content="AI tool, multi-model AI, code execution, AI for developers, AI for founders, stop prompting start executing, Sedrex AI">
   <meta name="author" content="Sedrex AI">
+  <link rel="canonical" href="https://sedrexai.com/">
 
-  <!-- ── OPEN GRAPH (LinkedIn, WhatsApp, Facebook previews) ── -->
-  <meta property="og:type"        content="website">
-  <meta property="og:url"         content="https://sedrexai.com/">
-  <meta property="og:title"       content="Sedrex AI — Stop Prompting. Start Executing.">
-  <meta property="og:description" content="The multi-model AI built for people who ship. From thought to verified results — instantly. No placeholders. No truncation. Just execution.">
-  <meta property="og:image"       content="https://sedrexai.com/og-image.png">
+  <!-- ── OPEN GRAPH ─────────────────────────────────────── -->
+  <meta property="og:type"         content="website">
+  <meta property="og:url"          content="https://sedrexai.com/">
+  <meta property="og:title"        content="Sedrex AI — Stop Prompting. Start Executing.">
+  <meta property="og:description"  content="The multi-model AI built for people who ship. From thought to verified results — instantly. No placeholders. No truncation. Just execution.">
+  <meta property="og:image"        content="https://sedrexai.com/og-image.png">
   <meta property="og:image:width"  content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:site_name"   content="Sedrex AI">
-  <meta property="og:locale"      content="en_US">
+  <meta property="og:image:alt"    content="Sedrex AI — Stop Prompting. Start Executing.">
+  <meta property="og:site_name"    content="Sedrex AI">
+  <meta property="og:locale"       content="en_US">
 
-  <!-- ── TWITTER / X CARD ─────────────────────────────────── -->
+  <!-- ── TWITTER / X CARD ──────────────────────────────── -->
   <meta name="twitter:card"        content="summary_large_image">
-  <meta name="twitter:site"        content="@sedrexai">
-  <meta name="twitter:creator"     content="@sedrexai">
+  <meta name="twitter:site"        content="@Sedrexai">
+  <meta name="twitter:creator"     content="@Sedrexai">
   <meta name="twitter:title"       content="Sedrex AI — Stop Prompting. Start Executing.">
   <meta name="twitter:description" content="The multi-model AI built for people who ship. No placeholders. No truncation. Just verified results — instantly.">
   <meta name="twitter:image"       content="https://sedrexai.com/og-image.png">
 
-  <!-- ── PWA & Mobile ─────────────────────────────────────── -->
+  <!-- ── FAVICONS ───────────────────────────────────────────
+       Priority order: browsers use first match they support.
+       favicon.ico      → all browsers, Google search logo
+       favicon-32.png   → modern browsers
+       favicon-16.png   → legacy fallback
+       sedrex-logo.svg  → existing file, sharp at all sizes
+       apple-touch-icon → iOS home screen
+  ──────────────────────────────────────────────────────── -->
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
   <link rel="icon" type="image/svg+xml" href="/sedrex-logo.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+
+  <!-- ── PWA ────────────────────────────────────────────── -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#10B981">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Sedrex">
 
-  <!-- ── Canonical ─────────────────────────────────────────── -->
-  <link rel="canonical" href="https://sedrexai.com/">
-
-  <!-- ── Structured Data (Google rich results) ─────────────── -->
+  <!-- ── STRUCTURED DATA (Google rich results) ─────────── -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "Sedrex AI",
     "url": "https://sedrexai.com",
+    "logo": "https://sedrexai.com/sedrex-logo.svg",
     "description": "Stop prompting. Start executing. The multi-model AI built for founders, developers, and professionals who ship.",
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "Web",
@@ -65,51 +82,58 @@
     "creator": {
       "@type": "Organization",
       "name": "Sedrex AI",
-      "url": "https://sedrexai.com"
+      "url": "https://sedrexai.com",
+      "logo": "https://sedrexai.com/sedrex-logo.svg",
+      "sameAs": [
+        "https://x.com/Sedrexai",
+        "https://www.linkedin.com/company/sedrexai/",
+        "https://www.instagram.com/sedrex.ai/",
+        "https://www.threads.com/@sedrex.ai"
+      ]
     }
   }
   </script>
 
-  <!-- ── Preconnect ────────────────────────────────────────── -->
+  <!-- ── PRECONNECT ─────────────────────────────────────── -->
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="dns-prefetch" href="https://esm.sh">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-  <!-- ── Fonts ─────────────────────────────────────────────── -->
+  <!-- ── FONTS ──────────────────────────────────────────── -->
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 
   <style>
     :root {
-      --bg-primary: #171717;
+      --bg-primary:   #171717;
       --bg-secondary: #0d0d0d;
-      --bg-tertiary: #212121;
-      --text-primary: #d4d4d8;
+      --bg-tertiary:  #212121;
+      --text-primary:   #d4d4d8;
       --text-secondary: #a1a1aa;
-      --border: rgba(255, 255, 255, 0.08);
-      --accent: #10B981;
-      --header-bg: rgba(23, 23, 23, 0.85);
-      --highlight: #f4f4f5;
-      --code-bg: #0a0a0a;
-      --code-header: rgba(255, 255, 255, 0.03);
-      --tooltip-bg: #1a1a1a;
-      --tooltip-text: #ffffff;
+      --border:      rgba(255,255,255,0.08);
+      --accent:      #10B981;
+      --header-bg:   rgba(23,23,23,0.85);
+      --highlight:   #f4f4f5;
+      --code-bg:     #0a0a0a;
+      --code-header: rgba(255,255,255,0.03);
+      --tooltip-bg:  #1a1a1a;
+      --tooltip-text:#ffffff;
     }
 
     [data-theme='light'] {
-      --bg-primary: #ffffff;
+      --bg-primary:   #ffffff;
       --bg-secondary: #f9f9fb;
-      --bg-tertiary: #f0f0f3;
-      --text-primary: #1a1a1a;
+      --bg-tertiary:  #f0f0f3;
+      --text-primary:   #1a1a1a;
       --text-secondary: #4b5563;
-      --border: #e5e7eb;
-      --highlight: #111827;
-      --accent: #059669;
-      --header-bg: rgba(255, 255, 255, 0.9);
-      --code-bg: #f3f4f6;
+      --border:      #e5e7eb;
+      --highlight:   #111827;
+      --accent:      #059669;
+      --header-bg:   rgba(255,255,255,0.9);
+      --code-bg:     #f3f4f6;
       --code-header: #e5e7eb;
-      --tooltip-bg: #111827;
-      --tooltip-text: #ffffff;
+      --tooltip-bg:  #111827;
+      --tooltip-text:#ffffff;
     }
 
     body {
@@ -146,7 +170,7 @@
     #root:empty::after {
       content: '';
       width: 40px; height: 40px;
-      border: 3px solid rgba(16, 185, 129, 0.2);
+      border: 3px solid rgba(16,185,129,0.2);
       border-top-color: #10B981;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
@@ -166,7 +190,7 @@
       box-shadow: 0 4px 12px -2px rgba(0,0,0,0.3);
       border: 1px solid rgba(255,255,255,0.08);
       opacity: 0; pointer-events: none;
-      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: all 0.15s cubic-bezier(0.4,0,0.2,1);
       z-index: 1000;
     }
     [data-sedrex-tooltip]:hover::after {
@@ -176,18 +200,20 @@
     .markdown-body {
       -webkit-user-select: text; user-select: text;
       min-width: 0; max-width: 100%; overflow-x: hidden;
+      line-height: 1.6; font-size: 1rem;
+      letter-spacing: -0.01em;
+      word-break: break-word; overflow-wrap: break-word;
     }
-
-    .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-    .pt-safe { padding-top: env(safe-area-inset-top); }
-
-    .markdown-body { line-height: 1.6; font-size: 1rem; letter-spacing: -0.01em; word-break: break-word; overflow-wrap: break-word; }
 
     @media (max-width: 640px) {
       .markdown-body { font-size: 0.9375rem; line-height: 1.55; }
     }
 
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+    .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+
     .markdown-body p, .markdown-body > div { margin-bottom: 1rem; }
+
     .markdown-body h1, .markdown-body h2, .markdown-body h3 {
       font-weight: 700; color: var(--highlight);
       margin-top: 2rem; margin-bottom: 1rem; letter-spacing: -0.025em;
@@ -205,22 +231,27 @@
     .markdown-body ul, .markdown-body ol { padding-left: 1.5rem; margin-bottom: 1.25rem; }
     .markdown-body li { margin-bottom: 0.35rem; line-height: 1.6; }
     .markdown-body strong { color: var(--highlight); }
+
     .markdown-body blockquote {
       border-left: 3px solid var(--accent);
       padding: 0.75rem 1rem; margin: 1.5rem 0;
       color: var(--text-secondary); font-style: italic;
-      background: var(--bg-tertiary); border-radius: 0 8px 8px 0;
+      background: var(--bg-tertiary);
+      border-radius: 0 8px 8px 0;
     }
+
     .markdown-body hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
     .markdown-body ul ul, .markdown-body ol ol,
-    .markdown-body ul ol, .markdown-body ol ul { margin-top: 0.3rem; margin-bottom: 0.3rem; }
+    .markdown-body ul ol,  .markdown-body ol ul { margin-top: 0.3rem; margin-bottom: 0.3rem; }
     .markdown-body li > strong:first-child { color: var(--accent); }
+
     .hljs { background: var(--code-bg) !important; color: var(--text-primary); }
 
     .markdown-body table {
       width: 100%; border-collapse: separate; border-spacing: 0;
       margin: 2.5rem 0; border: 1px solid var(--border);
-      border-radius: 14px; overflow: hidden; background: var(--bg-secondary);
+      border-radius: 14px; overflow: hidden;
+      background: var(--bg-secondary);
     }
     .markdown-body th {
       background: var(--code-header); color: var(--highlight);
@@ -251,8 +282,13 @@
       -webkit-font-smoothing: auto;
     }
     @media (max-width: 640px) { .markdown-body code { font-size: 0.8125rem; } }
-    .markdown-body pre code { white-space: pre; word-wrap: normal; display: block; min-width: fit-content; color: var(--text-primary); }
-    .markdown-body img, .markdown-body video, .markdown-body iframe { max-width: 100%; height: auto; }
+    .markdown-body pre code {
+      white-space: pre; word-wrap: normal; display: block;
+      min-width: fit-content; color: var(--text-primary);
+    }
+    .markdown-body img, .markdown-body video, .markdown-body iframe {
+      max-width: 100%; height: auto;
+    }
     .markdown-body :not(pre) > code {
       background: var(--bg-tertiary); color: var(--accent);
       padding: 0.15em 0.4em; border-radius: 5px;
@@ -267,25 +303,32 @@
     .glass {
       background: var(--header-bg);
       -webkit-backdrop-filter: blur(20px) saturate(180%);
-      backdrop-filter: blur(20px) saturate(180%);
+              backdrop-filter: blur(20px) saturate(180%);
       border-bottom: 1px solid var(--border);
-      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 4px 30px rgba(0,0,0,0.1);
     }
+
     .sidebar-transition {
-      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: transform 0.4s cubic-bezier(0.4,0,0.2,1), width 0.4s cubic-bezier(0.4,0,0.2,1);
+      -webkit-backface-visibility: hidden;
+              backface-visibility: hidden;
+      contain: layout style;
+      will-change: transform;
     }
 
     button:active, .chat-ctrl-btn:active, .message-action-btn:active,
     .sidebar-nav-item:active, .suggestion-chip:active {
       transform: scale(0.96);
-      transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: transform 0.1s cubic-bezier(0.4,0,0.2,1);
     }
 
-    .overflow-y-auto { -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
+    .overflow-y-auto,
+    .overflow-x-auto,
+    .overflow-auto { -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
 
     @keyframes thought-pulse {
       0%, 100% { opacity: 0.3; transform: scale(1); }
-      50% { opacity: 1; transform: scale(1.1); }
+      50%       { opacity: 1;   transform: scale(1.1); }
     }
     .thought-dot { animation: thought-pulse 1.5s infinite ease-in-out; }
 
@@ -293,83 +336,75 @@
 
     html, body, #root { overflow-x: hidden; width: 100%; position: relative; }
 
-    .sidebar-transition {
-      -webkit-backface-visibility: hidden; backface-visibility: hidden;
-      contain: layout style;
-    }
-
     button, a, [role="button"], input, textarea, select {
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
     }
 
-    .sidebar-transition { will-change: transform; }
-    .overflow-y-auto, .overflow-x-auto, .overflow-auto { -webkit-overflow-scrolling: touch; }
-
     .gap-12 > div { content-visibility: auto; contain-intrinsic-size: auto 120px; }
 
     header.glass { min-height: 56px; }
     @media (min-width: 640px) { header.glass { min-height: 64px; } }
-
-    .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
-    .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
   </style>
 
-<script type="importmap">
-{
-  "imports": {
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.39.0",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "remark-gfm": "https://esm.sh/remark-gfm@^4.0.1",
-    "react-markdown": "https://esm.sh/react-markdown@^10.1.0",
-    "@stripe/stripe-js": "https://esm.sh/@stripe/stripe-js@^3.0.0",
-    "recharts": "https://esm.sh/recharts@^2.12.7",
-    "mammoth": "https://esm.sh/mammoth@^1.6.0",
-    "jszip": "https://esm.sh/jszip@^3.10.1",
-    "xlsx": "https://esm.sh/xlsx@^0.18.5",
-    "pdfjs-dist": "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/+esm",
-    "@/": "./"
+  <script type="importmap">
+  {
+    "imports": {
+      "@google/genai":         "https://esm.sh/@google/genai@^1.34.0",
+      "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.39.0",
+      "react/":                "https://esm.sh/react@^19.2.3/",
+      "react":                 "https://esm.sh/react@^19.2.3",
+      "react-dom/":            "https://esm.sh/react-dom@^19.2.3/",
+      "remark-gfm":            "https://esm.sh/remark-gfm@^4.0.1",
+      "react-markdown":        "https://esm.sh/react-markdown@^10.1.0",
+      "@stripe/stripe-js":     "https://esm.sh/@stripe/stripe-js@^3.0.0",
+      "recharts":              "https://esm.sh/recharts@^2.12.7",
+      "mammoth":               "https://esm.sh/mammoth@^1.6.0",
+      "jszip":                 "https://esm.sh/jszip@^3.10.1",
+      "xlsx":                  "https://esm.sh/xlsx@^0.18.5",
+      "pdfjs-dist":            "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/+esm",
+      "@/":                    "./"
+    }
   }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
+  </script>
+
+  <link rel="stylesheet" href="/index.css">
 </head>
 <body>
   <div id="root"></div>
-<script type="module" src="/index.tsx"></script>
+  <script type="module" src="/index.tsx"></script>
 
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js', { scope: '/' })
-        .then((reg) => {
-          reg.addEventListener('updatefound', () => {
-            const newWorker = reg.installing;
-            if (!newWorker) return;
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                window.dispatchEvent(new CustomEvent('sw-update-ready', { detail: reg }));
-              }
+  <script>
+    /* ── Service Worker ───────────────────────────────── */
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+          .then(reg => {
+            reg.addEventListener('updatefound', () => {
+              const nw = reg.installing;
+              if (!nw) return;
+              nw.addEventListener('statechange', () => {
+                if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                  window.dispatchEvent(new CustomEvent('sw-update-ready', { detail: reg }));
+                }
+              });
             });
-          });
-        })
-        .catch((err) => console.warn('[SW] Registration failed:', err));
+          })
+          .catch(err => console.warn('[SW] Registration failed:', err));
 
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!refreshing) { refreshing = true; window.location.reload(); }
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) { refreshing = true; window.location.reload(); }
+        });
       });
-    });
-  }
+    }
 
-  (function () {
-    const params = new URLSearchParams(window.location.search);
-    const action = params.get('action');
-    if (action) { sessionStorage.setItem('pwa-launch-action', action); }
-  })();
-</script>
+    /* ── PWA shortcut action routing ──────────────────── */
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const action = params.get('action');
+      if (action) sessionStorage.setItem('pwa-launch-action', action);
+    })();
+  </script>
 </body>
 </html>

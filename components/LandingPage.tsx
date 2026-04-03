@@ -65,11 +65,6 @@ const IcoCheck = () => (
     <polyline points="2 8 6 12 14 4"/>
   </svg>
 );
-const IcoX = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-    <line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/>
-  </svg>
-);
 const IcoArrowUp = () => (
   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M10 16V4M4 10l6-6 6 6"/>
@@ -112,15 +107,6 @@ const IcoRocket = () => (
   </svg>
 );
 
-/* ── Logo ──────────────────────────────────────────────────── */
-const LogoMark = ({ size = 30 }: { size?: number }) => (
-  <svg viewBox="0 0 32 32" fill="none" width={size} height={size} aria-hidden="true">
-    <rect width="32" height="32" rx="8" fill="rgba(16,185,129,0.08)" stroke="rgba(16,185,129,0.22)" strokeWidth="1"/>
-    <path d="M21 9.5H13C11.07 9.5 9.5 11.07 9.5 13V14.2C9.5 16.13 11.07 17.7 13 17.7H19C20.93 17.7 22.5 19.27 22.5 21.2V22C22.5 23.93 20.93 25.5 19 25.5H9.5"
-      stroke="#10B981" strokeWidth="2.1" strokeLinecap="round"/>
-  </svg>
-);
-
 /* ── Marquee items ─────────────────────────────────────────── */
 const MARQUEE = [
   'Stop prompting', 'Start executing', 'Live code execution', 'Architecture diagrams',
@@ -132,14 +118,14 @@ const MARQUEE = [
    MAIN COMPONENT
    ══════════════════════════════════════════════════════════════ */
 const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
-  const [theme, setTheme]       = useState<'light' | 'dark'>('dark');
-  const [scrolled, setScrolled] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [theme, setTheme]           = useState<'light' | 'dark'>('dark');
+  const [scrolled, setScrolled]     = useState(false);
+  const [menuOpen, setMenuOpen]     = useState(false);
   const [typedText, setTypedText]   = useState('');
   const [isTyping, setIsTyping]     = useState(true);
   const [promptIdx, setPromptIdx]   = useState(0);
-  const [stats, setStats] = useState({ tokens: 0, latency: 0, artifacts: 0 });
-  const statsDone = useRef(false);
+  const [stats, setStats]           = useState({ tokens: 0, latency: 0, artifacts: 0 });
+  const statsDone                   = useRef(false);
 
   const PROMPTS = [
     'Build me a real-time analytics dashboard',
@@ -150,6 +136,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
     'Create a dark-mode component library in React',
   ];
 
+  /* ── theme init ─────────────────────────────────────────── */
   useEffect(() => {
     const saved = localStorage.getItem('sedrex_theme') as 'light' | 'dark' | null;
     const sys   = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -162,17 +149,20 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
     localStorage.setItem('sedrex_theme', next);
   };
 
+  /* ── scroll ─────────────────────────────────────────────── */
   useEffect(() => {
     const h = () => setScrolled(window.scrollY > 24);
     window.addEventListener('scroll', h, { passive: true });
     return () => window.removeEventListener('scroll', h);
   }, []);
 
+  /* ── body lock when mobile menu open ────────────────────── */
   useEffect(() => {
     document.body.style.overflow = menuOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [menuOpen]);
 
+  /* ── typewriter ─────────────────────────────────────────── */
   useEffect(() => {
     const prompt = PROMPTS[promptIdx];
     let i = 0;
@@ -189,6 +179,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
     return () => clearInterval(t);
   }, [promptIdx]);
 
+  /* ── scroll reveal ──────────────────────────────────────── */
   useEffect(() => {
     const obs = new IntersectionObserver(entries => {
       entries.forEach(e => {
@@ -205,6 +196,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
     return () => obs.disconnect();
   }, []);
 
+  /* ── cursor radial on caps ──────────────────────────────── */
   useEffect(() => {
     const h = (e: MouseEvent) => {
       document.querySelectorAll<HTMLElement>('.lp-cap').forEach(cap => {
@@ -218,7 +210,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
   }, []);
 
   const animateStats = () => {
-    const dur = 1800;
+    const dur   = 1800;
     const start = performance.now();
     const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
     const tick = (now: number) => {
@@ -238,19 +230,24 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
   return (
     <div className={`lp ${theme}`} lang="en">
 
-      {/* ── NAV ──────────────────────────────────────────────── */}
+      {/* ══════════════════════════════════════════════════════
+          NAV
+          ══════════════════════════════════════════════════════ */}
       <nav className={`lp-nav${scrolled ? ' lp-nav--scrolled' : ''}`} role="navigation" aria-label="Main navigation">
         <div className="lp-nav-inner">
+
           <button type="button" className="lp-nav-logo" onClick={onOpenAuth} aria-label="Go to Sedrex home">
-            <LogoMark />
+            <img src="/sedrex-logo.svg" alt="Sedrex" width={30} height={30} style={{ borderRadius: 6 }} />
             <span className="lp-nav-logo-name">Sedrex</span>
           </button>
+
           <div className="lp-nav-links" role="list">
             <a href="#capabilities" className="lp-nav-link" role="listitem">Capabilities</a>
             <a href="#how-it-works" className="lp-nav-link" role="listitem">How it works</a>
             <a href="#who-its-for"  className="lp-nav-link" role="listitem">Who it's for</a>
             <Link to="/pricing"     className="lp-nav-link" role="listitem">Pricing</Link>
           </div>
+
           <div className="lp-nav-right">
             <button type="button" className="lp-nav-theme" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
               {theme === 'dark' ? <IcoSun /> : <IcoMoon />}
@@ -279,7 +276,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
       {menuOpen && <div className="lp-drawer-overlay" onClick={closeMenu} aria-hidden="true" />}
 
       {/* ══════════════════════════════════════════════════════
-          HERO — UPDATED COPY
+          HERO
           ══════════════════════════════════════════════════════ */}
       <section className="lp-hero" aria-label="Hero">
         <div className="lp-hero-ambient" aria-hidden="true" />
@@ -288,19 +285,16 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
         <div className="lp-hero-inner">
           <div className="lp-hero-left">
 
-            {/* Eyebrow */}
             <div className="lp-hero-eyebrow">
               <span className="lp-eyebrow-dot" aria-hidden="true" />
               Multi-model AI · Built for people who ship
             </div>
 
-            {/* ── MAIN HOOK ─────────────────────────────────── */}
             <h1 className="lp-hero-h1">
               Stop prompting.<br />
               <em className="lp-hero-em">Start executing.</em>
             </h1>
 
-            {/* ── SUB + SUPPORT ─────────────────────────────── */}
             <p className="lp-hero-sub">
               The multi-model AI built for people who ship.
               <br />
@@ -309,19 +303,31 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
               </span>
             </p>
 
-            {/* Prompt bar */}
             <div className="lp-hero-bar-wrap">
-              <div className="lp-hero-bar" onClick={onOpenAuth} role="button" tabIndex={0}
-                onKeyDown={e => e.key === 'Enter' && onOpenAuth()} aria-label="Start executing">
-                <span className="lp-bar-typed" aria-live="polite">{typedText}<span className={`lp-bar-cursor${isTyping ? ' lp-bar-cursor--blink' : ''}`} aria-hidden="true">|</span></span>
-                <button type="button" className="lp-bar-send" onClick={e => { e.stopPropagation(); onOpenAuth(); }} aria-label="Send">
+              <div
+                className="lp-hero-bar"
+                onClick={onOpenAuth}
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => e.key === 'Enter' && onOpenAuth()}
+                aria-label="Start executing"
+              >
+                <span className="lp-bar-typed" aria-live="polite">
+                  {typedText}
+                  <span className={`lp-bar-cursor${isTyping ? ' lp-bar-cursor--blink' : ''}`} aria-hidden="true">|</span>
+                </span>
+                <button
+                  type="button"
+                  className="lp-bar-send"
+                  onClick={e => { e.stopPropagation(); onOpenAuth(); }}
+                  aria-label="Send"
+                >
                   <IcoArrowUp />
                 </button>
               </div>
               <p className="lp-bar-hint">No prompting guides. No model selection. Just type and execute.</p>
             </div>
 
-            {/* Chips */}
             <div className="lp-hero-chips" role="list" aria-label="Quick actions">
               {['Write code', 'Debug errors', 'Draw diagrams', 'Generate images', 'Research anything'].map(c => (
                 <button type="button" key={c} className="lp-chip" onClick={onOpenAuth} role="listitem">{c}</button>
@@ -330,7 +336,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
 
           </div>
 
-          {/* Product mockup — unchanged */}
+          {/* ── Product mockup ─────────────────────────────── */}
           <div className="lp-hero-mockup" aria-label="Product preview" aria-hidden="true">
             <div className="lp-mock-window">
               <div className="lp-mock-titlebar">
@@ -444,7 +450,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
       </div>
 
       {/* ══════════════════════════════════════════════════════
-          CAPABILITIES — unchanged structure, updated copy
+          CAPABILITIES
           ══════════════════════════════════════════════════════ */}
       <section className="lp-section" id="capabilities" aria-label="Capabilities">
         <div className="lp-wrap">
@@ -456,11 +462,10 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
 
           <div className="lp-caps">
 
-            {/* Code */}
             <div className="lp-cap lp-reveal lp-d1">
               <div className="lp-cap-eyebrow"><span>01</span><div className="lp-cap-line" />Code Execution</div>
               <div className="lp-cap-icon"><IcoCode /></div>
-              <div className="lp-cap-title">No more <code style={{fontSize:'0.85em', background:'rgba(16,185,129,0.12)', padding:'1px 6px', borderRadius:4, color:'#10B981'}}>// TODO</code></div>
+              <div className="lp-cap-title">No more <code style={{fontSize:'0.85em',background:'rgba(16,185,129,0.12)',padding:'1px 6px',borderRadius:4,color:'#10B981'}}>// TODO</code></div>
               <div className="lp-cap-desc">Tired of AI giving you snippets? Sedrex delivers the full file. Every line. Every time. Code runs immediately with a live preview — no copy-pasting into a terminal.</div>
               <div className="lp-cap-preview">
                 <div className="lp-preview-bar">
@@ -479,7 +484,6 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
               </div>
             </div>
 
-            {/* Diagrams */}
             <div className="lp-cap lp-reveal lp-d2">
               <div className="lp-cap-eyebrow"><span>02</span><div className="lp-cap-line" />Diagram Generation</div>
               <div className="lp-cap-icon"><IcoDiagram /></div>
@@ -507,7 +511,6 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
               </div>
             </div>
 
-            {/* Images */}
             <div className="lp-cap lp-reveal lp-d3">
               <div className="lp-cap-eyebrow"><span>03</span><div className="lp-cap-line" />Image Generation</div>
               <div className="lp-cap-icon"><IcoImage /></div>
@@ -526,7 +529,6 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
               </div>
             </div>
 
-            {/* Reasoning */}
             <div className="lp-cap lp-reveal lp-d4">
               <div className="lp-cap-eyebrow"><span>04</span><div className="lp-cap-line" />Deep Reasoning</div>
               <div className="lp-cap-icon"><IcoBrain /></div>
@@ -539,11 +541,11 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
                 </div>
                 <div className="lp-rchain">
                   {[
-                    { label: 'Intent parsing',    s: 'done'   },
-                    { label: 'Context retrieval', s: 'done'   },
-                    { label: 'Deep reasoning',    s: 'active', badge: 'Live' },
-                    { label: 'Cross-verification',s: 'wait'   },
-                    { label: 'Output synthesis',  s: 'wait'   },
+                    { label: 'Intent parsing',     s: 'done'   },
+                    { label: 'Context retrieval',  s: 'done'   },
+                    { label: 'Deep reasoning',     s: 'active', badge: 'Live' },
+                    { label: 'Cross-verification', s: 'wait'   },
+                    { label: 'Output synthesis',   s: 'wait'   },
                   ].map((r, i) => (
                     <div key={i} className={`lp-rstep lp-rstep--${r.s}`}>
                       <div className="lp-rdot" aria-hidden="true" />
@@ -556,7 +558,6 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
               </div>
             </div>
 
-            {/* Live Search */}
             <div className="lp-cap lp-reveal lp-d5">
               <div className="lp-cap-eyebrow"><span>05</span><div className="lp-cap-line" />Live Search</div>
               <div className="lp-cap-icon"><IcoSearch /></div>
@@ -579,7 +580,6 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
               </div>
             </div>
 
-            {/* Security */}
             <div className="lp-cap lp-reveal lp-d6">
               <div className="lp-cap-eyebrow"><span>06</span><div className="lp-cap-line" />Enterprise Security</div>
               <div className="lp-cap-icon"><IcoShield /></div>
@@ -606,7 +606,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
       </section>
 
       {/* ══════════════════════════════════════════════════════
-          HOW IT WORKS — updated copy
+          HOW IT WORKS
           ══════════════════════════════════════════════════════ */}
       <section className="lp-how" id="how-it-works" aria-label="How it works">
         <div className="lp-wrap">
@@ -619,20 +619,20 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
               {
                 n: '01', icon: <IcoZap />,
                 title: 'Just say what you need',
-                desc: 'No prompting guides. No model selection menus. No configuration. Type what you want to build — Sedrex figures out the rest before you finish the sentence.',
-                detail: 'Intent detection · Complexity scoring · Smart routing',
+                desc:  'No prompting guides. No model selection menus. No configuration. Type what you want to build — Sedrex figures out the rest before you finish the sentence.',
+                detail:'Intent detection · Complexity scoring · Smart routing',
               },
               {
                 n: '02', icon: <IcoBrain />,
                 title: 'Watch it think and build',
-                desc: 'Sedrex reasons through your request and streams the result back in real time — as working code, a rendered diagram, or a live interface. Not a wall of text.',
-                detail: 'Deep reasoning · Live streaming · Parallel execution',
+                desc:  'Sedrex reasons through your request and streams the result back in real time — as working code, a rendered diagram, or a live interface. Not a wall of text.',
+                detail:'Deep reasoning · Live streaming · Parallel execution',
               },
               {
                 n: '03', icon: <IcoRocket />,
                 title: 'Use it immediately',
-                desc: 'What Sedrex produces is not a suggestion — it runs, it renders, it exports. No placeholders. No truncation. Iterate on it, extend it, or hand it off. Everything in one place.',
-                detail: 'Live preview · Artifact history · One-click export',
+                desc:  'What Sedrex produces is not a suggestion — it runs, it renders, it exports. No placeholders. No truncation. Iterate on it, extend it, or hand it off. Everything in one place.',
+                detail:'Live preview · Artifact history · One-click export',
               },
             ].map((s, i) => (
               <div key={i} className={`lp-step lp-reveal lp-d${i + 1}`}>
@@ -648,7 +648,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
       </section>
 
       {/* ══════════════════════════════════════════════════════
-          WHO IT'S FOR — updated to 3 niches (Founders, Developers, Enterprises)
+          WHO IT'S FOR
           ══════════════════════════════════════════════════════ */}
       <section className="lp-who" id="who-its-for" aria-label="Who it's for">
         <div className="lp-wrap">
@@ -661,26 +661,26 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
               {
                 icon: <IcoRocket />,
                 title: 'Founders',
-                text: 'You shouldn\'t have to be a debugger for your AI. Sedrex goes from your idea to a working product — landing pages, backend logic, pitch decks, competitive research — without switching between twelve tools.',
-                tags: ['Rapid prototyping', 'Full stack build', 'Go-to-market'],
+                text:  "You shouldn't have to be a debugger for your AI. Sedrex goes from your idea to a working product — landing pages, backend logic, pitch decks, competitive research — without switching between twelve tools.",
+                tags:  ['Rapid prototyping', 'Full stack build', 'Go-to-market'],
               },
               {
                 icon: <IcoCode />,
                 title: 'Developers',
-                text: 'Tired of // TODO and half-baked code? Sedrex delivers the full file. Every line. Write, debug, draw architecture, and generate docs — in one workspace that remembers your context.',
-                tags: ['Full file output', 'Debug & fix', 'System design'],
+                text:  'Tired of // TODO and half-baked code? Sedrex delivers the full file. Every line. Write, debug, draw architecture, and generate docs — in one workspace that remembers your context.',
+                tags:  ['Full file output', 'Debug & fix', 'System design'],
               },
               {
                 icon: <IcoBarChart />,
                 title: 'Professionals',
-                text: 'Upload raw data, get instant analysis, executable Python, and charts you can actually read. Produce reports, presentations, and research without context-switching or re-uploading anything.',
-                tags: ['Data analysis', 'Research', 'Instant reports'],
+                text:  'Upload raw data, get instant analysis, executable Python, and charts you can actually read. Produce reports, presentations, and research without context-switching or re-uploading anything.',
+                tags:  ['Data analysis', 'Research', 'Instant reports'],
               },
               {
                 icon: <IcoShield />,
                 title: 'Enterprises',
-                text: 'SSO, audit logs, and role controls — built in, not bolted on. AI that scales across your organisation without trading security for convenience.',
-                tags: ['SSO & RBAC', 'Audit trails', 'Data privacy'],
+                text:  'SSO, audit logs, and role controls — built in, not bolted on. AI that scales across your organisation without trading security for convenience.',
+                tags:  ['SSO & RBAC', 'Audit trails', 'Data privacy'],
               },
             ].map((u, i) => (
               <div key={i} className={`lp-who-card lp-reveal lp-d${i + 1}`}>
@@ -697,7 +697,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
       </section>
 
       {/* ══════════════════════════════════════════════════════
-          CTA — updated copy
+          CTA
           ══════════════════════════════════════════════════════ */}
       <section className="lp-cta" aria-label="Call to action">
         <div className="lp-cta-glow" aria-hidden="true" />
@@ -713,12 +713,9 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
             </p>
             <div className="lp-cta-btns">
               <button type="button" className="lp-btn-primary" onClick={onOpenAuth}>
-                Start executing free
-                <span aria-hidden="true">→</span>
+                Start executing free <span aria-hidden="true">→</span>
               </button>
-              <Link to="/pricing" className="lp-btn-secondary">
-                View pricing
-              </Link>
+              <Link to="/pricing" className="lp-btn-secondary">View pricing</Link>
             </div>
             <p className="lp-cta-note">
               <span>Free to start</span>
@@ -731,28 +728,53 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
         </div>
       </section>
 
-      {/* ── Footer — unchanged ──────────────────────────────── */}
+      {/* ══════════════════════════════════════════════════════
+          FOOTER
+          ══════════════════════════════════════════════════════ */}
       <footer className="lp-footer" role="contentinfo">
         <div className="lp-wrap">
           <div className="lp-footer-grid">
+
             <div className="lp-footer-brand">
               <div className="lp-footer-logo">
-                <LogoMark size={26} />
+                <img src="/sedrex-logo.svg" alt="Sedrex" width={26} height={26} style={{ borderRadius: 5 }} />
                 <span className="lp-footer-logo-name">Sedrex</span>
               </div>
               <p className="lp-footer-tagline">Stop prompting. Start executing. The workspace where what you say becomes something you can ship.</p>
+
               <div className="lp-footer-socials">
-                <a href="https://twitter.com/sedrexai" className="lp-social" aria-label="Twitter / X" rel="noopener noreferrer" target="_blank">
-                  <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.253 5.622L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z"/></svg>
+
+                {/* X / Twitter */}
+                <a href="https://x.com/Sedrexai" className="lp-social" aria-label="X / Twitter" rel="noopener noreferrer" target="_blank">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.253 5.622L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z"/>
+                  </svg>
                 </a>
-                <a href="https://github.com/sedrexai" className="lp-social" aria-label="GitHub" rel="noopener noreferrer" target="_blank">
-                  <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/></svg>
+
+                {/* LinkedIn */}
+                <a href="https://www.linkedin.com/company/sedrexai/" className="lp-social" aria-label="LinkedIn" rel="noopener noreferrer" target="_blank">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                  </svg>
                 </a>
-                <a href="https://linkedin.com/company/sedrexai" className="lp-social" aria-label="LinkedIn" rel="noopener noreferrer" target="_blank">
-                  <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+
+                {/* Instagram */}
+                <a href="https://www.instagram.com/sedrex.ai/" className="lp-social" aria-label="Instagram" rel="noopener noreferrer" target="_blank">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                  </svg>
                 </a>
+
+                {/* Threads */}
+                <a href="https://www.threads.com/@sedrex.ai" className="lp-social" aria-label="Threads" rel="noopener noreferrer" target="_blank">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+                    <path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.03-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.589 12c.027 3.086.718 5.496 2.057 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.8-2.045 1.647-1.613 1.618-3.593 1.09-4.798-.31-.71-.873-1.3-1.634-1.75-.192 1.352-.622 2.446-1.284 3.272-.886 1.102-2.14 1.704-3.73 1.79-1.202.065-2.361-.218-3.259-.801-1.063-.689-1.685-1.74-1.752-2.964-.065-1.19.408-2.285 1.33-3.082.88-.76 2.119-1.207 3.583-1.291a13.853 13.853 0 0 1 3.02.142c-.126-.742-.375-1.332-.75-1.757-.513-.586-1.312-.883-2.371-.887h-.018c-.837 0-1.54.208-2.094.619-.468.346-.855.87-1.134 1.558l-1.917-.782c.466-1.139 1.101-2.032 1.892-2.657.939-.737 2.146-1.122 3.586-1.126h.023c1.791.007 3.186.538 4.148 1.578.934 1.007 1.42 2.423 1.488 4.213.155.07.308.144.458.223 1.154.62 2.057 1.532 2.61 2.826.825 1.888.871 5.003-1.508 7.446-1.763 1.815-3.957 2.692-6.886 2.712Zm.056-13.967c-.087 0-.175.003-.262.008-1.726.1-2.697.866-2.646 2.062.049 1.101.954 1.758 2.422 1.758.13 0 .261-.007.392-.02 1.344-.14 2.584-.795 2.993-3.602a11.516 11.516 0 0 0-2.9-.206Z"/>
+                  </svg>
+                </a>
+
               </div>
             </div>
+
             <div className="lp-footer-col">
               <div className="lp-footer-col-title">Product</div>
               <a href="#capabilities" className="lp-footer-link">Capabilities</a>
@@ -760,17 +782,21 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
               <a href="#how-it-works" className="lp-footer-link">How it works</a>
               <a href="#who-its-for"  className="lp-footer-link">Who it's for</a>
             </div>
+
             <div className="lp-footer-col">
               <div className="lp-footer-col-title">Company</div>
-              <Link to="/contact"  className="lp-footer-link">Contact</Link>
+              <Link to="/contact" className="lp-footer-link">Contact</Link>
               <a href="mailto:hello@sedrex.ai" className="lp-footer-link">hello@sedrex.ai</a>
             </div>
+
             <div className="lp-footer-col">
               <div className="lp-footer-col-title">Legal</div>
               <Link to="/privacy" className="lp-footer-link">Privacy Policy</Link>
               <Link to="/terms"   className="lp-footer-link">Terms of Service</Link>
             </div>
+
           </div>
+
           <div className="lp-footer-bottom">
             <span>© {new Date().getFullYear()} Sedrex. All rights reserved.</span>
             <span className="lp-footer-made">Stop prompting. Start executing.</span>
