@@ -1,5 +1,5 @@
 ﻿SEDREX AI - FULL SOURCE EXPORT
-Generated: 2026-04-03 11:22:24
+Generated: 2026-04-03 17:15:16
 Total files: 138
 ================================================================================
 
@@ -2830,7 +2830,7 @@ export default AgentRoutingTag;
 
 ================================================================================
 FILE: components\ArtifactCard.tsx
-MODIFIED: 2026-03-25 12:34  SIZE: 7405 bytes
+MODIFIED: 2026-04-03 15:12  SIZE: 7306 bytes
 ================================================================================
 
 // components/ArtifactCard.tsx
@@ -2889,22 +2889,24 @@ const ArtifactCard: React.FC<ArtifactCardProps> = memo(({
   const isDiagram = type === 'diagram' || lang === 'mermaid';
 
   const handleClick = () => {
-    // ── FIX v2.3: ID-ONLY lookup + mobile sidebar close ──────────
-    // v2.2: removed title fallback to fix duplicate artifact bug.
-    // v2.3: on mobile the sidebar z-index (200-300) sits above the
-    //   ArtifactPanel z-index (50), so the panel opened but was hidden
-    //   behind the sidebar. Fix: close the sidebar on mobile before
-    //   opening the panel so the user actually sees the artifact.
     const all = [...getArtifacts(), ...getDiagrams()];
     const artifact = all.find(a => a.id === id);
 
-    // Close sidebar on mobile so ArtifactPanel is visible (z-index fix)
+    // Close sidebar on mobile so ArtifactPanel is visible
     if (window.innerWidth < 1024) {
       window.dispatchEvent(new CustomEvent('sedrex:close-sidebar'));
     }
 
+    // Set active artifact in store
     setActiveArtifact(artifact ? artifact.id : id);
     openPanel();
+
+    // Dispatch custom event as a reliable fallback.
+    // This covers the case where the panel is already mounted but
+    // the Suspense/lazy load cycle caused activeId to be stale.
+    window.dispatchEvent(new CustomEvent('sedrex:open-artifact', {
+      detail: { id: artifact ? artifact.id : id },
+    }));
   };
 
   return (
@@ -3805,12 +3807,13 @@ MODIFIED: 2026-03-28 17:29  SIZE: 16207 bytes
 
 ================================================================================
 FILE: components\ArtifactPanel.tsx
-MODIFIED: 2026-04-03 11:06  SIZE: 59167 bytes
+MODIFIED: 2026-04-03 17:03  SIZE: 69152 bytes
 ================================================================================
 
 import React, {
   useRef, useEffect, useState, useCallback, memo,
 } from 'react';
+import { createPortal } from 'react-dom';
 import {
   useArtifacts, updateArtifact, deleteArtifact, Artifact, loadArtifactContent,
 } from '../services/artifactStore';
@@ -3968,12 +3971,29 @@ interface ExportMenuProps {
 const ExportMenu: React.FC<ExportMenuProps> = ({ artifact, content, onExport }) => {
   const [open,      setOpen]      = useState(false);
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
+  const [dropPos,   setDropPos]   = useState({ top: 0, left: 0 });
+  const btnRef  = useRef<HTMLButtonElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
 
+  // Recompute portal position whenever menu opens
+  useEffect(() => {
+    if (!open || !btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    const dropH = dropRef.current?.offsetHeight ?? 120;
+    setDropPos({
+      top:  Math.max(8, rect.top - dropH - 6),
+      left: Math.max(8, rect.right - 170),
+    });
+  }, [open]);
+
+  // Close on outside click
   useEffect(() => {
     if (!open) return;
     const h = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+      if (
+        dropRef.current && !dropRef.current.contains(e.target as Node) &&
+        btnRef.current  && !btnRef.current.contains(e.target as Node)
+      ) setOpen(false);
     };
     const t = setTimeout(() => document.addEventListener('mousedown', h), 10);
     return () => { clearTimeout(t); document.removeEventListener('mousedown', h); };
@@ -3986,14 +4006,41 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ artifact, content, onExport }) 
   };
 
   const items: { id: ExportFormat; label: string; icon: string }[] = [
-    { id: 'source', label: 'Source file', icon: '📄' },
+    { id: 'source', label: 'Source file',    icon: '📄' },
     { id: 'pdf',    label: 'Export as PDF',  icon: '📕' },
     { id: 'docx',   label: 'Export as DOCX', icon: '📘' },
   ];
 
+  // Portal renders into document.body — escapes ap-code-viewer overflow:hidden
+  const dropdown = open ? createPortal(
+    <div ref={dropRef} style={{
+      position: 'fixed', top: dropPos.top, left: dropPos.left,
+      background: 'var(--bg-secondary, #0d1117)',
+      border: '1px solid var(--border, rgba(255,255,255,0.12))',
+      borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+      minWidth: 170, zIndex: 99999, overflow: 'hidden',
+    }}>
+      {items.map(it => (
+        <button key={it.id} onClick={() => handle(it.id)} style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          width: '100%', padding: '9px 14px', border: 'none',
+          background: 'transparent', color: 'var(--text-primary)',
+          cursor: 'pointer', fontSize: 13, textAlign: 'left',
+        }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(16,185,129,0.08)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+        >
+          <span style={{ fontSize: 14 }}>{it.icon}</span>{it.label}
+        </button>
+      ))}
+    </div>,
+    document.body,
+  ) : null;
+
   return (
-    <div ref={wrapRef} style={{ position: 'relative', display: 'inline-flex' }}>
+    <>
       <button
+        ref={btnRef}
         className="ap-action-btn"
         onClick={() => setOpen(v => !v)}
         disabled={!!exporting}
@@ -4004,30 +4051,8 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ artifact, content, onExport }) 
           : <Icons.Download className="icon-12" />}
         <span>{exporting ? 'Exporting…' : 'Export ▾'}</span>
       </button>
-      {open && (
-        <div style={{
-          position: 'absolute', bottom: 'calc(100% + 6px)', right: 0,
-          background: 'var(--bg-secondary, #0d1117)',
-          border: '1px solid var(--border, rgba(255,255,255,0.12))',
-          borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-          minWidth: 170, zIndex: 999, overflow: 'hidden',
-        }}>
-          {items.map(it => (
-            <button key={it.id} onClick={() => handle(it.id)} style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              width: '100%', padding: '9px 14px', border: 'none',
-              background: 'transparent', color: 'var(--text-primary)',
-              cursor: 'pointer', fontSize: 13, textAlign: 'left',
-            }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(16,185,129,0.08)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-            >
-              <span style={{ fontSize: 14 }}>{it.icon}</span>{it.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+      {dropdown}
+    </>
   );
 };
 
@@ -4101,32 +4126,160 @@ const _cw=console.warn;console.warn=(...a)=>{if(typeof a[0]==='string'&&a[0].inc
 
   // JSX/TSX — Babel (FIXED: was crashing all React previews due to duplicate const Root=)
   if (lang === 'jsx' || lang === 'tsx') {
-    // Strip TypeScript-only constructs and import/export for browser execution
+    // ── Extract default export name ───────────────────────────────
+    // Babel wraps all code in an IIFE so `const Foo = () => ...` never
+    // reaches window. We capture the export name here and register it
+    // to window INSIDE the Babel script (same IIFE scope).
+    // Handle both `export default Name` and `export default function Name()`
+    const _exportMatch = content.match(/export\s+default\s+(?:function\s+|class\s+)?(\w+)/);
+    // Reject JS keywords that can't be component names
+    const _jsKeywords = new Set(['function','class','const','let','var','async','abstract']);
+    const _exportedName = (_exportMatch && !_jsKeywords.has(_exportMatch[1])) ? _exportMatch[1] : null;
+
+    // ── Shims as TS string vars ───────────────────────────────────
+    // Embedding complex JS directly inside a template literal causes
+    // Babel to throw "Missing semicolon" when parsing ArtifactPanel.tsx.
+    // Building them as plain TS string concatenation avoids this.
+    const _framerShim = '(function(){'
+      + 'var M=window.Motion||window.FramerMotion||{};'
+      + 'var keys=["motion","AnimatePresence","useAnimation","useMotionValue",'
+      + '"useTransform","useSpring","useCycle","useInView","useScroll",'
+      + '"useVelocity","useReducedMotion","animate","stagger",'
+      + '"MotionConfig","LazyMotion","domAnimation","useMotionValueEvent"];'
+      + 'keys.forEach(function(n){if(M[n]!==undefined)window[n]=M[n];});'
+      + 'if(!window.motion){'
+      + 'function _m(tag){return function(p){'
+      + 'var q={};Object.keys(p||{}).forEach(function(k){'
+      + 'if(!/^(initial|animate|exit|transition|variants|whileHover|whileTap|'
+      + 'whileFocus|whileInView|layout|layoutId|drag|dragConstraints|viewport|'
+      + 'onAnimationStart|onAnimationComplete)$/.test(k))q[k]=p[k];});'
+      + 'return React.createElement(tag,q,p&&p.children);};};'
+      + 'var mo={};'
+      + '["div","span","section","article","header","footer","main",'
+      + '"nav","aside","ul","li","ol","p","h1","h2","h3","h4",'
+      + '"h5","h6","a","button","img","form","input","label",'
+      + '"svg","path","circle","rect","g"].forEach(function(t){mo[t]=_m(t);});'
+      + 'window.motion=mo;}'
+      + 'if(!window.AnimatePresence)window.AnimatePresence=function(p){return p&&p.children||null;};'
+      + 'if(!window.useAnimation)window.useAnimation=function(){return{start:function(){},stop:function(){}};};'
+      + 'if(!window.useMotionValue)window.useMotionValue=function(v){return{get:function(){return v;},set:function(){}};};'
+      + 'if(!window.useScroll)window.useScroll=function(){return{scrollY:{get:function(){return 0;},onChange:function(){}},scrollYProgress:{get:function(){return 0;}}};};'
+      + 'if(!window.useInView)window.useInView=function(){return[null,true];};'
+      + 'if(!window.useTransform)window.useTransform=function(v,i,o){return{get:function(){return o[0];}};};'
+      + '})();';
+
+    // lucide UMD exposes icons as direct PascalCase keys on window.lucide
+    // (NOT on window.lucide.icons which doesn't exist in current builds)
+    // lucide shim: 3-tier approach
+    // Tier 1: lucide-react UMD (window.LucideReact) — ready-made React components
+    // Tier 2: vanilla lucide UMD (window.lucide) — reconstruct from SVG data
+    // Tier 3: stub fallback — generic SVG box for any icon not found
+    const _lucideShim = '(function(){'
+      + 'function _icon(sz,cl,sw,cm,children){'
+      + 'return React.createElement("svg",{'
+      + 'xmlns:"http://www.w3.org/2000/svg",width:sz,height:sz,'
+      + 'viewBox:"0 0 24 24",fill:"none",stroke:cl,'
+      + 'strokeWidth:sw,strokeLinecap:"round",strokeLinejoin:"round",className:cm'
+      + '},children);}'
+      + 'function _mkIcon(children){'
+      + 'return function(props){'
+      + 'var sz=(props&&props.size)||24,cl=(props&&props.color)||"currentColor",'
+      + 'sw=(props&&props.strokeWidth)||2,cm=(props&&props.className)||"";'
+      + 'return _icon(sz,cl,sw,cm,children);};}'
+      // Tier 1: lucide-react UMD exposes React components directly
+      + 'var LR=window.LucideReact||{};'
+      + 'Object.keys(LR).forEach(function(n){'
+      + 'if(/^[A-Z]/.test(n)&&typeof LR[n]==="function"&&!window[n])window[n]=LR[n];});'
+      // Tier 2: vanilla lucide UMD — data arrays → React SVG components
+      + 'var LL=window.lucide||{};'
+      + 'if(LL.icons){Object.keys(LL.icons).forEach(function(k){'
+      + 'var PK=k.split("-").map(function(p){return p[0].toUpperCase()+p.slice(1);}).join("");'
+      + 'if(window[PK])return;'
+      + 'var d=LL.icons[k];'
+      + 'if(Array.isArray(d))window[PK]=_mkIcon(d.map(function(c,i){return React.createElement(c[0],Object.assign({key:i},c[1]||{}));}));'
+      + '});}'
+      // Tier 3: stub fallback for 80+ common icon names not yet defined
+      + 'var _stub=_mkIcon([React.createElement("rect",{x:3,y:3,width:18,height:18,rx:2})]);'
+      + '["ShoppingBag","ShoppingCart","Menu","X","ArrowRight","ArrowLeft","ArrowUp","ArrowDown",'
+      + '"Instagram","Twitter","Facebook","Github","Youtube","Linkedin",'
+      + '"ChevronRight","ChevronLeft","ChevronDown","ChevronUp",'
+      + '"Search","User","Users","Heart","Star","Home","Settings","Bell",'
+      + '"Plus","Minus","Check","Edit","Trash","Trash2","Download","Upload",'
+      + '"Share","Share2","Copy","Mail","Phone","MapPin","Map","Calendar",'
+      + '"Clock","Tag","Filter","Grid","List","Eye","EyeOff","Lock","Unlock",'
+      + '"Info","AlertCircle","XCircle","CheckCircle","AlertTriangle",'
+      + '"Loader","Loader2","RefreshCw","RotateCw","ZoomIn","ZoomOut",'
+      + '"Maximize","Minimize","Moon","Sun","Wifi","Battery","Bluetooth",'
+      + '"Camera","Image","Video","Music","Play","Pause","Square",'
+      + '"Volume","Volume2","VolumeX","Mic","MicOff","Send","MessageCircle",'
+      + '"Globe","Link","ExternalLink","Bookmark","Flag","Award","Gift",'
+      + '"Package","Box","Layers","Layout","Sidebar","Columns",'
+      + '"BarChart","BarChart2","LineChart","PieChart","TrendingUp","TrendingDown",'
+      + '"DollarSign","CreditCard","Wallet","Percent","Hash","AtSign",'
+      + '"Code","Code2","Terminal","Database","Server","Cloud","Cpu","Monitor",'
+      + '"Smartphone","Tablet","Laptop","Printer","Headphones","Speaker","Zap",'
+      + '"Activity","Target","Anchor","Aperture","Archive","Book","Briefcase",'
+      + '"Compass","Crop","Disc","Feather","Folder","FolderOpen","HelpCircle",'
+      + '"Key","Layers","Leaf","LogIn","LogOut","Navigation","Paperclip",'
+      + '"Power","Radio","Save","Scissors","Shield","ShieldCheck","Sliders",'
+      + '"Smile","Sunset","Sunrise","Thermometer","ToggleLeft","ToggleRight",'
+      + '"Tool","Truck","Umbrella","Watch","Wind","XSquare","CheckSquare",'
+      + '"Circle","Triangle","Hexagon","Octagon","Pentagon"].forEach(function(n){'
+      + 'if(!window[n])window[n]=_stub;});'
+      + '})();'
+
+    // ── Strip imports/exports for browser execution ───────────────
     const clean = content
       .replace(/^export\s+default\s+(\w+)\s*;?\s*$/gm, '/* exported: $1 */')
       .replace(/^export\s+default\s+/gm, '')
       .replace(/^export\s+(const|let|var|function|class)\s+/gm, '$1 ')
       .replace(/^export\s*\{[^}]*\}\s*;?\s*$/gm, '')
-      .replace(/^import\s+type\s+.*$/gm, '')
-      .replace(/^import\s+.*from\s+['"][^'"]+['"]\s*;?\s*$/gm, '')
-      .replace(/^import\s+['"][^'"]+['"]\s*;?\s*$/gm, '');
+      // FIX: strip multiline imports — old /.* regex misses framer-motion,
+      // lucide-react etc which span multiple lines
+      .replace(/import\s+(?:type\s+)?\{[\s\S]*?\}\s*from\s*['"][^'"]+['"]\s*;?/g, '')
+      .replace(/import\s+\*\s+as\s+\w+\s+from\s*['"][^'"]+['"]\s*;?/g, '')
+      .replace(/import\s+\w+\s*,\s*\{[\s\S]*?\}\s*from\s*['"][^'"]+['"]\s*;?/g, '')
+      .replace(/import\s+\w+\s+from\s*['"][^'"]+['"]\s*;?/g, '')
+      .replace(/import\s+['"][^'"]+['"]\s*;?/g, '');
 
-    // Component name extractor — runs AFTER babel transpiles the clean code
-    // CRITICAL FIX: The old code had `${clean}const Root=const _names=` which is
-    // a JavaScript syntax error causing every React preview to silently crash.
-    // Fix: use a separate script tag for the root-finder so it runs after Babel.
+    // ── rootFinderScript ──────────────────────────────────────────
+    // Runs AFTER Babel compiles the user code.
+    // Priority: window.__sx_default (registered from IIFE) first,
+    // then well-known names, then any uppercase function returning JSX.
     const rootFinderScript = `
-const _pref=['App','Component','Dashboard','Page','Main','Home','Index','Root',
-  'Portfolio','Landing','Layout','Screen','View','Widget','Hero','Profile','Showcase',
-  'Form','Modal','Card','Table','List','Grid','Chart','Map','Player','Editor'];
-const _names=Object.keys(window).filter(n=>/^[A-Z]/.test(n)&&typeof window[n]==='function'&&window[n].toString().includes('return'));
-const _Root=_pref.map(n=>window[n]).find(Boolean)||(_names.length?window[_names[0]]:null);
-if(_Root){
-  try{ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(_Root));}
-  catch(e){document.getElementById('root').innerHTML='<div class="sx-err">Render error: '+e.message+'</div>';}
-}else{
-  document.getElementById('root').innerHTML='<div class="sx-err" style="padding:20px"><strong>No component found to render.</strong><br/><br/>Sedrex looked for: App, Component, Dashboard, Page, Layout, and more.<br/><br/>Make sure your component function starts with a capital letter.</div>';
-}`;
+(function(){
+  // window.__sx_default: set from inside Babel IIFE right after user code.
+  // This is the most reliable registration — in the same scope as the component.
+  var _Root = window.__sx_default || null;
+
+  // Fallback: scan only well-known component names (NO generic window scan —
+  // that was accidentally picking up Tailwind/lucide/framer CDN functions).
+  if (!_Root) {
+    var _pref=['App','Component','Counter','Dashboard','Page','Main','Home',
+      'Index','Root','Portfolio','Landing','Layout','Screen','View','Widget',
+      'Hero','Profile','Showcase','Form','Modal','Card','Table','Grid','Chart'];
+    for(var _i=0;_i<_pref.length;_i++){
+      var _c=window[_pref[_i]];
+      if(typeof _c==='function'&&!_c.toString().includes('[native code]')){
+        _Root=_c;break;
+      }
+    }
+  }
+
+  var _el=document.getElementById('root');
+  if(_Root){
+    try{
+      ReactDOM.createRoot(_el).render(React.createElement(_Root));
+    }catch(e){
+      _el.innerHTML='<div class="sx-err">Render error: '+e.message+'</div>';
+    }
+  }else{
+    _el.innerHTML='<div class="sx-err" style="padding:20px;font-family:monospace">'
+      +'<strong>No component found to render.</strong><br/><br/>'
+      +'Sedrex looked for: <em>App, Component, Counter, Dashboard, Page</em> and more.<br/><br/>'
+      +'Make sure your component has a capital letter name and uses: <code>export default YourName</code></div>';
+  }
+})();`
 
     return `<!DOCTYPE html>
 <html>
@@ -4137,40 +4290,40 @@ if(_Root){
 <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script>
-// Safe localStorage shim for sandboxed iframes
 try{localStorage.setItem('_sx','1');localStorage.removeItem('_sx');}
 catch(e){Object.defineProperty(window,'localStorage',{value:{_d:{},setItem(k,v){this._d[k]=v},getItem(k){return this._d[k]??null},removeItem(k){delete this._d[k]},clear(){this._d={}}}});}
 </script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/framer-motion@11/dist/framer-motion.js"></script>
+<script src="https://unpkg.com/lucide-react/dist/umd/lucide-react.min.js"></script>
 <script>
-// Suppress CDN-only warnings that pollute the host DevTools console
 const _cw=console.warn;console.warn=(...a)=>{if(typeof a[0]==='string'&&(a[0].includes('cdn.tailwindcss.com')||a[0].includes('should not be used in production')))return;_cw(...a);};
 </script>
+<script>${_framerShim}</script>
+<script>${_lucideShim}</script>
 ${base}
 <style>
-body{padding:16px}
-.sx-loading{display:flex;align-items:center;justify-content:center;height:60px;color:rgba(16,185,129,.7);font-family:monospace;font-size:13px;gap:8px}
+body{padding:0;margin:0}
+.sx-loading{display:flex;align-items:center;justify-content:center;height:80px;color:rgba(16,185,129,.7);font-family:monospace;font-size:13px;gap:8px}
 </style>
 </head>
 <body>
-<div id="root"><div class="sx-loading">⚡ Rendering component…</div></div>
+<div id="root"><div class="sx-loading">⚡ Rendering…</div></div>
 <script>
-// Global error handler — shows friendly error instead of blank screen
 window.onerror=function(msg,src,line,col,err){
   document.getElementById('root').innerHTML=
     '<div class="sx-err"><strong>Runtime Error</strong><br/>'+msg+
-    (err&&err.stack?'<br/><br/><small style="opacity:.6">'+err.stack.split('\\n').slice(0,3).join('<br/>')+'</small>':'')+'</div>';
+    (err&&err.stack?'<br/><small style="opacity:.6">'+err.stack.split('\\n').slice(0,3).join('<br/>')+'</small>':'')+'</div>';
   return true;
 };
 window.addEventListener('unhandledrejection',function(e){
   document.getElementById('root').innerHTML=
-    '<div class="sx-err"><strong>Promise Rejected</strong><br/>'+(e.reason?.message||String(e.reason))+'</div>';
+    '<div class="sx-err"><strong>Unhandled Promise</strong><br/>'+(e.reason?.message||String(e.reason))+'</div>';
 });
 </script>
 <script type="text/babel" data-presets="react,typescript">
 try {
-  // React hooks destructuring — available globally
   const {
     useState, useEffect, useRef, useCallback, useMemo,
     useReducer, useContext, createContext, Fragment, memo,
@@ -4178,8 +4331,12 @@ try {
     useDebugValue, useId, useTransition, useDeferredValue,
   } = React;
 
-  // User code (imports removed, exports flattened)
   ${clean}
+
+  // Register the default export to window so rootFinderScript can find it.
+  // Babel wraps all code in an IIFE — const/let vars don't reach window.
+  // This line executes in the SAME IIFE scope, so it CAN access the component.
+  ${_exportedName ? `try{window.__sx_default=${_exportedName};}catch(_e){}` : ''}
 
 } catch(compileErr) {
   document.getElementById('root').innerHTML=
@@ -4187,9 +4344,6 @@ try {
 }
 </script>
 <script>
-// Root component finder — runs AFTER Babel compiles the component
-// IMPORTANT: This is separate from the Babel script to avoid the
-// "const Root=const _names=" syntax error that was crashing all previews
 ${rootFinderScript}
 </script>
 </body>
@@ -4219,8 +4373,26 @@ ${rootFinderScript}
 
   // Python — Pyodide
   if (lang === 'python' || lang === 'py') {
-    const indented = content.split('\n').map((l: string) => '    ' + l).join('\n');
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8">${base}<script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script></head><body><div class="sx-label">Python Output</div><div class="sx-out" id="out"><span style="color:rgba(16,185,129,.7)">Loading Python runtime (first run ~5s)…</span></div><script>(async()=>{const out=document.getElementById('out');try{const pyodide=await loadPyodide();pyodide.globals.set('__captured__',[]);await pyodide.runPythonAsync(\`import sys,io\nclass _Cap(io.StringIO):\n    def write(self,s):\n        __captured__.append(s)\n        return len(s)\nsys.stdout=_Cap();sys.stderr=_Cap()\ntry:\n${indented}\nexcept Exception as e:\n    import traceback\n    __captured__.append(traceback.format_exc())\`);const lines=pyodide.globals.get('__captured__').toJs();const result=lines.join('');out.innerHTML='';if(result.trim()){result.split('\\n').forEach(line=>{const d=document.createElement('div');d.style.color=line.startsWith('Error')||line.startsWith('Traceback')||line.includes('Error:')?'#f87171':'#e4e8f0';d.textContent=line;out.appendChild(d);});}else{out.innerHTML='<span style="color:rgba(255,255,255,.3);font-style:italic">No output</span>';}}catch(e){out.innerHTML='<div class="sx-err">'+e.message+'</div>';}})();</script></body></html>`;
+    // safeCode: user code JSON-serialized → safe to inject as JS string literal
+    const safeCode = JSON.stringify(content);
+
+    // Python wrapper: redirects stdout via __captured__ list (works on ALL Pyodide versions)
+    // Defined as TS string concatenation — NO backticks → no outer template literal conflict
+    const _pyWrapStr = 'import sys,io\n'
+      + 'class _Cap(io.StringIO):\n'
+      + '    def write(self,s):\n'
+      + '        __captured__.append(s)\n'
+      + '        return len(s)\n'
+      + 'sys.stdout=_Cap();sys.stderr=_Cap()\n'
+      + 'try:\n'
+      + '    exec(_sx_src)\n'
+      + 'except Exception:\n'
+      + '    import traceback\n'
+      + '    __captured__.append(traceback.format_exc())\n';
+    // JSON.stringify → double-quoted JS string literal, safe inside HTML <script>
+    const safeWrap = JSON.stringify(_pyWrapStr);
+
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8">${base}<script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script></head><body><div class="sx-label">Python Output</div><div class="sx-out" id="out"><span style="color:rgba(16,185,129,.7)">Loading Python runtime (first run ~5s)…</span></div><script>(async()=>{const out=document.getElementById('out');try{const pyodide=await loadPyodide();pyodide.globals.set('__captured__',[]);pyodide.globals.set('_sx_src',${safeCode});await pyodide.runPythonAsync(${safeWrap});const _raw=pyodide.globals.get('__captured__');const lines=(_raw&&typeof _raw.toJs==='function')?Array.from(_raw.toJs()):Array.from(_raw||[]);const result=lines.join('');out.innerHTML='';if(result.trim()){result.split('\n').forEach(function(line){const d=document.createElement('div');const isErr=line.includes('Error:')||line.startsWith('Traceback')||line.startsWith('  File');d.style.color=isErr?'#f87171':'#e4e8f0';d.textContent=line;out.appendChild(d);});}else{out.innerHTML='<span style="color:rgba(255,255,255,.3);font-style:italic">No output</span>';}}catch(e){out.innerHTML='<div class="sx-err"><strong>Error</strong><br/>'+e.message+'</div>';}})();</script></body></html>`;
   }
 
   // CSS live preview
@@ -4702,6 +4874,21 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({ onWidthChange }) => {
   const totalCount = artifacts.length + diagrams.length + images.length;
 
   useEffect(() => { if (activeId) setTab('code'); }, [activeId]);
+
+  // Listen for direct open-artifact events from ArtifactCard clicks.
+  // This is a reliable fallback for when Suspense/lazy mounting causes
+  // the store subscription to miss the initial setActiveArtifact call.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { id: string };
+      if (detail?.id) {
+        openArtifact(detail.id);
+        setTab('code');
+      }
+    };
+    window.addEventListener('sedrex:open-artifact', handler);
+    return () => window.removeEventListener('sedrex:open-artifact', handler);
+  }, [openArtifact]);
   useEffect(() => { onWidthChange?.(panelOpen ? width : 0); }, [panelOpen, width, onWidthChange]);
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && panelOpen) { e.preventDefault(); closePanel(); } };
@@ -39295,7 +39482,7 @@ export async function verifyResponse(
 
 ================================================================================
 FILE: services\aiService.ts
-MODIFIED: 2026-04-03 11:06  SIZE: 85070 bytes
+MODIFIED: 2026-04-03 15:13  SIZE: 88032 bytes
 ================================================================================
 
 // src/services/aiService.ts
@@ -41059,23 +41246,95 @@ export const generateFollowUpSuggestions = async (
   } catch { markApiKeyFailure(apiKey); return []; }
 };
 
+// ── Local title fallback ─────────────────────────────────────────
+// Used when the API call fails or returns a generic response.
+// Extracts a meaningful 3-5 word phrase from the user message.
+function _localTitle(msg: string): string {
+  const cleaned = msg
+    .replace(/```[\s\S]*?```/g, '')     // strip code blocks
+    .replace(/[^\w\s]/g, ' ')           // strip punctuation
+    .trim();
+  const stopWords = new Set([
+    'a','an','the','is','are','was','were','be','been','being',
+    'have','has','had','do','does','did','will','would','could',
+    'should','may','might','can','shall','to','of','in','on',
+    'at','by','for','with','about','as','into','i','me','my',
+    'you','your','we','our','it','its','this','that','these',
+    'those','and','but','or','so','yet','nor','not','please',
+    'help','how','what','why','when','where','who','write',
+    'build','create','make','give','show','explain','tell',
+    'generate','develop','design','implement','fix','add',
+    'update','change','modify','get','want','need','like',
+  ]);
+  const words = cleaned.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w.toLowerCase()));
+  if (words.length === 0) return 'New Chat';
+  // Title-case and take up to 5 words
+  return words
+    .slice(0, 5)
+    .map(w => w[0].toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+}
+
 export const generateChatTitle = async (firstMessage: string): Promise<string> => {
-  if (apiKeyPool.length === 0) return "New Session";
+  if (apiKeyPool.length === 0) return _localTitle(firstMessage);
   let apiKey = "";
   try {
     apiKey = getApiKey();
     const ai      = new GoogleGenAI({ apiKey });
-    const trimmed = firstMessage.slice(0, 1_000);
-    const titlePrompt = `Generate a concise, descriptive chat title for this message — exactly like ChatGPT and Claude do it. 4 to 6 words. Title case. No quotes. No period. Make it specific to the topic, not generic.\n\nExamples of good titles:\n- Build React Auth System\n- Fix Navbar Responsive Bug\n- Explain Async Await JavaScript\n- Sort Algorithm TypeScript File\n- Landing Page Hero Section\n\nMessage: "${trimmed}"\n\nTitle:`;
+    const trimmed = firstMessage.slice(0, 800);
+
+    // Strict prompt: enforce format, penalize generic outputs
+    const titlePrompt = [
+      'You are a chat title generator. Generate a SHORT, SPECIFIC title for this conversation.',
+      '',
+      'RULES (all must be followed):',
+      '- 3 to 5 words ONLY. Never more, never less.',
+      '- Title Case (capitalize each word).',
+      '- No quotes, no period, no colon, no emoji.',
+      '- Be SPECIFIC to the topic. Never generic.',
+      '- NEVER output: "New Chat", "Chat", "Conversation", "Question", "Help", "Request".',
+      '',
+      'GOOD examples (study these patterns):',
+      '  "write a python fibonacci script"          → Python Fibonacci Sequence Script',
+      '  "build a react counter component"           → React Counter Component Build',
+      '  "fix the navbar responsive bug"             → Navbar Responsive Bug Fix',
+      '  "explain async await in javascript"         → JavaScript Async Await Explained',
+      '  "create a landing page for my startup"      → Startup Landing Page Design',
+      '  "sort an array and log it"                  → Array Sort And Log',
+      '  "why is my css not working"                 → CSS Debugging And Fix',
+      '  "write a sql query to find duplicates"      → SQL Find Duplicate Records',
+      '',
+      `User message: "${trimmed}"`,
+      '',
+      'Title (3-5 words, Title Case, no punctuation):',
+    ].join('\n');
+
     const response = await ai.models.generateContent({
       model:    MODELS.FLASH,
       contents: [{ role: 'user', parts: [{ text: titlePrompt }] }],
-      config:   { maxOutputTokens: 64, temperature: 0.4 },
+      config:   { maxOutputTokens: 20, temperature: 0.2 },
     });
-    const title = (response.text ?? "").trim().replace(/^Title:\s*/i, "").replace(/['"]/g, "").replace(/\.$/, "") || "New Session";
+
+    const raw = (response.text ?? '').trim();
+    const title = raw
+      .replace(/^Title[:\s]*/i, '')
+      .replace(/['"]/g, '')
+      .replace(/\.$/, '')
+      .replace(/^\s+|\s+$/g, '')
+      .slice(0, 60);
+
+    // Reject generic/empty outputs — fall back to local generator
+    const genericPhrases = ['new chat','new session','chat','conversation',
+      'question','help','request','untitled','unknown','general'];
+    const isGeneric = !title || title.split(' ').length < 2 ||
+      genericPhrases.some(g => title.toLowerCase() === g);
+
     markApiKeySuccess(apiKey);
-    return title;
-  } catch { markApiKeyFailure(apiKey); return "New Session"; }
+    return isGeneric ? _localTitle(firstMessage) : title;
+  } catch {
+    markApiKeyFailure(apiKey);
+    return _localTitle(firstMessage);
+  }
 };
 
 export function decode(base64: string): Uint8Array {

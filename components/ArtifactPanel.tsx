@@ -168,9 +168,10 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ artifact, content, onExport }) 
     if (!open || !btnRef.current) return;
     const rect = btnRef.current.getBoundingClientRect();
     const dropH = dropRef.current?.offsetHeight ?? 120;
-    const top  = rect.top - dropH - 6;   // open upward above button
-    const left = rect.right - 170;        // align to right edge of button
-    setDropPos({ top: Math.max(8, top), left: Math.max(8, left) });
+    setDropPos({
+      top:  Math.max(8, rect.top - dropH - 6),
+      left: Math.max(8, rect.right - 170),
+    });
   }, [open]);
 
   // Close on outside click
@@ -193,23 +194,19 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ artifact, content, onExport }) 
   };
 
   const items: { id: ExportFormat; label: string; icon: string }[] = [
-    { id: 'source', label: 'Source file',     icon: '📄' },
-    { id: 'pdf',    label: 'Export as PDF',   icon: '📕' },
-    { id: 'docx',   label: 'Export as DOCX',  icon: '📘' },
+    { id: 'source', label: 'Source file',    icon: '📄' },
+    { id: 'pdf',    label: 'Export as PDF',  icon: '📕' },
+    { id: 'docx',   label: 'Export as DOCX', icon: '📘' },
   ];
 
+  // Portal renders into document.body — escapes ap-code-viewer overflow:hidden
   const dropdown = open ? createPortal(
     <div ref={dropRef} style={{
-      position: 'fixed',
-      top:  dropPos.top,
-      left: dropPos.left,
+      position: 'fixed', top: dropPos.top, left: dropPos.left,
       background: 'var(--bg-secondary, #0d1117)',
       border: '1px solid var(--border, rgba(255,255,255,0.12))',
-      borderRadius: 10,
-      boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-      minWidth: 170,
-      zIndex: 99999,
-      overflow: 'hidden',
+      borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+      minWidth: 170, zIndex: 99999, overflow: 'hidden',
     }}>
       {items.map(it => (
         <button key={it.id} onClick={() => handle(it.id)} style={{
@@ -317,34 +314,160 @@ const _cw=console.warn;console.warn=(...a)=>{if(typeof a[0]==='string'&&a[0].inc
 
   // JSX/TSX — Babel (FIXED: was crashing all React previews due to duplicate const Root=)
   if (lang === 'jsx' || lang === 'tsx') {
-    // Strip TypeScript-only constructs and import/export for browser execution
+    // ── Extract default export name ───────────────────────────────
+    // Babel wraps all code in an IIFE so `const Foo = () => ...` never
+    // reaches window. We capture the export name here and register it
+    // to window INSIDE the Babel script (same IIFE scope).
+    // Handle both `export default Name` and `export default function Name()`
+    const _exportMatch = content.match(/export\s+default\s+(?:function\s+|class\s+)?(\w+)/);
+    // Reject JS keywords that can't be component names
+    const _jsKeywords = new Set(['function','class','const','let','var','async','abstract']);
+    const _exportedName = (_exportMatch && !_jsKeywords.has(_exportMatch[1])) ? _exportMatch[1] : null;
+
+    // ── Shims as TS string vars ───────────────────────────────────
+    // Embedding complex JS directly inside a template literal causes
+    // Babel to throw "Missing semicolon" when parsing ArtifactPanel.tsx.
+    // Building them as plain TS string concatenation avoids this.
+    const _framerShim = '(function(){'
+      + 'var M=window.Motion||window.FramerMotion||{};'
+      + 'var keys=["motion","AnimatePresence","useAnimation","useMotionValue",'
+      + '"useTransform","useSpring","useCycle","useInView","useScroll",'
+      + '"useVelocity","useReducedMotion","animate","stagger",'
+      + '"MotionConfig","LazyMotion","domAnimation","useMotionValueEvent"];'
+      + 'keys.forEach(function(n){if(M[n]!==undefined)window[n]=M[n];});'
+      + 'if(!window.motion){'
+      + 'function _m(tag){return function(p){'
+      + 'var q={};Object.keys(p||{}).forEach(function(k){'
+      + 'if(!/^(initial|animate|exit|transition|variants|whileHover|whileTap|'
+      + 'whileFocus|whileInView|layout|layoutId|drag|dragConstraints|viewport|'
+      + 'onAnimationStart|onAnimationComplete)$/.test(k))q[k]=p[k];});'
+      + 'return React.createElement(tag,q,p&&p.children);};};'
+      + 'var mo={};'
+      + '["div","span","section","article","header","footer","main",'
+      + '"nav","aside","ul","li","ol","p","h1","h2","h3","h4",'
+      + '"h5","h6","a","button","img","form","input","label",'
+      + '"svg","path","circle","rect","g"].forEach(function(t){mo[t]=_m(t);});'
+      + 'window.motion=mo;}'
+      + 'if(!window.AnimatePresence)window.AnimatePresence=function(p){return p&&p.children||null;};'
+      + 'if(!window.useAnimation)window.useAnimation=function(){return{start:function(){},stop:function(){}};};'
+      + 'if(!window.useMotionValue)window.useMotionValue=function(v){return{get:function(){return v;},set:function(){}};};'
+      + 'if(!window.useScroll)window.useScroll=function(){return{scrollY:{get:function(){return 0;},onChange:function(){}},scrollYProgress:{get:function(){return 0;}}};};'
+      + 'if(!window.useInView)window.useInView=function(){return[null,true];};'
+      + 'if(!window.useTransform)window.useTransform=function(v,i,o){return{get:function(){return o[0];}};};'
+      + '})();';
+
+    // lucide UMD exposes icons as direct PascalCase keys on window.lucide
+    // (NOT on window.lucide.icons which doesn't exist in current builds)
+    // lucide shim: 3-tier approach
+    // Tier 1: lucide-react UMD (window.LucideReact) — ready-made React components
+    // Tier 2: vanilla lucide UMD (window.lucide) — reconstruct from SVG data
+    // Tier 3: stub fallback — generic SVG box for any icon not found
+    const _lucideShim = '(function(){'
+      + 'function _icon(sz,cl,sw,cm,children){'
+      + 'return React.createElement("svg",{'
+      + 'xmlns:"http://www.w3.org/2000/svg",width:sz,height:sz,'
+      + 'viewBox:"0 0 24 24",fill:"none",stroke:cl,'
+      + 'strokeWidth:sw,strokeLinecap:"round",strokeLinejoin:"round",className:cm'
+      + '},children);}'
+      + 'function _mkIcon(children){'
+      + 'return function(props){'
+      + 'var sz=(props&&props.size)||24,cl=(props&&props.color)||"currentColor",'
+      + 'sw=(props&&props.strokeWidth)||2,cm=(props&&props.className)||"";'
+      + 'return _icon(sz,cl,sw,cm,children);};}'
+      // Tier 1: lucide-react UMD exposes React components directly
+      + 'var LR=window.LucideReact||{};'
+      + 'Object.keys(LR).forEach(function(n){'
+      + 'if(/^[A-Z]/.test(n)&&typeof LR[n]==="function"&&!window[n])window[n]=LR[n];});'
+      // Tier 2: vanilla lucide UMD — data arrays → React SVG components
+      + 'var LL=window.lucide||{};'
+      + 'if(LL.icons){Object.keys(LL.icons).forEach(function(k){'
+      + 'var PK=k.split("-").map(function(p){return p[0].toUpperCase()+p.slice(1);}).join("");'
+      + 'if(window[PK])return;'
+      + 'var d=LL.icons[k];'
+      + 'if(Array.isArray(d))window[PK]=_mkIcon(d.map(function(c,i){return React.createElement(c[0],Object.assign({key:i},c[1]||{}));}));'
+      + '});}'
+      // Tier 3: stub fallback for 80+ common icon names not yet defined
+      + 'var _stub=_mkIcon([React.createElement("rect",{x:3,y:3,width:18,height:18,rx:2})]);'
+      + '["ShoppingBag","ShoppingCart","Menu","X","ArrowRight","ArrowLeft","ArrowUp","ArrowDown",'
+      + '"Instagram","Twitter","Facebook","Github","Youtube","Linkedin",'
+      + '"ChevronRight","ChevronLeft","ChevronDown","ChevronUp",'
+      + '"Search","User","Users","Heart","Star","Home","Settings","Bell",'
+      + '"Plus","Minus","Check","Edit","Trash","Trash2","Download","Upload",'
+      + '"Share","Share2","Copy","Mail","Phone","MapPin","Map","Calendar",'
+      + '"Clock","Tag","Filter","Grid","List","Eye","EyeOff","Lock","Unlock",'
+      + '"Info","AlertCircle","XCircle","CheckCircle","AlertTriangle",'
+      + '"Loader","Loader2","RefreshCw","RotateCw","ZoomIn","ZoomOut",'
+      + '"Maximize","Minimize","Moon","Sun","Wifi","Battery","Bluetooth",'
+      + '"Camera","Image","Video","Music","Play","Pause","Square",'
+      + '"Volume","Volume2","VolumeX","Mic","MicOff","Send","MessageCircle",'
+      + '"Globe","Link","ExternalLink","Bookmark","Flag","Award","Gift",'
+      + '"Package","Box","Layers","Layout","Sidebar","Columns",'
+      + '"BarChart","BarChart2","LineChart","PieChart","TrendingUp","TrendingDown",'
+      + '"DollarSign","CreditCard","Wallet","Percent","Hash","AtSign",'
+      + '"Code","Code2","Terminal","Database","Server","Cloud","Cpu","Monitor",'
+      + '"Smartphone","Tablet","Laptop","Printer","Headphones","Speaker","Zap",'
+      + '"Activity","Target","Anchor","Aperture","Archive","Book","Briefcase",'
+      + '"Compass","Crop","Disc","Feather","Folder","FolderOpen","HelpCircle",'
+      + '"Key","Layers","Leaf","LogIn","LogOut","Navigation","Paperclip",'
+      + '"Power","Radio","Save","Scissors","Shield","ShieldCheck","Sliders",'
+      + '"Smile","Sunset","Sunrise","Thermometer","ToggleLeft","ToggleRight",'
+      + '"Tool","Truck","Umbrella","Watch","Wind","XSquare","CheckSquare",'
+      + '"Circle","Triangle","Hexagon","Octagon","Pentagon"].forEach(function(n){'
+      + 'if(!window[n])window[n]=_stub;});'
+      + '})();'
+
+    // ── Strip imports/exports for browser execution ───────────────
     const clean = content
       .replace(/^export\s+default\s+(\w+)\s*;?\s*$/gm, '/* exported: $1 */')
       .replace(/^export\s+default\s+/gm, '')
       .replace(/^export\s+(const|let|var|function|class)\s+/gm, '$1 ')
       .replace(/^export\s*\{[^}]*\}\s*;?\s*$/gm, '')
-      .replace(/^import\s+type\s+.*$/gm, '')
-      .replace(/^import\s+.*from\s+['"][^'"]+['"]\s*;?\s*$/gm, '')
-      .replace(/^import\s+['"][^'"]+['"]\s*;?\s*$/gm, '');
+      // FIX: strip multiline imports — old /.* regex misses framer-motion,
+      // lucide-react etc which span multiple lines
+      .replace(/import\s+(?:type\s+)?\{[\s\S]*?\}\s*from\s*['"][^'"]+['"]\s*;?/g, '')
+      .replace(/import\s+\*\s+as\s+\w+\s+from\s*['"][^'"]+['"]\s*;?/g, '')
+      .replace(/import\s+\w+\s*,\s*\{[\s\S]*?\}\s*from\s*['"][^'"]+['"]\s*;?/g, '')
+      .replace(/import\s+\w+\s+from\s*['"][^'"]+['"]\s*;?/g, '')
+      .replace(/import\s+['"][^'"]+['"]\s*;?/g, '');
 
-    // Component name extractor — runs AFTER babel transpiles the clean code
-    // CRITICAL FIX: The old code had `${clean}const Root=const _names=` which is
-    // a JavaScript syntax error causing every React preview to silently crash.
-    // Fix: use a separate script tag for the root-finder so it runs after Babel.
+    // ── rootFinderScript ──────────────────────────────────────────
+    // Runs AFTER Babel compiles the user code.
+    // Priority: window.__sx_default (registered from IIFE) first,
+    // then well-known names, then any uppercase function returning JSX.
     const rootFinderScript = `
-const _pref=['App','Component','Dashboard','Page','Main','Home','Index','Root',
-  'Portfolio','Landing','Layout','Screen','View','Widget','Hero','Profile','Showcase',
-  'Form','Modal','Card','Table','List','Grid','Chart','Map','Player','Editor'];
-const _names=Object.keys(window).filter(n=>/^[A-Z]/.test(n)&&typeof window[n]==='function'&&!window[n].toString().startsWith('class ')&&window[n].toString().includes('return'));
-const _candidates=[..._pref.map(n=>window[n]).filter(Boolean),..._names.map(n=>window[n])];
-let _Root=null;
-for(const _c of _candidates){try{const _t=React.createElement(_c);if(_t){_Root=_c;break;}}catch(e){continue;}}
-if(_Root){
-  try{ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(_Root));}
-  catch(e){document.getElementById('root').innerHTML='<div class="sx-err">Render error: '+e.message+'</div>';}
-}else{
-  document.getElementById('root').innerHTML='<div class="sx-err" style="padding:20px"><strong>No component found to render.</strong><br/><br/>Sedrex looked for: App, Component, Dashboard, Page, Layout, and more.<br/><br/>Make sure your component function starts with a capital letter.</div>';
-}`;
+(function(){
+  // window.__sx_default: set from inside Babel IIFE right after user code.
+  // This is the most reliable registration — in the same scope as the component.
+  var _Root = window.__sx_default || null;
+
+  // Fallback: scan only well-known component names (NO generic window scan —
+  // that was accidentally picking up Tailwind/lucide/framer CDN functions).
+  if (!_Root) {
+    var _pref=['App','Component','Counter','Dashboard','Page','Main','Home',
+      'Index','Root','Portfolio','Landing','Layout','Screen','View','Widget',
+      'Hero','Profile','Showcase','Form','Modal','Card','Table','Grid','Chart'];
+    for(var _i=0;_i<_pref.length;_i++){
+      var _c=window[_pref[_i]];
+      if(typeof _c==='function'&&!_c.toString().includes('[native code]')){
+        _Root=_c;break;
+      }
+    }
+  }
+
+  var _el=document.getElementById('root');
+  if(_Root){
+    try{
+      ReactDOM.createRoot(_el).render(React.createElement(_Root));
+    }catch(e){
+      _el.innerHTML='<div class="sx-err">Render error: '+e.message+'</div>';
+    }
+  }else{
+    _el.innerHTML='<div class="sx-err" style="padding:20px;font-family:monospace">'
+      +'<strong>No component found to render.</strong><br/><br/>'
+      +'Sedrex looked for: <em>App, Component, Counter, Dashboard, Page</em> and more.<br/><br/>'
+      +'Make sure your component has a capital letter name and uses: <code>export default YourName</code></div>';
+  }
+})();`
 
     return `<!DOCTYPE html>
 <html>
@@ -355,40 +478,40 @@ if(_Root){
 <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script>
-// Safe localStorage shim for sandboxed iframes
 try{localStorage.setItem('_sx','1');localStorage.removeItem('_sx');}
 catch(e){Object.defineProperty(window,'localStorage',{value:{_d:{},setItem(k,v){this._d[k]=v},getItem(k){return this._d[k]??null},removeItem(k){delete this._d[k]},clear(){this._d={}}}});}
 </script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/framer-motion@11/dist/framer-motion.js"></script>
+<script src="https://unpkg.com/lucide-react/dist/umd/lucide-react.min.js"></script>
 <script>
-// Suppress CDN-only warnings that pollute the host DevTools console
 const _cw=console.warn;console.warn=(...a)=>{if(typeof a[0]==='string'&&(a[0].includes('cdn.tailwindcss.com')||a[0].includes('should not be used in production')))return;_cw(...a);};
 </script>
+<script>${_framerShim}</script>
+<script>${_lucideShim}</script>
 ${base}
 <style>
-body{padding:16px}
-.sx-loading{display:flex;align-items:center;justify-content:center;height:60px;color:rgba(16,185,129,.7);font-family:monospace;font-size:13px;gap:8px}
+body{padding:0;margin:0}
+.sx-loading{display:flex;align-items:center;justify-content:center;height:80px;color:rgba(16,185,129,.7);font-family:monospace;font-size:13px;gap:8px}
 </style>
 </head>
 <body>
-<div id="root"><div class="sx-loading">⚡ Rendering component…</div></div>
+<div id="root"><div class="sx-loading">⚡ Rendering…</div></div>
 <script>
-// Global error handler — shows friendly error instead of blank screen
 window.onerror=function(msg,src,line,col,err){
   document.getElementById('root').innerHTML=
     '<div class="sx-err"><strong>Runtime Error</strong><br/>'+msg+
-    (err&&err.stack?'<br/><br/><small style="opacity:.6">'+err.stack.split('\\n').slice(0,3).join('<br/>')+'</small>':'')+'</div>';
+    (err&&err.stack?'<br/><small style="opacity:.6">'+err.stack.split('\\n').slice(0,3).join('<br/>')+'</small>':'')+'</div>';
   return true;
 };
 window.addEventListener('unhandledrejection',function(e){
   document.getElementById('root').innerHTML=
-    '<div class="sx-err"><strong>Promise Rejected</strong><br/>'+(e.reason?.message||String(e.reason))+'</div>';
+    '<div class="sx-err"><strong>Unhandled Promise</strong><br/>'+(e.reason?.message||String(e.reason))+'</div>';
 });
 </script>
 <script type="text/babel" data-presets="react,typescript">
 try {
-  // React hooks destructuring — available globally
   const {
     useState, useEffect, useRef, useCallback, useMemo,
     useReducer, useContext, createContext, Fragment, memo,
@@ -396,8 +519,12 @@ try {
     useDebugValue, useId, useTransition, useDeferredValue,
   } = React;
 
-  // User code (imports removed, exports flattened)
   ${clean}
+
+  // Register the default export to window so rootFinderScript can find it.
+  // Babel wraps all code in an IIFE — const/let vars don't reach window.
+  // This line executes in the SAME IIFE scope, so it CAN access the component.
+  ${_exportedName ? `try{window.__sx_default=${_exportedName};}catch(_e){}` : ''}
 
 } catch(compileErr) {
   document.getElementById('root').innerHTML=
@@ -405,9 +532,6 @@ try {
 }
 </script>
 <script>
-// Root component finder — runs AFTER Babel compiles the component
-// IMPORTANT: This is separate from the Babel script to avoid the
-// "const Root=const _names=" syntax error that was crashing all previews
 ${rootFinderScript}
 </script>
 </body>
@@ -437,8 +561,26 @@ ${rootFinderScript}
 
   // Python — Pyodide
   if (lang === 'python' || lang === 'py') {
-    const indented = content.split('\n').map((l: string) => '    ' + l).join('\n');
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8">${base}<script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script></head><body><div class="sx-label">Python Output</div><div class="sx-out" id="out"><span style="color:rgba(16,185,129,.7)">Loading Python runtime (first run ~5s)…</span></div><script>(async()=>{const out=document.getElementById('out');try{const pyodide=await loadPyodide();pyodide.globals.set('__captured__',[]);await pyodide.runPythonAsync(\`import sys,io\nclass _Cap(io.StringIO):\n    def write(self,s):\n        __captured__.append(s)\n        return len(s)\nsys.stdout=_Cap();sys.stderr=_Cap()\ntry:\n${indented}\nexcept Exception as e:\n    import traceback\n    __captured__.append(traceback.format_exc())\`);const _raw=pyodide.globals.get('__captured__');const lines=(_raw&&typeof _raw.toJs==='function')?_raw.toJs():Array.from(_raw||[]);const result=lines.join('');out.innerHTML='';if(result.trim()){result.split('\\n').forEach(line=>{const d=document.createElement('div');d.style.color=line.startsWith('Error')||line.startsWith('Traceback')||line.includes('Error:')?'#f87171':'#e4e8f0';d.textContent=line;out.appendChild(d);});}else{out.innerHTML='<span style="color:rgba(255,255,255,.3);font-style:italic">No output</span>';}}catch(e){out.innerHTML='<div class="sx-err">'+e.message+'</div>';}})();</script></body></html>`;
+    // safeCode: user code JSON-serialized → safe to inject as JS string literal
+    const safeCode = JSON.stringify(content);
+
+    // Python wrapper: redirects stdout via __captured__ list (works on ALL Pyodide versions)
+    // Defined as TS string concatenation — NO backticks → no outer template literal conflict
+    const _pyWrapStr = 'import sys,io\n'
+      + 'class _Cap(io.StringIO):\n'
+      + '    def write(self,s):\n'
+      + '        __captured__.append(s)\n'
+      + '        return len(s)\n'
+      + 'sys.stdout=_Cap();sys.stderr=_Cap()\n'
+      + 'try:\n'
+      + '    exec(_sx_src)\n'
+      + 'except Exception:\n'
+      + '    import traceback\n'
+      + '    __captured__.append(traceback.format_exc())\n';
+    // JSON.stringify → double-quoted JS string literal, safe inside HTML <script>
+    const safeWrap = JSON.stringify(_pyWrapStr);
+
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8">${base}<script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script></head><body><div class="sx-label">Python Output</div><div class="sx-out" id="out"><span style="color:rgba(16,185,129,.7)">Loading Python runtime (first run ~5s)…</span></div><script>(async()=>{const out=document.getElementById('out');try{const pyodide=await loadPyodide();pyodide.globals.set('__captured__',[]);pyodide.globals.set('_sx_src',${safeCode});await pyodide.runPythonAsync(${safeWrap});const _raw=pyodide.globals.get('__captured__');const lines=(_raw&&typeof _raw.toJs==='function')?Array.from(_raw.toJs()):Array.from(_raw||[]);const result=lines.join('');out.innerHTML='';if(result.trim()){result.split('\n').forEach(function(line){const d=document.createElement('div');const isErr=line.includes('Error:')||line.startsWith('Traceback')||line.startsWith('  File');d.style.color=isErr?'#f87171':'#e4e8f0';d.textContent=line;out.appendChild(d);});}else{out.innerHTML='<span style="color:rgba(255,255,255,.3);font-style:italic">No output</span>';}}catch(e){out.innerHTML='<div class="sx-err"><strong>Error</strong><br/>'+e.message+'</div>';}})();</script></body></html>`;
   }
 
   // CSS live preview
@@ -717,17 +859,110 @@ function buildSrcdocInline(
     .replace(/^export\s+default\s+/gm, '')
     .replace(/^export\s+(const|let|var|function|class)\s+/gm, '$1 ')
     .replace(/^export\s*\{[^}]*\}\s*;?\s*$/gm, '')
-    .replace(/^import\s+type\s+.*$/gm, '')
-    .replace(/^import\s+.*from\s+['"'][^'"]+['"']\s*;?\s*$/gm, '')
-    .replace(/^import\s+['"'][^'"]+['"']\s*;?\s*$/gm, '');
+    // FIX: multiline import stripping (framer-motion, lucide-react span multiple lines)
+    .replace(/import\s+(?:type\s+)?\{[\s\S]*?\}\s*from\s*['"][^'"]+['"]\s*;?/g, '')
+    .replace(/import\s+\*\s+as\s+\w+\s+from\s*['"][^'"]+['"]\s*;?/g, '')
+    .replace(/import\s+\w+\s*,\s*\{[\s\S]*?\}\s*from\s*['"][^'"]+['"]\s*;?/g, '')
+    .replace(/import\s+\w+\s+from\s*['"][^'"]+['"]\s*;?/g, '')
+    .replace(/import\s+['"][^'"]+['"]\s*;?/g, '');
 
   const base = `<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui,sans-serif;background:#0b0f1a;color:#e4e8f0;min-height:100vh}.sx-err{color:#f87171;background:rgba(248,113,113,.08);padding:14px;border-radius:8px;border:1px solid rgba(248,113,113,.25);font-family:monospace;font-size:13px;white-space:pre-wrap;margin:12px}</style>`;
 
-  const motionStub = `window.motion=new Proxy({},{get:(_,tag)=>React.forwardRef(({children,...p},ref)=>React.createElement(tag||'div',{...p,ref},children))});window.AnimatePresence=({children})=>children;window.useAnimation=()=>({start:()=>{},stop:()=>{}});window.useInView=()=>true;window.useScroll=()=>({scrollY:{get:()=>0}});window.useSpring=v=>v;window.useTransform=v=>v;`;
+  const motionStub = `window.motion=new Proxy({},{get:(_,tag)=>React.forwardRef(({children,...p},ref)=>React.createElement(tag||'div',{...p,ref},children))});window.AnimatePresence=({children})=>children;window.useAnimation=()=>({start:()=>{},stop:()=>{}});window.useInView=()=>true;window.useScroll=()=>({scrollY:{get:()=>0}});window.useSpring=v=>v;window.useTransform=v=>v;
+// ── Lucide-React icon stubs ───────────────────────────────────────
+// All imports are stripped from user code. These stubs provide every
+// common icon as a simple SVG so components render without ReferenceError.
+(function(){
+  function _mk(path){return function(p){var s=p&&p.size||24,c=p&&p.color||'currentColor',w=p&&p.strokeWidth||2,n=p&&p.className||'';return React.createElement('svg',{xmlns:'http://www.w3.org/2000/svg',width:s,height:s,viewBox:'0 0 24 24',fill:'none',stroke:c,strokeWidth:w,strokeLinecap:'round',strokeLinejoin:'round',className:n},path.map(function(d,i){return React.createElement('path',{key:i,d:d})}));}}
+  var icons={
+    ShoppingBag:_mk(['M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z','M3 6h18','M16 10a4 4 0 01-8 0']),
+    ShoppingCart:_mk(['M9 22c.55 0 1-.45 1-1s-.45-1-1-1-1 .45-1 1 .45 1 1 1z','M20 22c.55 0 1-.45 1-1s-.45-1-1-1-1 .45-1 1 .45 1 1 1z','M1 1h4l2.68 13.39a2 2 0 001.99 1.61h9.72a2 2 0 001.99-1.75L23 6H6']),
+    Menu:_mk(['M3 12h18','M3 6h18','M3 18h18']),
+    X:_mk(['M18 6L6 18','M6 6l12 12']),
+    Search:_mk(['M21 21l-6-6','M11 18a7 7 0 100-14 7 7 0 000 14z']),
+    User:_mk(['M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2','M12 11a4 4 0 100-8 4 4 0 000 8z']),
+    Heart:_mk(['M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z']),
+    Star:_mk(['M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z']),
+    ArrowRight:_mk(['M5 12h14','M12 5l7 7-7 7']),
+    ArrowLeft:_mk(['M19 12H5','M12 19l-7-7 7-7']),
+    ChevronRight:_mk(['M9 18l6-6-6-6']),
+    ChevronLeft:_mk(['M15 18l-6-6 6-6']),
+    ChevronDown:_mk(['M6 9l6 6 6-6']),
+    ChevronUp:_mk(['M18 15l-6-6-6 6']),
+    Home:_mk(['M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z','M9 22V12h6v10']),
+    Settings:_mk(['M12 15a3 3 0 100-6 3 3 0 000 6z','M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z']),
+    Instagram:_mk(['M16 2H8a6 6 0 00-6 6v8a6 6 0 006 6h8a6 6 0 006-6V8a6 6 0 00-6-6z','M12 16a4 4 0 100-8 4 4 0 000 8z','M17.5 6.5h.01']),
+    Twitter:_mk(['M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z']),
+    Facebook:_mk(['M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z']),
+    Mail:_mk(['M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z','M22 6l-10 7L2 6']),
+    Phone:_mk(['M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z']),
+    MapPin:_mk(['M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z','M12 13a3 3 0 100-6 3 3 0 000 6z']),
+    Plus:_mk(['M12 5v14','M5 12h14']),
+    Minus:_mk(['M5 12h14']),
+    Check:_mk(['M20 6L9 17l-5-5']),
+    Bell:_mk(['M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9','M13.73 21a2 2 0 01-3.46 0']),
+    Globe:_mk(['M12 22a10 10 0 100-20 10 10 0 000 20z','M2 12h20','M12 2a15.3 15.3 0 010 20','M12 2a15.3 15.3 0 000 20']),
+    Zap:_mk(['M13 2L3 14h9l-1 8 10-12h-9l1-8z']),
+    Award:_mk(['M12 15a7 7 0 100-14 7 7 0 000 14z','M8.21 13.89L7 23l5-3 5 3-1.21-9.12']),
+    Gift:_mk(['M20 12v10H4V12','M2 7h20v5H2z','M12 22V7','M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z','M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z']),
+    Truck:_mk(['M1 3h15v13H1z','M16 8h4l3 3v5h-7V8z','M5.5 21a2.5 2.5 0 100-5 2.5 2.5 0 000 5z','M18.5 21a2.5 2.5 0 100-5 2.5 2.5 0 000 5z']),
+    Tag:_mk(['M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z','M7 7h.01']),
+    Clock:_mk(['M12 22a10 10 0 100-20 10 10 0 000 20z','M12 6v6l4 2']),
+    Calendar:_mk(['M19 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2z','M16 2v4','M8 2v4','M3 10h18']),
+    Upload:_mk(['M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4','M17 8l-5-5-5 5','M12 3v12']),
+    Download:_mk(['M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4','M7 10l5 5 5-5','M12 15V3']),
+    Share2:_mk(['M18 8a3 3 0 100-6 3 3 0 000 6z','M6 15a3 3 0 100-6 3 3 0 000 6z','M18 20a3 3 0 100-6 3 3 0 000 6z','M8.59 13.51l6.83 3.98','M15.41 6.51l-6.82 3.98']),
+    ExternalLink:_mk(['M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6','M15 3h6v6','M10 14L21 3']),
+    Eye:_mk(['M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z','M12 15a3 3 0 100-6 3 3 0 000 6z']),
+    Lock:_mk(['M19 11H5a2 2 0 00-2 2v7a2 2 0 002 2h14a2 2 0 002-2v-7a2 2 0 00-2-2z','M7 11V7a5 5 0 0110 0v4']),
+    Linkedin:_mk(['M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6z','M2 9h4v12H2z','M4 6a2 2 0 100-4 2 2 0 000 4z']),
+    Youtube:_mk(['M22.54 6.42a2.78 2.78 0 00-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 00-1.95 1.96A29 29 0 001 12a29 29 0 00.46 5.58 2.78 2.78 0 001.95 1.95C5.12 20 12 20 12 20s6.88 0 8.59-.47a2.78 2.78 0 001.95-1.95A29 29 0 0023 12a29 29 0 00-.46-5.58z','M9.75 15.02l5.75-3.02-5.75-3.02v6.04z']),
+    Code:_mk(['M16 18l6-6-6-6','M8 6l-6 6 6 6']),
+    Copy:_mk(['M20 9H11a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-9a2 2 0 00-2-2z','M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1']),
+    Edit:_mk(['M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7','M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z']),
+    Trash:_mk(['M3 6h18','M8 6V4h8v2','M19 6l-1 14H6L5 6']),
+    RefreshCw:_mk(['M23 4v6h-6','M1 20v-6h6','M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15']),
+    Filter:_mk(['M22 3H2l8 9.46V19l4 2v-8.54L22 3z']),
+    Grid:_mk(['M3 3h7v7H3z','M14 3h7v7h-7z','M3 14h7v7H3z','M14 14h7v7h-7z']),
+    List:_mk(['M8 6h13','M8 12h13','M8 18h13','M3 6h.01','M3 12h.01','M3 18h.01']),
+    Info:_mk(['M12 22a10 10 0 100-20 10 10 0 000 20z','M12 16v-4','M12 8h.01']),
+    AlertCircle:_mk(['M12 22a10 10 0 100-20 10 10 0 000 20z','M12 8v4','M12 16h.01']),
+    CheckCircle:_mk(['M22 11.08V12a10 10 0 11-5.93-9.14','M22 4L12 14.01l-3-3']),
+    XCircle:_mk(['M12 22a10 10 0 100-20 10 10 0 000 20z','M15 9l-6 6','M9 9l6 6']),
+    Loader:_mk(['M12 2v4','M12 18v4','M4.93 4.93l2.83 2.83','M16.24 16.24l2.83 2.83','M2 12h4','M18 12h4','M4.93 19.07l2.83-2.83','M16.24 7.76l2.83-2.83']),
+    TrendingUp:_mk(['M23 6l-9.5 9.5-5-5L1 18','M17 6h6v6']),
+    TrendingDown:_mk(['M23 18l-9.5-9.5-5 5L1 6','M17 18h6v-6']),
+    DollarSign:_mk(['M12 1v22','M17 5H9.5a3.5 3.5 0 100 7h5a3.5 3.5 0 110 7H6']),
+    CreditCard:_mk(['M21 4H3a2 2 0 00-2 2v12a2 2 0 002 2h18a2 2 0 002-2V6a2 2 0 00-2-2z','M1 10h22']),
+    Package:_mk(['M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 001 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z','M3.27 6.96L12 12.01l8.73-5.05','M12 22.08V12']),
+    Layers:_mk(['M12 2L2 7l10 5 10-5-10-5z','M2 17l10 5 10-5','M2 12l10 5 10-5']),
+  };
+  Object.keys(icons).forEach(function(n){if(!window[n])window[n]=icons[n];});
+})();`;
 
   const localStorageShim = `try{localStorage.setItem('sx','1');localStorage.removeItem('sx');}catch(e){Object.defineProperty(window,'localStorage',{value:{_d:{},setItem(k,v){this._d[k]=v},getItem(k){return this._d[k]??null},removeItem(k){delete this._d[k]},clear(){this._d={}}}});}`;
 
-  const rootDetect = `const _names=Object.keys(window).filter(n=>/^[A-Z]/.test(n)&&typeof window[n]==='function'&&window[n].toString().includes('return'));const _pref=['App','Component','Dashboard','Page','Main','Home','Index','Root','Portfolio','Landing','Layout','Screen','View','Widget','Hero','Profile','Showcase'];const _Root=_pref.map(n=>window[n]).find(Boolean)||(_names.length?window[_names[0]]:null);if(_Root){ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(_Root));}else{document.getElementById('root').innerHTML='<div class="sx-err">No component found. Make sure your component function name starts with a capital letter.</div>';}`;
+  const rootDetect = `
+// Register default export so rootDetect can find it (Babel scope → window)
+if(typeof __sx_root!=='undefined')window.__sx_default=__sx_root;
+var _pref=['App','Component','Counter','Dashboard','Page','Main','Home','Index',
+  'Root','Portfolio','Landing','Layout','Screen','View','Widget','Hero',
+  'Profile','Showcase','Form','Modal','Card'];
+// Only check window.__sx_default (registered above) and well-known names.
+// NO generic window scan — it picks up CDN library functions → Illegal constructor.
+var _Root=window.__sx_default||null;
+if(!_Root){for(var _i=0;_i<_pref.length;_i++){var _c=window[_pref[_i]];if(typeof _c==='function'&&!_c.toString().includes('[native code]')){_Root=_c;break;}}}
+if(_Root){try{ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(_Root));}catch(e){document.getElementById('root').innerHTML='<div class="sx-err">Render error: '+e.message+'</div>';}}
+else{document.getElementById('root').innerHTML='<div class="sx-err" style="padding:20px"><strong>No component found.</strong><br/>Make sure your component name starts with a capital letter and is the default export.</div>'}`;
+
+  // Extract default export name to register inside Babel scope
+  const _inlineExport = raw.match(/export\s+default\s+(?:function\s+|class\s+)?(\w+)/);
+  const _inlineName = (_inlineExport && !['function','class','const','let','var'].includes(_inlineExport[1]))
+    ? _inlineExport[1] : null;
+  // Registration: sets both window.__sx_default (for rootDetect) and __sx_root (local ref)
+  const _inlineReg = _inlineName
+    ? `try{var __sx_root=${_inlineName};window.__sx_default=${_inlineName};}catch(_e){}`
+    : `var __sx_root=undefined;`;
 
   const hooks = `const {useState,useEffect,useRef,useCallback,useMemo,useReducer,useContext,createContext,Fragment,memo}=React;`;
 
@@ -747,7 +982,7 @@ function buildSrcdocInline(
     '<\/head><body><div id="root"><\/div>',
   ].join('');
   const errHandler = `<script>window.onerror=function(m){document.body.innerHTML='<div class=\"sx-err\">'+m+'<\/div>';};<\/script>`;
-  const babelScript = `<script type="text/babel">try{${hooks}${clean}${rootDetect}}catch(e){document.body.innerHTML='<div class=\"sx-err\">'+e.message+'<\/div>';}<\/script>`;
+  const babelScript = `<script type="text/babel">try{${hooks}${clean}${_inlineReg}${rootDetect}}catch(e){document.body.innerHTML='<div class=\"sx-err\">'+e.message+'<\/div>';}<\/script>`;
   return head + errHandler + babelScript + '<\/body><\/html>';
 }
 
@@ -920,6 +1155,21 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({ onWidthChange }) => {
   const totalCount = artifacts.length + diagrams.length + images.length;
 
   useEffect(() => { if (activeId) setTab('code'); }, [activeId]);
+
+  // Listen for direct open-artifact events from ArtifactCard clicks.
+  // This is a reliable fallback for when Suspense/lazy mounting causes
+  // the store subscription to miss the initial setActiveArtifact call.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { id: string };
+      if (detail?.id) {
+        openArtifact(detail.id);
+        setTab('code');
+      }
+    };
+    window.addEventListener('sedrex:open-artifact', handler);
+    return () => window.removeEventListener('sedrex:open-artifact', handler);
+  }, [openArtifact]);
   useEffect(() => { onWidthChange?.(panelOpen ? width : 0); }, [panelOpen, width, onWidthChange]);
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && panelOpen) { e.preventDefault(); closePanel(); } };

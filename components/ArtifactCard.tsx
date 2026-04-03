@@ -54,22 +54,24 @@ const ArtifactCard: React.FC<ArtifactCardProps> = memo(({
   const isDiagram = type === 'diagram' || lang === 'mermaid';
 
   const handleClick = () => {
-    // ── FIX v2.3: ID-ONLY lookup + mobile sidebar close ──────────
-    // v2.2: removed title fallback to fix duplicate artifact bug.
-    // v2.3: on mobile the sidebar z-index (200-300) sits above the
-    //   ArtifactPanel z-index (50), so the panel opened but was hidden
-    //   behind the sidebar. Fix: close the sidebar on mobile before
-    //   opening the panel so the user actually sees the artifact.
     const all = [...getArtifacts(), ...getDiagrams()];
     const artifact = all.find(a => a.id === id);
 
-    // Close sidebar on mobile so ArtifactPanel is visible (z-index fix)
+    // Close sidebar on mobile so ArtifactPanel is visible
     if (window.innerWidth < 1024) {
       window.dispatchEvent(new CustomEvent('sedrex:close-sidebar'));
     }
 
+    // Set active artifact in store
     setActiveArtifact(artifact ? artifact.id : id);
     openPanel();
+
+    // Dispatch custom event as a reliable fallback.
+    // This covers the case where the panel is already mounted but
+    // the Suspense/lazy load cycle caused activeId to be stale.
+    window.dispatchEvent(new CustomEvent('sedrex:open-artifact', {
+      detail: { id: artifact ? artifact.id : id },
+    }));
   };
 
   return (

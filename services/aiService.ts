@@ -1759,23 +1759,95 @@ export const generateFollowUpSuggestions = async (
   } catch { markApiKeyFailure(apiKey); return []; }
 };
 
+// ── Local title fallback ─────────────────────────────────────────
+// Used when the API call fails or returns a generic response.
+// Extracts a meaningful 3-5 word phrase from the user message.
+function _localTitle(msg: string): string {
+  const cleaned = msg
+    .replace(/```[\s\S]*?```/g, '')     // strip code blocks
+    .replace(/[^\w\s]/g, ' ')           // strip punctuation
+    .trim();
+  const stopWords = new Set([
+    'a','an','the','is','are','was','were','be','been','being',
+    'have','has','had','do','does','did','will','would','could',
+    'should','may','might','can','shall','to','of','in','on',
+    'at','by','for','with','about','as','into','i','me','my',
+    'you','your','we','our','it','its','this','that','these',
+    'those','and','but','or','so','yet','nor','not','please',
+    'help','how','what','why','when','where','who','write',
+    'build','create','make','give','show','explain','tell',
+    'generate','develop','design','implement','fix','add',
+    'update','change','modify','get','want','need','like',
+  ]);
+  const words = cleaned.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w.toLowerCase()));
+  if (words.length === 0) return 'New Chat';
+  // Title-case and take up to 5 words
+  return words
+    .slice(0, 5)
+    .map(w => w[0].toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+}
+
 export const generateChatTitle = async (firstMessage: string): Promise<string> => {
-  if (apiKeyPool.length === 0) return "New Session";
+  if (apiKeyPool.length === 0) return _localTitle(firstMessage);
   let apiKey = "";
   try {
     apiKey = getApiKey();
     const ai      = new GoogleGenAI({ apiKey });
-    const trimmed = firstMessage.slice(0, 1_000);
-    const titlePrompt = `Generate a concise, descriptive chat title for this message — exactly like ChatGPT and Claude do it. 4 to 6 words. Title case. No quotes. No period. Make it specific to the topic, not generic.\n\nExamples of good titles:\n- Build React Auth System\n- Fix Navbar Responsive Bug\n- Explain Async Await JavaScript\n- Sort Algorithm TypeScript File\n- Landing Page Hero Section\n\nMessage: "${trimmed}"\n\nTitle:`;
+    const trimmed = firstMessage.slice(0, 800);
+
+    // Strict prompt: enforce format, penalize generic outputs
+    const titlePrompt = [
+      'You are a chat title generator. Generate a SHORT, SPECIFIC title for this conversation.',
+      '',
+      'RULES (all must be followed):',
+      '- 3 to 5 words ONLY. Never more, never less.',
+      '- Title Case (capitalize each word).',
+      '- No quotes, no period, no colon, no emoji.',
+      '- Be SPECIFIC to the topic. Never generic.',
+      '- NEVER output: "New Chat", "Chat", "Conversation", "Question", "Help", "Request".',
+      '',
+      'GOOD examples (study these patterns):',
+      '  "write a python fibonacci script"          → Python Fibonacci Sequence Script',
+      '  "build a react counter component"           → React Counter Component Build',
+      '  "fix the navbar responsive bug"             → Navbar Responsive Bug Fix',
+      '  "explain async await in javascript"         → JavaScript Async Await Explained',
+      '  "create a landing page for my startup"      → Startup Landing Page Design',
+      '  "sort an array and log it"                  → Array Sort And Log',
+      '  "why is my css not working"                 → CSS Debugging And Fix',
+      '  "write a sql query to find duplicates"      → SQL Find Duplicate Records',
+      '',
+      `User message: "${trimmed}"`,
+      '',
+      'Title (3-5 words, Title Case, no punctuation):',
+    ].join('\n');
+
     const response = await ai.models.generateContent({
       model:    MODELS.FLASH,
       contents: [{ role: 'user', parts: [{ text: titlePrompt }] }],
-      config:   { maxOutputTokens: 64, temperature: 0.4 },
+      config:   { maxOutputTokens: 20, temperature: 0.2 },
     });
-    const title = (response.text ?? "").trim().replace(/^Title:\s*/i, "").replace(/['"]/g, "").replace(/\.$/, "") || "New Session";
+
+    const raw = (response.text ?? '').trim();
+    const title = raw
+      .replace(/^Title[:\s]*/i, '')
+      .replace(/['"]/g, '')
+      .replace(/\.$/, '')
+      .replace(/^\s+|\s+$/g, '')
+      .slice(0, 60);
+
+    // Reject generic/empty outputs — fall back to local generator
+    const genericPhrases = ['new chat','new session','chat','conversation',
+      'question','help','request','untitled','unknown','general'];
+    const isGeneric = !title || title.split(' ').length < 2 ||
+      genericPhrases.some(g => title.toLowerCase() === g);
+
     markApiKeySuccess(apiKey);
-    return title;
-  } catch { markApiKeyFailure(apiKey); return "New Session"; }
+    return isGeneric ? _localTitle(firstMessage) : title;
+  } catch {
+    markApiKeyFailure(apiKey);
+    return _localTitle(firstMessage);
+  }
 };
 
 export function decode(base64: string): Uint8Array {
