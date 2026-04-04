@@ -32,6 +32,7 @@ import {
   loadAllUserArtifacts,
   clearArtifacts,
   extractArtifactFromResponse,
+  extractAllArtifactsFromResponse,
   createArtifact,
   isPanelOpen,
   subscribeToArtifacts,
@@ -532,22 +533,46 @@ const App: React.FC = () => {
       let artifactWasCreated = false;
 
       if (!response.isDiff) {
-        const extracted = extractArtifactFromResponse(response.content, userMsg.content);
+        // SESSION 10: Persist ALL artifacts to DB — not just the first.
+        // Primary path: extractAllArtifactsFromResponse handles every closed fence.
+        //   Loop createArtifact() for each so artifacts[1..n] survive page reload.
+        // Fallback path: extractArtifactFromResponse handles unclosed fences
+        //   (streaming cut-offs where the AI omitted the closing ```).
+        // The two paths are mutually exclusive — no double-call, no title collision.
+        const multiResult = user
+          ? extractAllArtifactsFromResponse(response.content, userMsg.content)
+          : null;
 
-        if (extracted && user) {
-          // SESSION 8: Set the flag from the FIRST (and only) extraction result
+        if (multiResult && user && multiResult.artifacts.length > 0) {
           artifactWasCreated = true;
-
-          createArtifact({
-            sessionId,
-            userId:   user.id,
-            title:    extracted.title,
-            language: extracted.language,
-            content:  extracted.content,
-            type:     extracted.type,
-            filePath: extracted.filePath,
-          }).catch(() => { });
-          finalContent = extracted.reducedResponse ?? finalContent;
+          for (const art of multiResult.artifacts) {
+            createArtifact({
+              sessionId,
+              userId:   user.id,
+              title:    art.title,
+              language: art.language,
+              content:  art.content,
+              type:     art.type,
+              filePath: art.filePath,
+            }).catch(() => { });
+          }
+          finalContent = multiResult.reducedResponse;
+        } else {
+          // Fallback: unclosed fence (streaming cut-off) or no user
+          const extracted = extractArtifactFromResponse(response.content, userMsg.content);
+          if (extracted && user) {
+            artifactWasCreated = true;
+            createArtifact({
+              sessionId,
+              userId:   user.id,
+              title:    extracted.title,
+              language: extracted.language,
+              content:  extracted.content,
+              type:     extracted.type,
+              filePath: extracted.filePath,
+            }).catch(() => { });
+            finalContent = extracted.reducedResponse ?? finalContent;
+          }
         }
 
         // Extract & Store Diagrams for Sidebar

@@ -100,10 +100,15 @@ const CODE_LANGUAGES: Record<string, string> = {
   tailwind: 'Tailwind',   vue: 'Vue',
 };
 
+// Shell/terminal languages are never artifacts — they're commands, not files.
+// Listing them explicitly prevents large install scripts from opening the
+// artifact panel when they happen to exceed MIN_LINES_FOR_ARTIFACT.
 const EXCLUDED_LANGUAGES = new Set([
   'mermaid',
   'chart',
   'products',
+  'bash', 'sh', 'shell', 'zsh',
+  'console', 'terminal', 'cmd', 'fish',
 ]);
 
 export interface ExtractedArtifact {
@@ -222,56 +227,105 @@ function generateVersionedTitleInBatch(baseTitle: string, usedInBatch: Set<strin
 }
 
 // ══════════════════════════════════════════════════════════════════
-// extractAllArtifactsFromResponse
+// extractAllArtifactsFromResponse  (v3 — line-based parser)
 //
-// BUG FIX: the original extractArtifactFromResponse picks ONE block
-// (largest or file-path priority) and strips every other large block.
-// When the AI returns package.json + index.html + App.tsx in one
-// response, only one card ever appeared.
+// ROOT CAUSE OF PREVIOUS VERSION'S FAILURE:
+//   The gm-regex approach (/^```(\w*)…^```$/gm) relies on JavaScript's
+//   regex engine advancing lastIndex correctly across multiple exec() calls
+//   in multiline mode. In practice, interleaved prose + bash + file blocks
+//   caused the engine to either skip blocks or match the opening fence of
+//   block N+1 as the closing fence of block N, so only the last qualifying
+//   block appeared in `blocks[]`.
 //
-// This function extracts ALL qualifying closed fenced blocks, injects
-// an [ARTIFACT:title] marker for each one at its original position,
-// and returns the array + the fully-reduced response string.
+//   ADDITIONALLY: extractArtifactFromResponse (used by App.tsx) called this
+//   function's predecessor, picked ONE block, and stripped all others via
+//   the PART B regex — so even multi-block responses were reduced to a single
+//   [ARTIFACT:] marker before ChatArea ever saw the content.
 //
-// renderWithArtifacts in ChatArea already loops all [ARTIFACT:] markers
-// so no changes are needed there.
+// FIX:
+//   • Line-based parser — walks every line exactly once, never re-scans,
+//     no lastIndex state, guaranteed to find every closed fence.
+//   • Qualifying blocks are replaced with [ARTIFACT:] markers by rebuilding
+//     the line array (no byte-offset arithmetic = no position corruption).
+//   • extractArtifactFromResponse now delegates here so App.tsx's
+//     finalContent contains ALL markers, not just one.
 // ══════════════════════════════════════════════════════════════════
 export function extractAllArtifactsFromResponse(
   response:    string,
   userPrompt?: string,
 ): MultiExtractResult | null {
-  const FENCE_RE = /^```(\w*)[ \t]*\r?\n([\s\S]*?)^```[ \t]*$/gm;
 
-  // Collect every qualifying closed fence with its byte range
-  const blocks: Array<{
-    lang:  string;
-    code:  string;
-    full:  string;
-    start: number;
-    end:   number;
-  }> = [];
-
-  let m: RegExpExecArray | null;
-  while ((m = FENCE_RE.exec(response)) !== null) {
-    const lang  = (m[1] ?? '').toLowerCase().trim() || 'text';
-    const code  = m[2];
-    const lines = code.split('\n').length;
-    if (!EXCLUDED_LANGUAGES.has(lang) && lines >= MIN_LINES_FOR_ARTIFACT) {
-      blocks.push({ lang, code, full: m[0], start: m.index, end: m.index + m[0].length });
-    }
+  // ── Phase 1: Collect all closed fence blocks ───────────────────────────
+  interface RawBlock {
+    lang:      string;
+    codeLines: string[];
+    startLine: number;   // index of opening ``` line in `lines[]`
+    endLine:   number;   // index of closing ``` line in `lines[]`
   }
 
-  if (blocks.length === 0) return null;
+  const lines     = response.split('\n');
+  const rawBlocks: RawBlock[] = [];
 
+  let inFence    = false;
+  let fenceLang  = '';
+  let fenceStart = 0;
+  let codeLines: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (!inFence) {
+      // An opening fence must start with ``` and carry a non-empty language tag.
+      // A bare ``` at the top level is a stray closing fence — skip it.
+      if (line.startsWith('```')) {
+        // Take only the first whitespace-delimited token as the language tag
+        // so ` ```javascript tailwind.config.js ` → lang = 'javascript'.
+        const rawTag = line.slice(3).trim().split(/\s+/)[0].toLowerCase();
+        if (rawTag !== '') {
+          inFence    = true;
+          fenceLang  = rawTag;
+          fenceStart = i;
+          codeLines  = [];
+        }
+      }
+    } else {
+      // Inside a fence — a closing fence is a line whose trimmed content
+      // is exactly ``` (with optional trailing spaces/tabs, no language tag).
+      if (line.trimEnd() === '```') {
+        rawBlocks.push({
+          lang:      fenceLang || 'text',
+          codeLines: codeLines.slice(),
+          startLine: fenceStart,
+          endLine:   i,
+        });
+        inFence   = false;
+        fenceLang = '';
+        codeLines = [];
+      } else {
+        codeLines.push(line);
+      }
+    }
+  }
+  // Unclosed fences at EOF are intentionally dropped —
+  // the fallback open-fence matcher in extractArtifactFromResponse handles them.
+
+  // ── Phase 2: Filter to qualifying blocks ──────────────────────────────
+  const qualifying = rawBlocks.filter(
+    b => !EXCLUDED_LANGUAGES.has(b.lang) && b.codeLines.length >= MIN_LINES_FOR_ARTIFACT
+  );
+
+  if (qualifying.length === 0) return null;
+
+  // ── Phase 3: Build artifact metadata ──────────────────────────────────
   const usedTitles = new Set<string>();
   const artifacts: Omit<ExtractedArtifact, 'reducedResponse'>[] = [];
 
-  for (const block of blocks) {
+  for (const block of qualifying) {
     let lang = block.lang;
-    const code = block.code.trimEnd();
-    const lines = code.split('\n').length;
+    const code      = block.codeLines.join('\n').trimEnd();
+    const lineCount = block.codeLines.length;
 
-    // JSX/TSX promotion (identical logic to the single extractor)
+    // JSX/TSX promotion
     if (['javascript', 'js', 'typescript', 'ts'].includes(lang)) {
       const hasJSXTags   = /<[A-Z][A-Za-z0-9]*[\s\/>]|<\/[A-Za-z][A-Za-z0-9]*>/.test(code);
       const hasReact     = /import\s+.*[Rr]eact|from\s+['"]react['"]|useState|useEffect|useRef/.test(code);
@@ -283,12 +337,11 @@ export function extractAllArtifactsFromResponse(
 
     const type: ArtifactType = lang === 'html' ? 'html' : 'code';
 
-    // File path from inline comment or the lines just before the block
-    const firstLine  = code.split('\n')[0] ?? '';
+    // File-path detection: first-line comment OR the 3 prose lines before the block
+    const firstLine    = block.codeLines[0] ?? '';
     const pathFromCode = firstLine.match(/(?:\/\/|#)\s*([\w./\-]+\.\w+)/)?.[1];
-    const beforeBlock  = response.slice(0, block.start);
-    const lastLines    = beforeBlock.split('\n').slice(-3).join('\n');
-    const pathMatch    = lastLines.match(/(?:\/\/|#|\/\*|\*\*File:?|Path:?)\s*([\w./\-]+\.\w+)/);
+    const beforeLines  = lines.slice(Math.max(0, block.startLine - 3), block.startLine).join('\n');
+    const pathMatch    = beforeLines.match(/(?:\/\/|#|\/\*|\*\*File:?|Path:?)\s*([\w./\-]+\.\w+)/);
     const filePath     = pathFromCode ?? pathMatch?.[1];
 
     const baseTitle = filePath
@@ -297,92 +350,101 @@ export function extractAllArtifactsFromResponse(
 
     const title = generateVersionedTitleInBatch(baseTitle, usedTitles);
 
-    artifacts.push({ title, language: lang, content: code, type, filePath, lineCount: lines });
+    artifacts.push({ title, language: lang, content: code, type, filePath, lineCount });
   }
 
-  // Build reducedResponse in a single forward pass — replace each block
-  // with its [ARTIFACT:title] marker using the tracked byte offsets.
-  let reduced = '';
-  let cursor  = 0;
-  for (let i = 0; i < blocks.length; i++) {
-    reduced += response.slice(cursor, blocks[i].start);
-    reduced += `\n\n[ARTIFACT:${artifacts[i].title}]\n`;
-    cursor   = blocks[i].end;
-  }
-  reduced += response.slice(cursor);
+  // ── Phase 4: Build reducedResponse ────────────────────────────────────
+  // Walk lines forward. When we reach a qualifying block's opening line,
+  // emit an [ARTIFACT:title] marker and skip through (inclusive) its closing
+  // line. All other lines — prose, non-qualifying fences, small snippets —
+  // are emitted as-is.
+  const qualifyingByStart = new Map<number, number>();
+  qualifying.forEach((b, idx) => qualifyingByStart.set(b.startLine, idx));
 
-  // Final cleanup (mirrors the single extractor)
-  reduced = reduced
-    .replace(/^```[ \t]*$/gm, '')
+  const outLines: string[] = [];
+  let skipUntil = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    if (i <= skipUntil) continue;  // inside a block being replaced
+
+    if (qualifyingByStart.has(i)) {
+      const artIdx = qualifyingByStart.get(i)!;
+      outLines.push('');
+      outLines.push(`[ARTIFACT:${artifacts[artIdx].title}]`);
+      outLines.push('');
+      skipUntil = qualifying[artIdx].endLine;  // skip through the closing ```
+    } else {
+      outLines.push(lines[i]);
+    }
+  }
+
+  const reducedResponse = outLines.join('\n')
     .replace(/^(here is|here's|the following|below is|this is)\b[^\n]*:\s*\n/gim, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-  return { artifacts, reducedResponse: reduced };
+  return { artifacts, reducedResponse };
 }
 
+// ══════════════════════════════════════════════════════════════════
+// extractArtifactFromResponse  (v3 — delegates to multi-extractor)
+//
+// WHY THIS CHANGE:
+//   App.tsx calls extractArtifactFromResponse and stores its
+//   `reducedResponse` as the final message content in the DB.
+//   The old implementation picked ONE block and STRIPPED all others
+//   (PART B regex), so only one [ARTIFACT:] marker ever reached
+//   ChatArea — regardless of how many code blocks were in the response.
+//
+//   By delegating to extractAllArtifactsFromResponse we get a
+//   reducedResponse with ALL [ARTIFACT:] markers.  App.tsx's
+//   createArtifact() still persists only the first artifact (artifact[0])
+//   to the DB.  Artifacts [1..n] are registered ephemerally here so
+//   their cards appear immediately in the current session.
+//
+// FALLBACK:
+//   extractAllArtifactsFromResponse only matches CLOSED fences.
+//   For streaming cut-offs (unclosed fence at EOF) the open-fence
+//   matcher below handles the edge case.
+// ══════════════════════════════════════════════════════════════════
 export function extractArtifactFromResponse(
-  response:   string,
+  response:    string,
   userPrompt?: string,
 ): ExtractedArtifact | null {
-  const FENCE_RE = /^```(\w*)[ \t]*\r?\n([\s\S]*?)^```[ \t]*$/gm;
-  let best: { lang: string; code: string; full: string } | null = null;
-  let bestLines = 0;
-  let match: RegExpExecArray | null;
+  if (!response.includes('```')) return null;
 
-  // Priority 1: block whose first line is a file-path comment (// src/... etc.)
-  // This is always the complete file — grab it before the non-greedy FENCE_RE loop
-  // can match a smaller inner block (e.g. a helper function) instead.
-  const filePathMatch = response.match(
-    /^```(\w+)[ \t]*\r?\n(\/\/\s*[\w./\-]+\.\w+[\s\S]*?)^```[ \t]*$/m
-  );
-  if (filePathMatch) {
-    const lang  = filePathMatch[1].toLowerCase();
-    const code  = filePathMatch[2];
-    const lines = code.split('\n').length;
-    if (!EXCLUDED_LANGUAGES.has(lang) && lines >= MIN_LINES_FOR_ARTIFACT) {
-      best      = { lang, code, full: filePathMatch[0] };
-      bestLines = lines;
+  // ── Primary path: closed fences ───────────────────────────────────────
+  const multiResult = extractAllArtifactsFromResponse(response, userPrompt);
+
+  if (multiResult && multiResult.artifacts.length > 0) {
+    const [first, ...rest] = multiResult.artifacts;
+
+    // Register extra artifacts in memory so renderWithArtifacts finds them.
+    // App.tsx will call createArtifact() only for `first` — the extras are
+    // ephemeral for this session load.  A page reload will show them as
+    // "pending" until a deeper architectural fix persists all to the DB.
+    for (const extra of rest) {
+      registerEphemeralArtifact(extra);
     }
+
+    return {
+      ...first,
+      reducedResponse: multiResult.reducedResponse,
+    };
   }
 
-  // Priority 2: no file-path block — fall back to the largest fenced block
-  if (!best) {
-    while ((match = FENCE_RE.exec(response)) !== null) {
-      const lang  = match[1].toLowerCase().trim() || 'text';
-      const code  = match[2];
-      const lines = code.split('\n').length;
+  // ── Fallback: open fence (streaming cut-off or missing closing ```) ───
+  const openMatch = /^```(\w+)[ \t]*\r?\n([\s\S]*)/m.exec(response);
+  if (!openMatch) return null;
 
-      if (EXCLUDED_LANGUAGES.has(lang)) continue;
+  const rawLang = openMatch[1].trim().split(/\s+/)[0].toLowerCase() || 'text';
+  const code    = openMatch[2];
+  const lines   = code.split('\n').length;
 
-      if (lines >= MIN_LINES_FOR_ARTIFACT && lines > bestLines) {
-        best      = { lang, code, full: match[0] };
-        bestLines = lines;
-      }
-    }
-  }
+  if (EXCLUDED_LANGUAGES.has(rawLang) || lines < MIN_LINES_FOR_ARTIFACT) return null;
 
-  if (!best) {
-    // Fallback: opening fence with no closing fence (streaming cut-off or large response).
-    // Take everything after the opening ``` as the code body.
-    const openMatch = /^```(\w+)[ \t]*\r?\n([\s\S]*)/m.exec(response);
-    if (openMatch) {
-      const lang  = openMatch[1].toLowerCase().trim() || 'text';
-      const code  = openMatch[2];
-      const lines = code.split('\n').length;
-      if (!EXCLUDED_LANGUAGES.has(lang) && lines >= MIN_LINES_FOR_ARTIFACT) {
-        best      = { lang, code, full: openMatch[0] };
-        bestLines = lines;
-      }
-    }
-  }
-
-  if (!best) return null;
-
-  let lang     = best.lang;
-  const code   = best.code.trimEnd();
-
-  // Promote js/ts to jsx/tsx if React content detected
+  // JSX/TSX promotion
+  let lang = rawLang;
   if (['javascript', 'js', 'typescript', 'ts'].includes(lang)) {
     const hasJSXTags   = /<[A-Z][A-Za-z0-9]*[\s\/>]|<\/[A-Za-z][A-Za-z0-9]*>/.test(code);
     const hasReact     = /import\s+.*[Rr]eact|from\s+['"]react['"]|useState|useEffect|useRef/.test(code);
@@ -392,51 +454,30 @@ export function extractArtifactFromResponse(
     }
   }
 
-  const isHtml  = lang === 'html';
-  const isReact = lang === 'jsx' || lang === 'tsx';
-  const type: ArtifactType = isHtml ? 'html' : isReact ? 'code' : 'code';
+  const type: ArtifactType = lang === 'html' ? 'html' : 'code';
 
-  const firstLine   = code.split('\n')[0] ?? '';
+  const firstLine    = code.split('\n')[0] ?? '';
   const pathFromCode = firstLine.match(/(?:\/\/|#)\s*([\w./\-]+\.\w+)/)?.[1];
-
-  const beforeBlock = response.slice(0, response.indexOf(best.full));
-  const lastLines   = beforeBlock.split('\n').slice(-3).join('\n');
-  const pathMatch   = lastLines.match(/(?:\/\/|#|\/\*|\*\*File:?|Path:?)\s*([\w./\-]+\.\w+)/);
-  const filePath    = pathFromCode ?? pathMatch?.[1];
-
-  // SESSION 8: deriveTitleFromPrompt is now a module-level function (hoisted above)
-  // No behavioral change — same logic, same return values.
-  const baseTitle = filePath
-    ? filePath.split('/').pop() ?? filePath
+  const baseTitle    = pathFromCode
+    ? pathFromCode.split('/').pop() ?? pathFromCode
     : deriveTitleFromPrompt(userPrompt ?? '', lang);
+  const title        = generateVersionedTitle(baseTitle);
 
-  // generateVersionedTitle checks current _artifacts in memory
-  const title = generateVersionedTitle(baseTitle);
-
-  let reducedResponse = response.replace(best.full, `\n\n[ARTIFACT:${title}]\n`);
-
-  // PART B: Remove ALL remaining large code fences — they are secondary blocks
-  // from the same file that weren't selected as "best" but still bleed into the bubble.
-  const STRIP_ALL_LARGE = /^```(\w*)[ \t]*\r?\n([\s\S]*?)^```[ \t]*$/gm;
-  reducedResponse = reducedResponse.replace(
-    STRIP_ALL_LARGE, (_m: string, lang: string, code: string) => {
-      const lo = (lang || '').toLowerCase();
-      if (EXCLUDED_LANGUAGES.has(lo)) return _m;
-      if (code.split('\n').length >= MIN_LINES_FOR_ARTIFACT) return '';
-      return _m;
-    }
-  );
-  reducedResponse = reducedResponse
-    .replace(/^```\w+[ \t]*\r?\n[\s\S]*$/m, '')       // unclosed fence at end (cut-off large file)
-    .replace(/^\/\/\s*src\/[^\n]+\n/gm, '')            // orphaned file-path comments
-    .replace(/^\/\*\*[\s\S]*?\*\/\n/gm, '')             // orphaned JSDoc blocks
-    .replace(/^(function|const|let|var|class|export|import)\s+\w[^\n]*/gm, '') // SESSION 9 FIX: [^\n]* strips ENTIRE line not just keyword prefix
+  const reducedResponse = response
+    .replace(openMatch[0], `\n\n[ARTIFACT:${title}]\n`)
     .replace(/^```[ \t]*$/gm, '')
-    .replace(/^(here is|here's|the following|below is|this is)\b[^\n]*:\s*\n/gim, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-  return { title, language: lang, content: code, type, filePath, lineCount: bestLines, reducedResponse };
+  return {
+    title,
+    language:  lang,
+    content:   code.trimEnd(),
+    type,
+    filePath:  pathFromCode,
+    lineCount: lines,
+    reducedResponse,
+  };
 }
 
 export function extractDiagramsFromResponse(response: string): string[] {

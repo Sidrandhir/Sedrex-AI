@@ -963,7 +963,7 @@ const ThinkingBlock = memo(({ content }: { content: string }) => {
         type="button"
         className="thinking-toggle"
         onClick={() => setIsOpen(v => !v)}
-        aria-expanded={isOpen}
+        aria-expanded={isOpen ? 'true' : 'false'}
       >
         <span className={`thinking-chevron${isOpen ? ' open' : ''}`}>›</span>
         <span className="thinking-label">
@@ -1078,8 +1078,12 @@ const MessageItem = memo(
                 </div>
               );
             }
-            // After streaming: suppress large blocks that belong in artifact panel.
-            if (!isStreaming && lineCount >= 20) return null;
+            // After streaming: suppress large blocks that belong in the artifact
+            // panel.  Shell/terminal languages are excluded from artifact
+            // extraction and must always render inline — never suppress them.
+            const blockLang = (child.props.className ?? '').replace('language-', '').toLowerCase();
+            const isShellLang = ['bash', 'sh', 'shell', 'zsh', 'console', 'terminal', 'cmd', 'fish'].includes(blockLang);
+            if (!isStreaming && lineCount >= 20 && !isShellLang) return null;
             return <CodeBlock className={child.props.className}>{child.props.children}</CodeBlock>;
           }
           return <CodeBlock>{children}</CodeBlock>;
