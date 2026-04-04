@@ -72,20 +72,46 @@ _stdout_lines.clear()
 _stderr_lines.clear()
 `);
 
-    // Run user code — wrap in exec so last expression is captured separately
-    let ret;
-    try {
-      // Try to eval as expression first to capture return value
-      ret = await py.runPythonAsync(code);
-    } catch (_) {
-      ret = undefined;
-    }
+    // Wrap user code in a Python-level try/except so that ALL Python
+    // exceptions (SyntaxError, NameError, ZeroDivisionError, etc.) are
+    // caught inside the Python interpreter and written to sys.stderr as a
+    // full traceback. This prevents the JS inner-catch from silently
+    // swallowing exceptions and returning success=true with no output.
+    //
+    // We use a two-phase approach:
+    //   1. Attempt eval (expression) to capture a return value.
+    //   2. If that raises a SyntaxError (multi-statement code), fall back to
+    //      exec — both wrapped in Python-level try/except/traceback.
+    const wrappedCode = [
+      'import traceback as _tb',
+      '_ret = None',
+      '_exec_ok = False',
+      'try:',
+      '    _ret = eval(compile(' + JSON.stringify(code) + ', "<string>", "eval"))',
+      '    _exec_ok = True',
+      'except SyntaxError:',
+      '    try:',
+      '        exec(compile(' + JSON.stringify(code) + ', "<string>", "exec"))',
+      '        _exec_ok = True',
+      '    except Exception as _e:',
+      '        import sys as _sys',
+      '        _sys.stderr.write(_tb.format_exc())',
+      '        _exec_ok = False',
+      'except Exception as _e:',
+      '    import sys as _sys',
+      '    _sys.stderr.write(_tb.format_exc())',
+      '    _exec_ok = False',
+    ].join('\n');
+
+    await py.runPythonAsync(wrappedCode);
 
     // Collect captured output
     stdout    = py.globals.get('_stdout_lines').toJs() ?? [];
     stderr    = py.globals.get('_stderr_lines').toJs() ?? [];
+    const ret = py.globals.get('_ret');
     returnVal = (ret !== undefined && ret !== null) ? String(ret) : '';
-    success   = true;
+    // success = true only when no exception was raised
+    success   = py.globals.get('_exec_ok') === true;
 
   } catch (err) {
     // Pyodide surfaces Python tracebacks as the error message

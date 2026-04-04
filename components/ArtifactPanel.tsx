@@ -2,6 +2,7 @@ import React, {
   useRef, useEffect, useState, useCallback, memo,
 } from 'react';
 import { createPortal } from 'react-dom';
+import DOMPurify from 'dompurify';
 import {
   useArtifacts, updateArtifact, deleteArtifact, Artifact, loadArtifactContent,
 } from '../services/artifactStore';
@@ -645,13 +646,18 @@ const DiagramViewer = memo(({ artifact }: { artifact: Artifact }) => {
     (async () => {
       try {
         const mermaid = (await import('mermaid')).default;
+        // securityLevel: 'antiscript' — keeps all SVG structure intact while
+        // stripping event handlers. 'loose' forces htmlLabels ON regardless of
+        // the flowchart setting, causing <foreignObject> nodes that DOMPurify's
+        // svg profile strips → blank labels.
+        // htmlLabels: false → native SVG <text> elements, always preserved.
         mermaid.initialize({
           startOnLoad: false,
           theme: 'dark',
-          securityLevel: 'loose',
+          securityLevel: 'antiscript',
           maxTextSize: 500000,
           flowchart: {
-            htmlLabels: true,
+            htmlLabels: false,
             useMaxWidth: true,
             rankSpacing: 50,
             nodeSpacing: 30,
@@ -696,7 +702,7 @@ const DiagramViewer = memo(({ artifact }: { artifact: Artifact }) => {
       {error ? (
         <div style={{ padding: 20 }}><div style={{ color: '#f87171', marginBottom: 12, fontSize: 13 }}>⚠ {error}</div><pre style={{ fontSize: 11, opacity: 0.6, overflowX: 'auto', color: 'var(--text-secondary)' }}>{fullContent}</pre></div>
       ) : svg ? (
-        <div className="ap-code-scroll" style={{ padding: 20, display: 'flex', justifyContent: 'center' }}><div dangerouslySetInnerHTML={{ __html: svg }} style={{ maxWidth: '100%' }} /></div>
+        <div className="ap-code-scroll" style={{ padding: 20, display: 'flex', justifyContent: 'center' }}><div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } }) }} style={{ maxWidth: '100%' }} /></div>
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}><div className="ap-spinner" /></div>
       )}
@@ -794,6 +800,25 @@ const CodeViewer = memo(({ artifact, onSwitchToPreview }: { artifact: Artifact; 
           <button className={`ap-action-btn${copied ? ' ap-action-btn--success' : ''}`} onClick={handleCopy}>{copied ? <Icons.Check className="icon-12" /> : <Icons.Copy className="icon-12" />}<span>{copied ? 'Copied!' : 'Copy'}</span></button>
         </div>
       </div>
+      {/* CSS import warning — shown when a React/JS artifact imports a CSS file.
+          The preview sandbox strips all CSS imports so styles from those files
+          never apply. Alert the user so they know why things look unstyled. */}
+      {!fetching && /^\s*import\s+['"][^'"]+\.css['"]\s*;?/m.test(fullContent) && (
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: 10,
+          margin: '12px 16px 0', padding: '10px 14px',
+          background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.35)',
+          borderRadius: 8, fontSize: 12, color: '#facc15', lineHeight: 1.5,
+        }}>
+          <span style={{ fontSize: 15, flexShrink: 0 }}>⚠</span>
+          <span>
+            <strong>CSS imports are not supported in the preview.</strong>
+            {' '}External stylesheet imports are stripped when the sandbox runs.
+            Use <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: 3 }}>style={'{{}}'}</code> inline objects
+            or a <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: 3 }}>&lt;style&gt;</code> tag inside your component instead.
+          </span>
+        </div>
+      )}
       {fetching ? (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}>
           <div className="ap-spinner" />

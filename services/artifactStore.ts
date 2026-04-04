@@ -107,12 +107,18 @@ const EXCLUDED_LANGUAGES = new Set([
 ]);
 
 export interface ExtractedArtifact {
-  title:           string;
-  language:        string;
-  content:         string;
-  type:            ArtifactType;
-  filePath?:       string;
-  lineCount:       number;
+  title:            string;
+  language:         string;
+  content:          string;
+  type:             ArtifactType;
+  filePath?:        string;
+  lineCount:        number;
+  reducedResponse?: string;  // optional — not present on individual items in multi-extract
+}
+
+// Returned by extractAllArtifactsFromResponse
+export interface MultiExtractResult {
+  artifacts:       Omit<ExtractedArtifact, 'reducedResponse'>[];
   reducedResponse: string;
 }
 
@@ -183,6 +189,136 @@ function generateVersionedTitle(baseTitle: string): string {
   }
 
   return `${baseTitle} v${maxVersion + 1}`;
+}
+
+// Like generateVersionedTitle but also tracks titles that were just generated
+// within the same batch (before any of them are pushed to _artifacts).
+function generateVersionedTitleInBatch(baseTitle: string, usedInBatch: Set<string>): string {
+  const all = [..._artifacts, ..._diagrams];
+  const allTitles = [...all.map(a => a.title), ...usedInBatch];
+
+  const hasBase = allTitles.some(t => {
+    const stripped = t.replace(/\sv\d+$/, '');
+    return stripped === baseTitle || t === baseTitle;
+  });
+
+  if (!hasBase) {
+    usedInBatch.add(baseTitle);
+    return baseTitle;
+  }
+
+  let maxVersion = 1;
+  for (const t of allTitles) {
+    const stripped = t.replace(/\sv\d+$/, '');
+    if (stripped === baseTitle || t === baseTitle) {
+      const m = t.match(/\sv(\d+)$/);
+      if (m) maxVersion = Math.max(maxVersion, parseInt(m[1], 10));
+    }
+  }
+
+  const versioned = `${baseTitle} v${maxVersion + 1}`;
+  usedInBatch.add(versioned);
+  return versioned;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// extractAllArtifactsFromResponse
+//
+// BUG FIX: the original extractArtifactFromResponse picks ONE block
+// (largest or file-path priority) and strips every other large block.
+// When the AI returns package.json + index.html + App.tsx in one
+// response, only one card ever appeared.
+//
+// This function extracts ALL qualifying closed fenced blocks, injects
+// an [ARTIFACT:title] marker for each one at its original position,
+// and returns the array + the fully-reduced response string.
+//
+// renderWithArtifacts in ChatArea already loops all [ARTIFACT:] markers
+// so no changes are needed there.
+// ══════════════════════════════════════════════════════════════════
+export function extractAllArtifactsFromResponse(
+  response:    string,
+  userPrompt?: string,
+): MultiExtractResult | null {
+  const FENCE_RE = /^```(\w*)[ \t]*\r?\n([\s\S]*?)^```[ \t]*$/gm;
+
+  // Collect every qualifying closed fence with its byte range
+  const blocks: Array<{
+    lang:  string;
+    code:  string;
+    full:  string;
+    start: number;
+    end:   number;
+  }> = [];
+
+  let m: RegExpExecArray | null;
+  while ((m = FENCE_RE.exec(response)) !== null) {
+    const lang  = (m[1] ?? '').toLowerCase().trim() || 'text';
+    const code  = m[2];
+    const lines = code.split('\n').length;
+    if (!EXCLUDED_LANGUAGES.has(lang) && lines >= MIN_LINES_FOR_ARTIFACT) {
+      blocks.push({ lang, code, full: m[0], start: m.index, end: m.index + m[0].length });
+    }
+  }
+
+  if (blocks.length === 0) return null;
+
+  const usedTitles = new Set<string>();
+  const artifacts: Omit<ExtractedArtifact, 'reducedResponse'>[] = [];
+
+  for (const block of blocks) {
+    let lang = block.lang;
+    const code = block.code.trimEnd();
+    const lines = code.split('\n').length;
+
+    // JSX/TSX promotion (identical logic to the single extractor)
+    if (['javascript', 'js', 'typescript', 'ts'].includes(lang)) {
+      const hasJSXTags   = /<[A-Z][A-Za-z0-9]*[\s\/>]|<\/[A-Za-z][A-Za-z0-9]*>/.test(code);
+      const hasReact     = /import\s+.*[Rr]eact|from\s+['"]react['"]|useState|useEffect|useRef/.test(code);
+      const hasReturnJSX = /return\s*\(\s*<|=>\s*<[A-Z]/.test(code);
+      if ((hasJSXTags && hasReact) || hasReturnJSX) {
+        lang = (lang === 'typescript' || lang === 'ts') ? 'tsx' : 'jsx';
+      }
+    }
+
+    const type: ArtifactType = lang === 'html' ? 'html' : 'code';
+
+    // File path from inline comment or the lines just before the block
+    const firstLine  = code.split('\n')[0] ?? '';
+    const pathFromCode = firstLine.match(/(?:\/\/|#)\s*([\w./\-]+\.\w+)/)?.[1];
+    const beforeBlock  = response.slice(0, block.start);
+    const lastLines    = beforeBlock.split('\n').slice(-3).join('\n');
+    const pathMatch    = lastLines.match(/(?:\/\/|#|\/\*|\*\*File:?|Path:?)\s*([\w./\-]+\.\w+)/);
+    const filePath     = pathFromCode ?? pathMatch?.[1];
+
+    const baseTitle = filePath
+      ? filePath.split('/').pop() ?? filePath
+      : deriveTitleFromPrompt(userPrompt ?? '', lang);
+
+    const title = generateVersionedTitleInBatch(baseTitle, usedTitles);
+
+    artifacts.push({ title, language: lang, content: code, type, filePath, lineCount: lines });
+  }
+
+  // Build reducedResponse in a single forward pass — replace each block
+  // with its [ARTIFACT:title] marker using the tracked byte offsets.
+  let reduced = '';
+  let cursor  = 0;
+  for (let i = 0; i < blocks.length; i++) {
+    reduced += response.slice(cursor, blocks[i].start);
+    reduced += `\n\n[ARTIFACT:${artifacts[i].title}]\n`;
+    cursor   = blocks[i].end;
+  }
+  reduced += response.slice(cursor);
+
+  // Final cleanup (mirrors the single extractor)
+  reduced = reduced
+    .replace(/^```[ \t]*$/gm, '')
+    .replace(/^(here is|here's|the following|below is|this is)\b[^\n]*:\s*\n/gim, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return { artifacts, reducedResponse: reduced };
 }
 
 export function extractArtifactFromResponse(

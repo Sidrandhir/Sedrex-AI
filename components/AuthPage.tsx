@@ -36,8 +36,9 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
       const user = isLogin
         ? await login(email, password)
         : await signup(email, password, name);
+      const supabaseRef = (import.meta.env.VITE_SUPABASE_URL || '').split('.')[0].split('//')[1] || '';
       const hasSession =
-        !!localStorage.getItem('sb-' + (process.env.SUPABASE_URL || '').split('.')[0].split('//')[1] + '-auth-token') ||
+        !!localStorage.getItem(`sb-${supabaseRef}-auth-token`) ||
         !!document.cookie.includes('sb-access-token');
       if (!isLogin && !hasSession) {
         setInfoMessage('Account created! Check your email to confirm, then log in.');

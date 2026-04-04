@@ -45,6 +45,7 @@ import { Routes, Route } from 'react-router-dom';
 import Privacy from './components/Privacy';
 import Terms from './components/Terms';
 import Contact from './components/Contact';
+import NotFound from './components/NotFound';
 import CommandPalette from './components/CommandPalette';
 import { isSupabaseConfigured as initialConfigured, supabase } from './services/supabaseClient';
 import { getProjectIndex } from './services/codebaseContext';
@@ -546,7 +547,7 @@ const App: React.FC = () => {
             type:     extracted.type,
             filePath: extracted.filePath,
           }).catch(() => { });
-          finalContent = extracted.reducedResponse;
+          finalContent = extracted.reducedResponse ?? finalContent;
         }
 
         // Extract & Store Diagrams for Sidebar
@@ -686,6 +687,11 @@ const App: React.FC = () => {
       setSessions(prev => prev.map(s => s.id === activeSessionId ? {
         ...s, messages: s.messages.map(m => ({ ...m, suggestions: undefined })),
       } : s));
+      // BUG 3 FIX: Optimistic increment — fill the progress bar immediately on
+      // send without waiting for the Supabase re-fetch after AI responds.
+      // The getStats() call at end of requestAIResponse will reconcile the real DB
+      // value, but this makes the bar responsive and accurate from the first send.
+      setUserStats(prev => prev ? { ...prev, monthlyMessagesSent: prev.monthlyMessagesSent + 1 } : prev);
       const savedUserMsg = await api.saveMessage(activeSessionId, {
         role: 'user',
         codebaseRef: getProjectIndex() ? { projectName: getProjectIndex()!.projectName, totalFiles: getProjectIndex()!.totalFiles } : undefined,
@@ -703,6 +709,9 @@ const App: React.FC = () => {
     if (idx === -1) return;
     try {
       analytics.editMessage(messageId, activeSessionId);
+      // BUG 3 FIX: Same optimistic increment as handleSendMessage — edited
+      // messages also consume a quota slot.
+      setUserStats(prev => prev ? { ...prev, monthlyMessagesSent: prev.monthlyMessagesSent + 1 } : prev);
       const savedMsg = await api.saveMessage(activeSessionId, { role: 'user', content: newContent, timestamp: Date.now() });
       const updated = [...activeSession.messages.slice(0, idx), savedMsg];
       setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: updated } : s));
@@ -937,6 +946,7 @@ const App: React.FC = () => {
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/contact" element={<Contact />} />
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </div>
 

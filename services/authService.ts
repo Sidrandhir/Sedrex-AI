@@ -2,21 +2,23 @@
 import { User, UserTier } from "../types";
 import { supabase } from "./supabaseClient";
 
-// Returns a list of users known to this client's local registry to support synchronous stats calculation.
+// Returns whether this browser has a known returning user session.
+// Stores only an anonymous flag — no PII (no email, no user ID).
 export const getAllUsers = (): User[] => {
-  if (typeof window === 'undefined') return [];
-  const stored = localStorage.getItem('sedrex_known_users');
-  return stored ? JSON.parse(stored) : [];
+  // Legacy: return empty array — PII storage removed.
+  // Call sites that needed this for analytics now read from Supabase Auth directly.
+  return [];
 };
 
-// Helper function to register a user in the local registry for synchronous analytics retrieval.
-const registerUserLocally = (user: User) => {
+// Marks that this browser has completed at least one authenticated session.
+// Stores no PII — only a boolean presence flag.
+const registerUserLocally = (_user: User) => {
   if (typeof window === 'undefined') return;
-  const users = getAllUsers();
-  if (!users.find(u => u.id === user.id)) {
-    users.push(user);
-    localStorage.setItem('sedrex_known_users', JSON.stringify(users));
-  }
+  try {
+    localStorage.setItem('sedrex_has_visited', 'true');
+    // Clean up any legacy PII that may have been stored by a previous version
+    localStorage.removeItem('sedrex_known_users');
+  } catch { /* ignore quota errors */ }
 };
 
 /**

@@ -59,25 +59,25 @@ export const TIER_CONFIG: Record<TierId, TierConfig> = {
     priceCents:    0,
     stripePriceId: '',
 
-    monthlyMessages:   Infinity, // e.g. replace with 50
-    dailyMessages:     Infinity, // e.g. replace with 10
-    monthlyTokens:     Infinity, // e.g. replace with 100_000
-    maxFileSizeMB:     10,
-    maxFilesPerMsg:    3,
-    maxConversations:  Infinity, // e.g. replace with 20
+    monthlyMessages:   30,
+    dailyMessages:     10,
+    monthlyTokens:     50_000,
+    maxFileSizeMB:     5,
+    maxFilesPerMsg:    1,
+    maxConversations:  20,
     contextWindowMsgs: 10,
 
     features: {
       codeExecution:       true,
-      imageGeneration:     true,
-      voiceInput:          true,
+      imageGeneration:     false,
+      voiceInput:          false,
       artifactPanel:       true,
       priorityRouting:     false,
       advancedModels:      false,
       teamAccess:          false,
       apiAccess:           false,
-      customSystemPrompt:  true,
-      exportConversations: true,
+      customSystemPrompt:  false,
+      exportConversations: false,
       slaGuarantee:        false,
       dedicatedSupport:    false,
     },
@@ -88,14 +88,14 @@ export const TIER_CONFIG: Record<TierId, TierConfig> = {
     name:          'Sedrex Pro',
     displayPrice:  '$29 / mo',
     priceCents:    2900,
-    stripePriceId: 'price_FILL_IN_STRIPE_PRICE_ID', // ← paste your Stripe price ID here
+    stripePriceId: 'price_FILL_IN_STRIPE_PRICE_ID', // ← paste your Stripe price ID after creating product in Stripe Dashboard
 
-    monthlyMessages:   Infinity, // e.g. replace with 2000
-    dailyMessages:     Infinity, // e.g. replace with 200
-    monthlyTokens:     Infinity, // e.g. replace with 5_000_000
-    maxFileSizeMB:     50,
-    maxFilesPerMsg:    10,
-    maxConversations:  Infinity,
+    monthlyMessages:   2_000,
+    dailyMessages:     200,
+    monthlyTokens:     2_000_000,
+    maxFileSizeMB:     25,
+    maxFilesPerMsg:    5,
+    maxConversations:  500,
     contextWindowMsgs: 20,
 
     features: {
@@ -121,11 +121,11 @@ export const TIER_CONFIG: Record<TierId, TierConfig> = {
     priceCents:    null,
     stripePriceId: '', // handled via Stripe Quote / custom invoice
 
-    monthlyMessages:   Infinity,
-    dailyMessages:     Infinity,
-    monthlyTokens:     Infinity,
-    maxFileSizeMB:     200,
-    maxFilesPerMsg:    50,
+    monthlyMessages:   10_000,
+    dailyMessages:     1_000,
+    monthlyTokens:     10_000_000,
+    maxFileSizeMB:     50,
+    maxFilesPerMsg:    10,
     maxConversations:  Infinity,
     contextWindowMsgs: 50,
 

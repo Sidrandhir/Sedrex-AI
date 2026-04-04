@@ -22,13 +22,13 @@ const _env = (typeof import.meta !== 'undefined' && import.meta.env)
 
 export const MODELS = {
   // ── Google Gemini ────────────────────────────────────────────────
-  GEMINI_FLASH:        'gemini-3-flash-preview',                   // Primary — 1K RPM, 10K/day
-  GEMINI_FLASH_LITE:   'gemini-3.1-flash-lite-preview',            // Lightweight — titles, follow-ups
-  GEMINI_PRO:          'gemini-3.1-pro-preview',                   // Best quality — 25 RPM, 250/day limit
+  GEMINI_FLASH:        'gemini-2.5-flash',                         // Primary — stable, fast
+  GEMINI_FLASH_LITE:   'gemini-2.0-flash',                         // Lightweight — titles, follow-ups
+  GEMINI_PRO:          'gemini-2.5-pro-preview',                   // Best quality — advanced reasoning
   GEMINI_STABLE:       'gemini-2.5-flash',                         // Stable fallback — after rate-limit
   GEMINI_LAST_RESORT:  'gemini-2.0-flash',                         // Absolute last resort
-  GEMINI_IMAGE:        'nano-banana-pro-preview',                  // Image fallback 1 — 20 RPM, 250/day
-  GEMINI_IMAGE2:       'gemini-3.1-flash-image-preview',           // Image fallback 2
+  GEMINI_IMAGE:        'gemini-2.0-flash-exp',                     // Image fallback 1 — multimodal experimental
+  GEMINI_IMAGE2:       'gemini-2.0-flash',                         // Image fallback 2 — stable multimodal
   GEMINI_IMAGE3:       'gemini-2.5-flash-image',                   // Image fallback 3 — budget
   IMAGEN:              'imagen-4.0-generate-001',                  // Imagen 4 — 10 RPM, 70/day
   IMAGEN_FAST:         'imagen-4.0-fast-generate-001',             // Imagen 4 Fast
@@ -407,7 +407,6 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
   [MODELS.GPT_FAST]:             { input: 0.25,  output: 2.00  },
   [MODELS.GPT_BALANCED]:         { input: 0.88,  output: 7.00  },
   [MODELS.GPT_REASONING]:        { input: 1.10,  output: 4.40  },
-  [MODELS.GPT_CODE]:             { input: 1.25,  output: 10.00 },
   [MODELS.GROK_FAST]:            { input: 0.20,  output: 0.50  },
   [MODELS.GROK_PRO]:             { input: 2.00,  output: 15.00 },
   [MODELS.DEEPSEEK_CHAT]:        { input: 0.30,  output: 0.50  },

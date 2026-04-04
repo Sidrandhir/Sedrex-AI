@@ -1,6 +1,7 @@
 import React, {
   useRef, useEffect, useState, useCallback, useMemo, memo,
 } from 'react';
+import DOMPurify from 'dompurify';
 import { Message, AIModel, SedrexRoute, ChatSession, GroundingChunk, MessageImage } from '../types';
 import { Icons } from '../constants';
 import ReactMarkdown from 'react-markdown';
@@ -14,7 +15,7 @@ import { ConfidenceBadge } from './ConfidenceBadge';
 import type { ConfidenceSignal } from '../services/aiService';
 import ArtifactCard from './ArtifactCard';
 import { RunButton, CodeRunner } from './CodeRunner';
-import { getArtifacts, extractArtifactFromResponse, registerEphemeralArtifact } from '../services/artifactStore';
+import { getArtifacts, extractArtifactFromResponse, extractAllArtifactsFromResponse, registerEphemeralArtifact } from '../services/artifactStore';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   BarChart, Bar, LineChart, Line,
@@ -355,26 +356,27 @@ const MermaidBlock = memo(({ code }: { code: string }) => {
         setLoading(true);
         const mermaid = (await import('mermaid')).default;
 
-        // Initialize once per page load.
-        // 'antiscript' removes onclick/onerror handlers but keeps all SVG
-        // features that Mermaid needs. 'strict' (old value) strips too much
-        // and was breaking diagram rendering.
-        if (!(window as any).__MERMAID_READY__) {
-          mermaid.initialize({
-            startOnLoad: false,
-            theme: 'dark',
-            securityLevel: 'loose',
-            maxTextSize: 500000,
-            flowchart: {
-              htmlLabels: true,
-              useMaxWidth: true,
-              rankSpacing: 50,
-              nodeSpacing: 30,
-            },
-            maxEdges: 500,
-          });
-          (window as any).__MERMAID_READY__ = true;
-        }
+        // Re-initialize on every render to guarantee correct settings.
+        // securityLevel: 'antiscript' — strips onclick/onerror but preserves
+        // all SVG structure. 'loose' was the bug: it silently re-enables
+        // htmlLabels regardless of the flowchart.htmlLabels setting, causing
+        // Mermaid to render labels as <foreignObject><div> which DOMPurify's
+        // svg profile strips — leaving every node blank.
+        // htmlLabels: false forces native SVG <text> elements, which the svg
+        // profile correctly preserves.
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: 'dark',
+          securityLevel: 'antiscript',
+          maxTextSize: 500000,
+          flowchart: {
+            htmlLabels: false,
+            useMaxWidth: true,
+            rankSpacing: 50,
+            nodeSpacing: 30,
+          },
+          maxEdges: 500,
+        });
 
         const { svg: rendered } = await mermaid.render(id, sanitizeMermaid(code));
         if (active) {
@@ -415,7 +417,7 @@ const MermaidBlock = memo(({ code }: { code: string }) => {
       ) : loading ? (
         <div className="nx-diagram-loading"><div className="nx-spinner" /></div>
       ) : (
-        <div className="nx-diagram-body" dangerouslySetInnerHTML={{ __html: svg }} />
+        <div className="nx-diagram-body" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } }) }} />
       )}
     </div>
   );
@@ -938,6 +940,7 @@ interface MessageItemProps {
   onEditChange: (val: string) => void;
   onRegenerate: (id: string) => void;
   onFeedback: (id: string, fb: 'good' | 'bad' | null) => void;
+  submittedFeedback: Set<string>;
   onSpeak: (id: string, text: string) => void;
   onSuggestionClick?: (text: string) => void;
   mdComponents: any;
@@ -993,7 +996,7 @@ const MessageItem = memo(
   ({
     msg, isLast, isLoading, copiedId, editingId, editContent, speakingMsgId,
     confidence, onCopy, onStartEdit, onCancelEdit, onSubmitEdit, onEditChange,
-    onRegenerate, onFeedback, onSpeak, onSuggestionClick,
+    onRegenerate, onFeedback, submittedFeedback, onSpeak, onSuggestionClick,
     mdComponents, remarkPlugins,
   }: MessageItemProps) => {
     const isUser = msg.role === 'user';
@@ -1011,19 +1014,25 @@ const MessageItem = memo(
       const cacheKey = djb2(content);
       if (markdownCache.has(cacheKey)) return markdownCache.get(cacheKey)!;
 
-      // FIX 3: If msg.content still has a raw code fence but no artifact marker
-      // (e.g. setSessions race or historical message), extract and use reducedResponse
-      // so the code block doesn't bleed into the chat bubble.
+      // MULTI-ARTIFACT FIX: If msg.content has raw code fences but no markers,
+      // extract ALL qualifying blocks at once (not just the largest one).
+      // extractAllArtifactsFromResponse injects one [ARTIFACT:title] per block.
+      // renderWithArtifacts already loops all markers so no change needed there.
       let displayContent = content;
       if (!(msg as any).isDiff && !content.includes('[ARTIFACT:') && content.includes('```')) {
-        const extracted = extractArtifactFromResponse(content);
-        if (extracted) {
-          displayContent = extracted.reducedResponse;
-          // SESSION 9 FIX: Register in artifact store so [ARTIFACT:] marker
-          // resolves to a real ArtifactCard instead of a dead placeholder.
-          // Previously this path only fixed display content but never populated
-          // the store — clicking the marker showed a grey "pending" chip.
-          registerEphemeralArtifact(extracted);
+        const multiResult = extractAllArtifactsFromResponse(content);
+        if (multiResult && multiResult.artifacts.length > 0) {
+          displayContent = multiResult.reducedResponse;
+          // Register every extracted artifact so its [ARTIFACT:] marker resolves
+          // to a real ArtifactCard with a working View button.
+          multiResult.artifacts.forEach(a => registerEphemeralArtifact(a));
+        } else {
+          // Fallback: single extractor for edge cases (unclosed fence, streaming cut-off)
+          const extracted = extractArtifactFromResponse(content);
+          if (extracted) {
+            displayContent = extracted.reducedResponse ?? content;
+            registerEphemeralArtifact(extracted);
+          }
         }
       }
 
@@ -1038,24 +1047,45 @@ const MessageItem = memo(
     // FIX 2: When the processed content already contains an [ARTIFACT:] marker,
     // the code block is rendered by the artifact panel — suppress any duplicate
     // large code blocks that ReactMarkdown would otherwise render inline.
+    // BUG 2 FIX: Also intercept during streaming — if a code block exceeds the
+    // artifact threshold while streaming (closing fence not yet arrived), show
+    // a loading placeholder instead of the raw partial code. This prevents the
+    // artifact panel from opening mid-stream with half-written content.
     const hasArtifact = !isStreaming && processedMarkdown.includes('[ARTIFACT:');
     const localMdComponents = useMemo(() => {
-      if (!hasArtifact) return mdComponents;
+      if (!hasArtifact && !isStreaming) return mdComponents;
       return {
         ...mdComponents,
         pre: ({ children }: any) => {
           const child = React.Children.only(children) as React.ReactElement<any> | null;
           if (child?.props) {
             const codeStr = String(child.props.children ?? '').replace(/\n$/, '');
-            // Suppress code blocks that meet the artifact threshold — they belong
-            // in the artifact panel, not inline in the chat bubble.
-            if (codeStr.split('\n').length >= 20) return null;
+            const lineCount = codeStr.split('\n').length;
+            // During streaming: large blocks become a placeholder — never render
+            // raw partial code inline and never open the artifact panel early.
+            if (isStreaming && lineCount >= 30) {
+              return (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '12px 16px', margin: '8px 0',
+                  background: 'var(--bg-secondary, #1a1a2e)',
+                  border: '1px solid var(--border-color, rgba(255,255,255,0.08))',
+                  borderRadius: 8, color: 'var(--text-secondary, #94a3b8)',
+                  fontSize: 13,
+                }}>
+                  <div className="nx-spinner" style={{ width: 14, height: 14, flexShrink: 0 }} />
+                  <span>Generating artifact…</span>
+                </div>
+              );
+            }
+            // After streaming: suppress large blocks that belong in artifact panel.
+            if (!isStreaming && lineCount >= 20) return null;
             return <CodeBlock className={child.props.className}>{child.props.children}</CodeBlock>;
           }
           return <CodeBlock>{children}</CodeBlock>;
         },
       };
-    }, [hasArtifact, mdComponents]);
+    }, [hasArtifact, isStreaming, mdComponents]);
 
     return (
       <div className={`message-group message-enter ${isUser ? 'message-user' : 'message-assistant'}`}>
@@ -1275,24 +1305,32 @@ const MessageItem = memo(
                 <Icons.Flag className="icon-14" />
               </button>
               <div className="message-action-divider" />
-              <button
-                type="button"
-                className={`message-action-btn${msg.feedback === 'good' ? ' active-good' : ''}`}
-                onClick={() => onFeedback(msg.id, msg.feedback === 'good' ? null : 'good')}
-                title="Good response"
-              >
-                <Icons.ThumbsUp className="icon-14" />
-                <span className="action-btn-label">Good</span>
-              </button>
-              <button
-                type="button"
-                className={`message-action-btn${msg.feedback === 'bad' ? ' active-bad' : ''}`}
-                onClick={() => onFeedback(msg.id, msg.feedback === 'bad' ? null : 'bad')}
-                title="Bad response"
-              >
-                <Icons.ThumbsDown className="icon-14" />
-                <span className="action-btn-label">Bad</span>
-              </button>
+              {submittedFeedback.has(msg.id) ? (
+                <span className="message-action-btn" style={{ opacity: 0.5, cursor: 'default', fontSize: '0.75rem' }} title="Feedback recorded">
+                  ✓ Thanks
+                </span>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className={`message-action-btn${msg.feedback === 'good' ? ' active-good' : ''}`}
+                    onClick={() => onFeedback(msg.id, msg.feedback === 'good' ? null : 'good')}
+                    title="Good response"
+                  >
+                    <Icons.ThumbsUp className="icon-14" />
+                    <span className="action-btn-label">Good</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`message-action-btn${msg.feedback === 'bad' ? ' active-bad' : ''}`}
+                    onClick={() => onFeedback(msg.id, msg.feedback === 'bad' ? null : 'bad')}
+                    title="Bad response"
+                  >
+                    <Icons.ThumbsDown className="icon-14" />
+                    <span className="action-btn-label">Bad</span>
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Generated Image Logic */}
@@ -1341,6 +1379,7 @@ const MessageItem = memo(
   (prev, next) => {
     if (prev.msg.content !== next.msg.content) return false;
     if (prev.msg.feedback !== next.msg.feedback) return false;
+    if (prev.submittedFeedback.has(prev.msg.id) !== next.submittedFeedback.has(next.msg.id)) return false;
     if (prev.msg.suggestions !== next.msg.suggestions) return false;
     if (prev.msg.codebaseRef !== next.msg.codebaseRef) return false;
     if (prev.isLast !== next.isLast) return false;
@@ -1371,6 +1410,13 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const [autoScroll, setAutoScroll] = useState(true);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
+  const [submittedFeedback, setSubmittedFeedback] = useState<Set<string>>(new Set());
+
+  const handleFeedbackGuarded = useCallback((id: string, fb: 'good' | 'bad' | null) => {
+    if (fb !== null && submittedFeedback.has(id)) return;
+    if (fb !== null) setSubmittedFeedback(prev => new Set(prev).add(id));
+    onFeedback(id, fb);
+  }, [submittedFeedback, onFeedback]);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   // Inject streaming cursor CSS once on mount
@@ -1536,7 +1582,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               onSubmitEdit={handleSubmitEdit}
               onEditChange={setEditContent}
               onRegenerate={onRegenerate}
-              onFeedback={onFeedback}
+              onFeedback={handleFeedbackGuarded}
+              submittedFeedback={submittedFeedback}
               onSpeak={speakMessage}
               onSuggestionClick={onSuggestionClick}
               mdComponents={mdComponents}

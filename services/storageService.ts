@@ -278,7 +278,7 @@ export const storageService = {
     if (!isSupabaseConfigured || !supabase) return [];
     let query = supabase
       .from('file_uploads')
-      .select('*')
+      .select('id, original_name, display_name, file_type, mime_type, file_size_bytes, file_size_human, storage_path, public_url, upload_status, created_at')
       .eq('user_id', userId)
       .eq('is_deleted', false)
       .order('created_at', { ascending: false });
@@ -296,7 +296,8 @@ export const storageService = {
       .from('file_uploads')
       .select('file_type, file_size_bytes')
       .eq('user_id', userId)
-      .eq('is_deleted', false);
+      .eq('is_deleted', false)
+      .limit(1000);
 
     const files = data ?? [];
     return {
@@ -361,7 +362,7 @@ export async function getStats(userId: string) {
   try {
     const { data } = await supabase
       .from('user_stats')
-      .select('*')
+      .select('user_id, tier, total_messages, monthly_messages, tokens_estimated, model_usage, daily_history')
       .eq('user_id', userId)
       .maybeSingle();
     return {

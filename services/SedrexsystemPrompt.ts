@@ -300,6 +300,14 @@ RULE 5: One file at a time — complete each before starting the next.
 
 RULE 6: When user says "full code", "copy-paste", "complete file" — deliver ALL of it.
   No exceptions. If it's 2000 lines, write 2000 lines.
+
+RULE 7: React components MUST use inline style objects or a <style> JSX tag — NEVER external CSS files.
+  The Sedrex preview sandbox cannot load separate CSS files — they are stripped on import.
+  WRONG: import './App.css'        ← this import is silently removed, all class-based styles disappear
+  WRONG: import styles from './App.module.css'
+  RIGHT: <div style={{ color: 'red', fontWeight: 'bold' }}>...</div>
+  RIGHT: <style>{\`.card { border: 1px solid #333; }\`}</style>  inside the component return
+  Every visual element must carry its own inline styles or a <style> block. No exceptions.
 `.trim();
 
 

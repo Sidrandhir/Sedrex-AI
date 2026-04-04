@@ -43,13 +43,13 @@ import { verifyResponse } from "./agents/verificationAgent";
 import { getCodebaseContextForQuery } from "./codebaseContext";
 
 const MODELS = {
-  FLASH:         "gemini-3-flash-preview",             // Primary — fastest general queries
-  FLASH_LITE:    "gemini-3.1-flash-lite-preview",      // Lightweight — titles, follow-ups, expansion
-  PRO:           "gemini-3.1-pro-preview",             // Heavy tasks — most advanced reasoning (250/day limit)
+  FLASH:         "gemini-2.5-flash",                  // Primary — fastest general queries
+  FLASH_LITE:    "gemini-2.0-flash",                  // Lightweight — titles, follow-ups, expansion
+  PRO:           "gemini-2.5-pro-preview",            // Heavy tasks — most advanced reasoning
   IMAGEN:        "imagen-4.0-generate-001",            // Image — Imagen 4 photorealistic
   IMAGEN_FAST:   "imagen-4.0-fast-generate-001",       // Image — Imagen 4 Fast
-  GEMINI_IMAGE:  "nano-banana-pro-preview",            // Image fallback 1 — Nano Banana Pro
-  GEMINI_IMAGE2: "gemini-3.1-flash-image-preview",     // Image fallback 2 — Nano Banana 2
+  GEMINI_IMAGE:  "gemini-2.0-flash-exp",              // Image fallback 1 — multimodal flash experimental
+  GEMINI_IMAGE2: "gemini-2.0-flash",                  // Image fallback 2 — stable flash multimodal
   STABLE_FLASH:  "gemini-2.5-flash",                  // Stable fallback — after rate-limit/429
   LAST_RESORT:   "gemini-2.0-flash",                  // Circuit breaker — absolute last resort
 } as const;
@@ -282,24 +282,34 @@ const apiKeyPool = [
   return true;
 });
 
-console.log("[SEDREX] Neural key pool size:", apiKeyPool.length);
-if (apiKeyPool.length === 0) {
-  console.error("[SEDREX] ❌ No neural keys configured. Add VITE_GEMINI_KEY to .env.local");
+if (import.meta.env.DEV) {
+  console.log("[SEDREX] Neural key pool size:", apiKeyPool.length);
+  if (apiKeyPool.length === 0) {
+    console.error("[SEDREX] ❌ No neural keys configured. Add VITE_GEMINI_KEY to .env.local");
+  }
 }
 
 // ── Multi-provider config ─────────────────────────────────────────
 const PROVIDER_OPENAI = {
   key:       _vite.VITE_OPENAI_KEY || _proc.OPENAI_API_KEY || "",
-  model:     "gpt-4-turbo-preview",
-  available: !!(_vite.VITE_OPENAI_KEY || _proc.OPENAI_API_KEY),
+  model:     "gpt-4o",
+  // Only mark available when key looks real (not a placeholder)
+  available: !!(_vite.VITE_OPENAI_KEY || _proc.OPENAI_API_KEY) &&
+    !(_vite.VITE_OPENAI_KEY || '').startsWith('sk-...') &&
+    (_vite.VITE_OPENAI_KEY || _proc.OPENAI_API_KEY || '').length > 20,
 };
 const PROVIDER_CLAUDE = {
   key:       _vite.VITE_CLAUDE_KEY || _proc.ANTHROPIC_API_KEY || "",
   model:     "claude-3-5-sonnet-20241022",
-  available: !!(_vite.VITE_CLAUDE_KEY || _proc.ANTHROPIC_API_KEY),
+  // Only mark available when key looks real (not a placeholder)
+  available: !!(_vite.VITE_CLAUDE_KEY || _proc.ANTHROPIC_API_KEY) &&
+    !(_vite.VITE_CLAUDE_KEY || '').startsWith('sk-ant-...') &&
+    (_vite.VITE_CLAUDE_KEY || _proc.ANTHROPIC_API_KEY || '').length > 20,
 };
-console.log("[SEDREX] Precision Engine:", PROVIDER_OPENAI.available ? "✅ configured" : "⏳ using core fallback");
-console.log("[SEDREX] Code Engine:", PROVIDER_CLAUDE.available ? "✅ configured" : "⏳ using core fallback");
+if (import.meta.env.DEV) {
+  console.log("[SEDREX] Precision Engine:", PROVIDER_OPENAI.available ? "✅ configured" : "⏳ using core fallback");
+  console.log("[SEDREX] Code Engine:", PROVIDER_CLAUDE.available ? "✅ configured" : "⏳ using core fallback");
+}
 
 // ── Gemini key rotation ───────────────────────────────────────────
 let apiKeyIndex = 0;
@@ -336,6 +346,9 @@ function markApiKeySuccess(key: string): void {
 type CacheEntry = { value: SedrexResponse; expiresAt: number };
 const responseCache = new Map<string, CacheEntry>();
 
+// Module-level cache GC — intentionally not cleared on unmount.
+// This service is a singleton module, not a React component.
+// The interval persists for the lifetime of the tab, which is correct behavior.
 setInterval(() => {
   const now = Date.now();
   for (const [k, v] of responseCache) {
@@ -1220,7 +1233,7 @@ async function processRequest(
   const classifiedIntent = classifyIntent(prompt, hasImage, hasDocs);
   const isEditIntent = classifiedIntent === 'technical' && detectEditIntent(prompt, history);
 
-  if (isEditIntent) {
+  if (isEditIntent && import.meta.env.DEV) {
     console.log("[SEDREX] Edit intent detected — injecting DIFF_PROTOCOL");
   }
 
@@ -1462,7 +1475,7 @@ async function processRequest(
                   dallePrompt = parsed.action_input.prompt;
                 }
               }
-              console.log('[SEDREX Visual] Image intent detected — redirecting to visual engine.');
+              if (import.meta.env.DEV) console.log('[SEDREX Visual] Image intent detected — redirecting to visual engine.');
               try {
                 const imgResult = await generateImage(dallePrompt);
                 const response: SedrexResponse = {
@@ -1598,7 +1611,7 @@ async function processRequest(
       // ═══════════════════════════════════════════════════════════
       const isDiff = isEditIntent || isDiffContent(content);
 
-      if (isDiff) {
+      if (isDiff && import.meta.env.DEV) {
         console.log("[SEDREX] Diff response detected — skipping artifact extraction");
       }
 
@@ -1896,7 +1909,7 @@ async function generateImage(
   // ── Prompt expansion (best-effort, silent on failure) ─────────────
   let expandedPrompt = prompt;
   try {
-    console.log("[SEDREX Visual] Expanding image prompt…");
+    if (import.meta.env.DEV) console.log("[SEDREX Visual] Expanding image prompt…");
     const expansionKey = getApiKey();
     const expansionAi  = new GoogleGenAI({ apiKey: expansionKey });
     const expansionResult = await expansionAi.models.generateContent({
@@ -1907,7 +1920,7 @@ async function generateImage(
     const expanded = expansionResult.text?.trim();
     if (expanded && expanded.length > 20 && !expanded.toLowerCase().includes("return only")) {
       expandedPrompt = expanded;
-      console.log("[SEDREX Visual] Prompt expanded:", expandedPrompt.slice(0, 100) + "…");
+      if (import.meta.env.DEV) console.log("[SEDREX Visual] Prompt expanded:", expandedPrompt.slice(0, 100) + "…");
     }
     markApiKeySuccess(expansionKey);
   } catch (expansionErr) {
@@ -1950,7 +1963,7 @@ async function generateImage(
 
   // ── STRATEGY 1: Imagen 4 (predict) ───────────────────────────────
   try {
-    console.log("[SEDREX Visual] Strategy 1: Imagen 4…");
+    if (import.meta.env.DEV) console.log("[SEDREX Visual] Strategy 1: Imagen 4…");
     const key = getApiKey();
     if (!key) throw new Error("No API key available");
     const ai = new GoogleGenAI({ apiKey: key });
@@ -1962,7 +1975,7 @@ async function generateImage(
     const img = response?.generatedImages?.[0];
     if (!img?.image?.imageBytes) throw new Error("Imagen 4 returned no image data");
     markApiKeySuccess(key);
-    console.log("[SEDREX Visual] ✅ Strategy 1 succeeded (Imagen 4)");
+    if (import.meta.env.DEV) console.log("[SEDREX Visual] ✅ Strategy 1 succeeded (Imagen 4)");
     return {
       url:    `data:${img.image.mimeType || "image/png"};base64,${img.image.imageBytes}`,
       text:   `Image generated from: "${expandedPrompt.slice(0, 120)}${expandedPrompt.length > 120 ? '…' : ''}"`,
@@ -1975,21 +1988,21 @@ async function generateImage(
     console.warn("[SEDREX Visual] Strategy 1 failed:", e1?.message ?? e1);
   }
 
-  // ── STRATEGY 2: Nano Banana Pro ───────────────────────────────────
+  // ── STRATEGY 2: Gemini Flash Experimental (multimodal) ───────────
   try {
-    console.log("[SEDREX Visual] Strategy 2: Nano Banana Pro…");
-    const result = await runGeminiImageStrategy(MODELS.GEMINI_IMAGE, "Nano Banana Pro");
-    console.log("[SEDREX Visual] ✅ Strategy 2 succeeded (Nano Banana Pro)");
+    if (import.meta.env.DEV) console.log("[SEDREX Visual] Strategy 2: Gemini Flash Exp…");
+    const result = await runGeminiImageStrategy(MODELS.GEMINI_IMAGE, "Gemini Flash Exp");
+    if (import.meta.env.DEV) console.log("[SEDREX Visual] ✅ Strategy 2 succeeded (Gemini Flash Exp)");
     return result;
   } catch (e2: any) {
     console.warn("[SEDREX Visual] Strategy 2 failed:", e2?.message ?? e2);
   }
 
-  // ── STRATEGY 3: Nano Banana 2 ─────────────────────────────────────
+  // ── STRATEGY 3: Gemini Flash Stable (multimodal) ─────────────────
   try {
-    console.log("[SEDREX Visual] Strategy 3: Nano Banana 2…");
-    const result = await runGeminiImageStrategy(MODELS.GEMINI_IMAGE2, "Nano Banana 2");
-    console.log("[SEDREX Visual] ✅ Strategy 3 succeeded (Nano Banana 2)");
+    if (import.meta.env.DEV) console.log("[SEDREX Visual] Strategy 3: Gemini Flash Stable…");
+    const result = await runGeminiImageStrategy(MODELS.GEMINI_IMAGE2, "Gemini Flash Stable");
+    if (import.meta.env.DEV) console.log("[SEDREX Visual] ✅ Strategy 3 succeeded (Gemini Flash Stable)");
     return result;
   } catch (e3: any) {
     console.error("[SEDREX Visual] ❌ All 3 image strategies failed:", e3?.message ?? e3);

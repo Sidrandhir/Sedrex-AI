@@ -14,7 +14,7 @@ let worker: Worker | null = null;
 let msgId = 0;
 const pending = new Map<number, { resolve: PendingCallback; timeout: ReturnType<typeof setTimeout> }>();
 
-const PYTHON_TIMEOUT_MS = 30_000; // Pyodide first-load can be ~5-10s on slow connections
+const PYTHON_TIMEOUT_MS = 15_000; // 15 s — enough for Pyodide first-load (~5-10s) + execution
 
 function getWorker(): Worker {
   if (worker) return worker;

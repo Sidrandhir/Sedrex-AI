@@ -261,7 +261,7 @@ class AnalyticsService {
       const [u, a, m, q, e] = await Promise.all([
         supabase.from('profiles').select('id', { count: 'exact', head: true }),
         supabase.from('user_sessions').select('id', { count: 'exact', head: true }).eq('is_active', true),
-        supabase.from('user_daily_metrics').select('*').eq('date', today),
+        supabase.from('user_daily_metrics').select('date, queries_made, total_tokens, gemini_queries, claude_queries, openai_queries, artifacts_created, errors').eq('date', today).limit(100),
         supabase.from('user_query_log').select('model_used,response_time_ms').gte('created_at', `${today}T00:00:00Z`).limit(500),
         supabase.from('user_events').select('properties,created_at').eq('event_type', 'error').order('created_at', { ascending: false }).limit(20),
       ]);
