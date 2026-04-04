@@ -335,7 +335,12 @@ export const storageService = {
         storage_path:    result.path,
         public_url:      result.publicUrl ?? null,
         original_name:   result.originalName,
-        file_type:       result.fileType,
+        // Map app-only FileType values to the CHECK-constraint-valid set.
+        // 'avatar'/'export'/'artifact' are not in the schema's CHECK list.
+        file_type:       result.fileType === 'avatar'   ? 'image'
+                       : result.fileType === 'export'   ? 'text'
+                       : result.fileType === 'artifact' ? 'code'
+                       : result.fileType,
         mime_type:       result.mimeType,
         file_size_bytes: result.sizeBytes,
       });
