@@ -337,16 +337,44 @@ export function extractAllArtifactsFromResponse(
 
     const type: ArtifactType = lang === 'html' ? 'html' : 'code';
 
-    // File-path detection: first-line comment OR the 3 prose lines before the block
+    // File-path detection: first-line comment OR the 3 prose lines before the block.
+    // EXTENSION GUARD: pathMatch from surrounding prose can pick up filenames
+    // from adjacent blocks (e.g. "**File: Main.jsx**" appearing 2 lines before
+    // a CSS block → CSS artifact gets titled "Main.jsx").  Only accept a
+    // prose-detected path when its extension is compatible with the block language.
     const firstLine    = block.codeLines[0] ?? '';
     const pathFromCode = firstLine.match(/(?:\/\/|#)\s*([\w./\-]+\.\w+)/)?.[1];
     const beforeLines  = lines.slice(Math.max(0, block.startLine - 3), block.startLine).join('\n');
-    const pathMatch    = beforeLines.match(/(?:\/\/|#|\/\*|\*\*File:?|Path:?)\s*([\w./\-]+\.\w+)/);
-    const filePath     = pathFromCode ?? pathMatch?.[1];
+    const pathMatchRaw = beforeLines.match(/(?:\/\/|#|\/\*|\*\*File:?|Path:?)\s*([\w./\-]+\.\w+)/)?.[1];
 
+    // Validate that a prose-detected filename belongs to the same language family.
+    const extCompatible = (detectedLang: string, fp: string): boolean => {
+      const ext = (fp.split('.').pop() ?? '').toLowerCase();
+      const CSS_EXTS  = ['css', 'scss', 'sass', 'less'];
+      const JS_EXTS   = ['js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs'];
+      const PY_EXTS   = ['py', 'pyw'];
+      const HTML_EXTS = ['html', 'htm'];
+      if (CSS_EXTS.includes(detectedLang))                              return CSS_EXTS.includes(ext);
+      if (['javascript', 'js', 'jsx'].includes(detectedLang))           return JS_EXTS.includes(ext);
+      if (['typescript', 'ts', 'tsx'].includes(detectedLang))           return JS_EXTS.includes(ext);
+      if (['python', 'py'].includes(detectedLang))                      return PY_EXTS.includes(ext);
+      if (['html', 'htm'].includes(detectedLang))                       return HTML_EXTS.includes(ext);
+      return true; // other languages: accept any matched path
+    };
+
+    const validatedProseMatch = (pathMatchRaw && extCompatible(lang, pathMatchRaw))
+      ? pathMatchRaw
+      : undefined;
+
+    const filePath = pathFromCode ?? validatedProseMatch;
+
+    // For CSS/SCSS blocks with no detected filename, default to 'styles.css'
+    // rather than deriving a meaningless title from surrounding conversation text.
     const baseTitle = filePath
       ? filePath.split('/').pop() ?? filePath
-      : deriveTitleFromPrompt(userPrompt ?? '', lang);
+      : (['css', 'scss', 'sass', 'less'].includes(lang))
+        ? 'styles.css'
+        : deriveTitleFromPrompt(userPrompt ?? '', lang);
 
     const title = generateVersionedTitleInBatch(baseTitle, usedTitles);
 

@@ -51,16 +51,22 @@ interface ChatAreaProps {
 function preprocessMarkdown(raw: string): string {
   if (!raw) return '';
 
-  let result = raw;
-
-  // FIX 1a: Strip HTML <br> tags — replace with newline
-  result = result.replace(/<br\s*\/?>/gi, '\n');
-
-  // FIX 1b: Remove stray HTML tags from LLM output.
-  // SECURITY: <a> and <img> are intentionally excluded — both can carry
-  // onerror/onload attributes that execute JS even inside React, because
-  // Mermaid output uses dangerouslySetInnerHTML. Only safe inline tags kept.
-  result = result.replace(/<(?!\/?(strong|em|code|s)\b)[^>]+>/gi, '');
+  // FIX 1a/1b: HTML tag stripping must NOT touch code fences.
+  // Split the raw string by fenced code blocks (captured so they're preserved),
+  // apply stripping only to prose sections (even indices), keep fences (odd indices).
+  const fenceParts = raw.split(/(```[\s\S]*?```)/g);
+  let result = fenceParts.map((part, idx) => {
+    if (idx % 2 === 1) return part; // inside a fence — preserve exactly as-is
+    let s = part;
+    // FIX 1a: Strip HTML <br> tags in prose — replace with newline
+    s = s.replace(/<br\s*\/?>/gi, '\n');
+    // FIX 1b: Remove stray HTML tags from LLM prose output.
+    // SECURITY: <a> and <img> are intentionally excluded — both can carry
+    // onerror/onload attributes that execute JS even inside React, because
+    // Mermaid output uses dangerouslySetInnerHTML. Only safe inline tags kept.
+    s = s.replace(/<(?!\/?(strong|em|code|s)\b)[^>]+>/gi, '');
+    return s;
+  }).join('');
 
   // FIX 1c: Strict separator-only regex — never match data rows
   // Old: /^(\|(?:[:\-\s|]+)\|)$/gm  ← too broad, matched cells with dashes
@@ -116,25 +122,51 @@ function preprocessMarkdown(raw: string): string {
 function sanitizeMessageContent(content: string): string {
   if (!content.includes('[ARTIFACT:')) return content;
 
-  return content
-    .split('\n')
-    .filter(line => {
-      const t = line.trim();
-      if (!t) return true;
-      // Always keep markdown structure lines
-      if (t.startsWith('#') || t.startsWith('*') ||
-          t.startsWith('-') || t.startsWith('>')) return true;
-      // Always keep artifact placeholders
-      if (t.startsWith('[ARTIFACT:')) return true;
-      // Drop lines that are clearly raw code fragments
-      const isCodeLine =
-        /^(function|const|let|var|class|export|import|return|if|while|for)\s/.test(t) ||
-        /^[\w<>[\]]+\s*[=:({]/.test(t) ||  // assignments, type annotations, calls
-        /^[});\]]+$/.test(t) ||              // closing braces / semicolons alone
-        /^\s*\/\//.test(t) ||               // SESSION 9 FIX: standalone comment lines only (was /\/\// which also dropped prose lines containing URLs or // in text)
-        /^\s{4,}/.test(line);               // heavily indented (4+ spaces = code indent)
-      return !isCodeLine;
-    })
+  // FENCE-AWARE pass: track whether we are inside a ``` block.
+  // Lines inside a fence must NEVER be stripped — they are code that
+  // the user needs to read. Only lines in the PROSE sections (outside
+  // fences) should be cleaned up.
+  // ROOT CAUSE OF PREVIOUS BUG: the old implementation ran a flat
+  // .filter() without fence tracking, so it stripped indented HTML/JSX
+  // lines (matched by /^\s{4,}/) that were inside code blocks, leaving
+  // index.html blank and main.jsx showing only the first/last line.
+  const lines = content.split('\n');
+  const result: string[] = [];
+  let inFence = false;
+
+  for (const line of lines) {
+    const t = line.trim();
+
+    // Fence boundary — toggle state and always keep the fence line itself
+    if (t.startsWith('```')) {
+      inFence = !inFence;
+      result.push(line);
+      continue;
+    }
+
+    // Inside a code fence: preserve every line unconditionally
+    if (inFence) {
+      result.push(line);
+      continue;
+    }
+
+    // ── Prose section only ─────────────────────────────────────────
+    if (!t) { result.push(line); continue; }
+    if (t.startsWith('#') || t.startsWith('*') ||
+        t.startsWith('-') || t.startsWith('>')) { result.push(line); continue; }
+    if (t.startsWith('[ARTIFACT:')) { result.push(line); continue; }
+
+    // Drop lines that are clearly raw code fragments that leaked into prose
+    const isCodeLine =
+      /^(function|const|let|var|class|export|import|return|if|while|for)\s/.test(t) ||
+      /^[\w<>[\]]+\s*[=:({]/.test(t) ||
+      /^[});\]]+$/.test(t) ||
+      /^\s*\/\//.test(t) ||
+      /^\s{4,}/.test(line);
+    if (!isCodeLine) result.push(line);
+  }
+
+  return result
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();

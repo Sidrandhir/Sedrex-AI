@@ -777,8 +777,15 @@ const CodeViewer = memo(({ artifact, onSwitchToPreview }: { artifact: Artifact; 
     }
   }, [artifact, fullContent]);
 
-  const isRunnable = ['javascript', 'js', 'typescript', 'ts', 'jsx', 'tsx',
-    'python', 'py', 'html', 'css', 'json'].includes((artifact.language ?? '').toLowerCase());
+  // Run ▶ is only shown for types whose preview produces visible output.
+  // html → blank iframe (index.html has no content without a server)
+  // javascript/js/typescript/ts → console sandbox shows "No console output" (blank/dark)
+  // jsx/tsx → renders React component visually ✓
+  // python/py → runs via Pyodide ✓
+  // css → shows styled demo page ✓
+  // json → renders interactive tree ✓
+  const isRunnable = ['jsx', 'tsx', 'python', 'py', 'css', 'json']
+    .includes((artifact.language ?? '').toLowerCase());
 
   return (
     <div className="ap-code-viewer">

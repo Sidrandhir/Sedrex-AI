@@ -35,10 +35,12 @@ export type ExecutionStatus = 'idle' | 'running' | 'done' | 'error' | 'timeout';
 
 // ── Supported languages ───────────────────────────────────────────
 
+// 'html' intentionally excluded — html execution produces a blank iframe
+// (index.html has no content without a dev server) and causes the Run
+// button to appear on html artifact cards with no useful output.
 export const EXECUTABLE_LANGS = new Set<string>([
   'javascript', 'js',
   'typescript', 'ts',
-  'html',
   'python', 'py',
   'json',
 ]);
@@ -153,6 +155,9 @@ function runJSON(code: string): ExecutionResult {
 }
 
 // ── Main execution function ───────────────────────────────────────
+// SAFETY: wrapped in try/catch at top level — any unexpected error is
+// delivered to onResult instead of propagating to React's error boundary
+// and crashing the whole app with a full-page error screen.
 
 export function executeCode(
   code:     string,
@@ -160,78 +165,127 @@ export function executeCode(
   onResult: (result: ExecutionResult) => void,
 ): () => void {  // returns cleanup function
 
-  const lang = normalizeLanguage(language);
+  try {
+    const lang = normalizeLanguage(language);
 
-  // JSON — synchronous, no iframe needed
-  if (lang === 'json') {
-    onResult(runJSON(code));
-    return () => {};
-  }
+    // JSON — synchronous, no iframe needed
+    if (lang === 'json') {
+      onResult(runJSON(code));
+      return () => {};
+    }
 
-  // HTML / CSS — return rendered preview, no execution
-  if (lang === 'html' || lang === 'css') {
-    const html = buildHTMLPreview(code, lang);
-    onResult({ stdout: [], stderr: [], returnVal: '', html, elapsed: 0, success: true });
-    return () => {};
-  }
+    // HTML / CSS — return rendered preview, no execution
+    if (lang === 'html' || lang === 'css') {
+      const html = buildHTMLPreview(code, lang);
+      onResult({ stdout: [], stderr: [], returnVal: '', html, elapsed: 0, success: true });
+      return () => {};
+    }
 
-  // Python — Pyodide Web Worker (lazy-loaded on first run)
-  if (lang === 'python') {
-    return runPython(code, onResult);
-  }
+    // Python — Pyodide Web Worker (lazy-loaded on first run)
+    if (lang === 'python') {
+      return runPython(code, onResult);
+    }
 
-  // JavaScript / TypeScript — sandboxed iframe
-  const start  = Date.now();
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:absolute;width:0;height:0;border:0;visibility:hidden';
-  iframe.setAttribute('sandbox', 'allow-scripts');  // no allow-same-origin = fully isolated
-  document.body.appendChild(iframe);
+    // JavaScript / TypeScript — sandboxed iframe
+    const start  = Date.now();
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:absolute;width:0;height:0;border:0;visibility:hidden';
+    iframe.setAttribute('sandbox', 'allow-scripts');  // no allow-same-origin = fully isolated
+    document.body.appendChild(iframe);
 
-  let timeoutId: ReturnType<typeof setTimeout>;
-  let settled = false;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    let settled = false;
 
-  const cleanup = () => {
-    if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-    clearTimeout(timeoutId);
-    window.removeEventListener('message', handler);
-  };
+    const cleanup = () => {
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+      clearTimeout(timeoutId);
+      window.removeEventListener('message', handler);
+    };
 
-  const handler = (evt: MessageEvent) => {
-    if (evt.data?.type !== 'sedrex-exec-result') return;
-    if (settled) return;
-    settled = true;
-    cleanup();
-    onResult({
-      stdout:    evt.data.stdout    ?? [],
-      stderr:    evt.data.stderr    ?? [],
-      returnVal: evt.data.returnVal ?? '',
-      html:      '',
-      elapsed:   Date.now() - start,
-      success:   evt.data.stderr.length === 0,
-    });
-  };
+    const handler = (evt: MessageEvent) => {
+      if (evt.data?.type !== 'sedrex-exec-result') return;
+      if (settled) return;
+      settled = true;
+      cleanup();
+      onResult({
+        stdout:    evt.data.stdout    ?? [],
+        stderr:    evt.data.stderr    ?? [],
+        returnVal: evt.data.returnVal ?? '',
+        html:      '',
+        elapsed:   Date.now() - start,
+        success:   evt.data.stderr.length === 0,
+      });
+    };
 
-  window.addEventListener('message', handler);
+    window.addEventListener('message', handler);
 
-  timeoutId = setTimeout(() => {
-    if (settled) return;
-    settled = true;
-    cleanup();
+    timeoutId = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      onResult({
+        stdout: [],
+        stderr: [`Execution timed out after ${SANDBOX_TIMEOUT_MS / 1000}s`],
+        returnVal: '',
+        html: '',
+        elapsed: SANDBOX_TIMEOUT_MS,
+        success: false,
+      });
+    }, SANDBOX_TIMEOUT_MS);
+
+    // Write sandbox HTML into the iframe.
+    // CRASH FIX: contentDocument can be null in certain browser security
+    // contexts even after the iframe is appended to the DOM. The previous
+    // code used the non-null assertion (!) which gives no runtime protection —
+    // calling .open() on null throws "Cannot read properties of null
+    // (reading 'open')" and crashes the entire app via React's error boundary.
+    // Guard explicitly and surface the error in the output panel instead.
+    const doc = iframe.contentDocument;
+    if (!doc) {
+      cleanup();
+      console.warn('[Sedrex] executeCode: iframe.contentDocument is null — cannot open sandbox');
+      onResult({
+        stdout: [],
+        stderr: ['Execution sandbox unavailable (contentDocument is null). Try a different browser or disable extensions that block iframes.'],
+        returnVal: '',
+        html: '',
+        elapsed: Date.now() - start,
+        success: false,
+      });
+      return () => {};
+    }
+
+    try {
+      doc.open();
+      doc.write(buildSandboxHTML(code));
+      doc.close();
+    } catch (writeErr: any) {
+      cleanup();
+      console.warn('[Sedrex] executeCode: failed to write to sandbox iframe:', writeErr);
+      onResult({
+        stdout: [],
+        stderr: [writeErr?.message ?? 'Failed to initialise execution sandbox'],
+        returnVal: '',
+        html: '',
+        elapsed: Date.now() - start,
+        success: false,
+      });
+      return () => {};
+    }
+
+    return cleanup;
+
+  } catch (unexpectedErr: any) {
+    // Last-resort catch — must never let an error escape to React's boundary
+    console.warn('[Sedrex] executeCode: unexpected error:', unexpectedErr);
     onResult({
       stdout: [],
-      stderr: [`Execution timed out after ${SANDBOX_TIMEOUT_MS / 1000}s`],
+      stderr: [unexpectedErr?.message ?? 'Unexpected error during code execution'],
       returnVal: '',
       html: '',
-      elapsed: SANDBOX_TIMEOUT_MS,
+      elapsed: 0,
       success: false,
     });
-  }, SANDBOX_TIMEOUT_MS);
-
-  // Write sandbox HTML into the iframe
-  const doc = iframe.contentDocument!;
-  doc.open();
-  doc.write(buildSandboxHTML(code));
-  doc.close();
-
-  return cleanup;
+    return () => {};
+  }
 }

@@ -50,7 +50,10 @@ const ArtifactCard: React.FC<ArtifactCardProps> = memo(({
   const lang = language.toLowerCase();
   const icon = FILE_ICONS[lang] ?? '📄';
   const label = LANG_LABELS[lang] ?? language.toUpperCase();
-  const canPreview = type === 'html' || lang === 'jsx' || lang === 'tsx' || lang === 'html';
+  // Preview badge only for jsx/tsx — these render React components visually.
+  // html artifacts (index.html shells) render blank in the iframe without a server,
+  // so we don't advertise "Preview" for them.
+  const canPreview = lang === 'jsx' || lang === 'tsx';
   const isDiagram = type === 'diagram' || lang === 'mermaid';
 
   const handleClick = () => {
