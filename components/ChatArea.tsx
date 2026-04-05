@@ -15,6 +15,7 @@ import { ConfidenceBadge } from './ConfidenceBadge';
 import type { ConfidenceSignal } from '../services/aiService';
 import ArtifactCard from './ArtifactCard';
 import { RunButton, CodeRunner } from './CodeRunner';
+import { ThinkingSteps } from './ThinkingSteps';
 import { getArtifacts, extractArtifactFromResponse, extractAllArtifactsFromResponse, registerEphemeralArtifact } from '../services/artifactStore';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -1218,12 +1219,20 @@ const MessageItem = memo(
         {!isUser && (
           <div className="message-assistant-body">
             {/* Typing indicator — only when no content yet */}
-            {isStreaming && !msg.content && (
+            {isStreaming && !msg.content && !(msg.thinkingState && msg.thinkingState.phase != 'idle') && (
               <div className="typing-dots">
                 <div className="typing-dot" />
                 <div className="typing-dot" />
                 <div className="typing-dot" />
               </div>
+            )}
+
+            {msg.thinkingState && msg.thinkingState.phase !== 'idle' && (
+              <ThinkingSteps
+                phase={msg.thinkingState.phase}
+                steps={msg.thinkingState.steps}
+                activeStepIndex={msg.thinkingState.activeStepIndex}
+              />
             )}
 
             {/* Thinking block — collapsible reasoning trace, only for complex intents */}

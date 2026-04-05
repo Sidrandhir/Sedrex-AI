@@ -96,6 +96,17 @@ export interface Message {
   };
   // Thinking content shown in collapsible reasoning block
   thinkingContent?: string;
+  thinkingState?: {
+    phase: 'idle' | 'planning' | 'thinking' | 'answering' | 'done';
+    steps: Array<{
+      id: string;
+      label: string;
+      icon: string;
+      detail: string;
+      status: 'pending' | 'active' | 'done';
+    }>;
+    activeStepIndex: number;
+  };
 }
 
 export interface ChatSession {

@@ -22,6 +22,7 @@ import { ChatSession, Message, SedrexRoute, UserStats, User, AIModel, MessageIma
 import { getAIResponse, generateChatTitle, routePrompt, generateFollowUpSuggestions } from './services/aiService';
 import { getStats } from './services/storageService';
 import { getCurrentUser, logout } from './services/authService';
+import { useThinkingSteps } from './hooks/useThinkingSteps';
 import { getAdminStats } from './services/analyticsService';
 import { api } from './services/apiService';
 import { persistenceService } from './services/persistenceService';
@@ -112,6 +113,7 @@ const App: React.FC = () => {
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const { startThinking, clearTimers } = useThinkingSteps();
 
   // ── Stripe checkout return detection ───────────────────────────
   useEffect(() => {
@@ -450,6 +452,7 @@ const App: React.FC = () => {
     }
     setIsLoading(true);
     abortControllerRef.current = new AbortController();
+    clearTimers();
     const userMsg = currentHistory[currentHistory.length - 1];
     const previewRoute = routePrompt(userMsg.content, !!(userMsg.images?.length || userMsg.image), (userMsg.documents?.length || 0) > 0);
     const assistantId = 'assistant-' + Math.random().toString(36).substr(2, 9);
@@ -459,8 +462,40 @@ const App: React.FC = () => {
       ...s,
       messages: [...currentHistory, {
         id: assistantId, role: 'assistant', content: '', timestamp: Date.now(), model: previewRoute.model,
+        thinkingState: {
+          phase: 'idle',
+          steps: [],
+          activeStepIndex: -1
+        }
       }],
     } : s));
+
+    // Start thinking (non-blocking)
+    const thinkingGen = startThinking(
+      userMsg.content,
+      previewRoute.intent,
+      import.meta.env.VITE_CLAUDE_KEY ?? '',
+      abortControllerRef.current?.signal
+    );
+
+    (async () => {
+      for await (const snap of thinkingGen) {
+        if (abortControllerRef.current?.signal.aborted) break;
+
+        setSessions(prev => prev.map(s =>
+          s.id === sessionId
+            ? {
+                ...s,
+                messages: s.messages.map(m =>
+                  m.id === assistantId
+                    ? { ...m, thinkingState: snap }
+                    : m
+                )
+              }
+            : s
+        ));
+      }
+    })();
 
     let accumulatedText = '';
     let flushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -607,7 +642,13 @@ const App: React.FC = () => {
 
       setSessions(prev => prev.map(s => s.id === sessionId ? {
         ...s,
-        messages: s.messages.map(m => m.id === assistantId ? { ...m, content: finalContent, generatedImageUrl: response.generatedImageUrl } : m),
+        messages: s.messages.map(m => m.id === assistantId ? { ...m, content: finalContent, generatedImageUrl: response.generatedImageUrl,
+          thinkingState: {
+            phase: 'done',
+            steps: m.thinkingState?.steps ?? [],
+            activeStepIndex: m.thinkingState?.steps?.length ?? 0
+          }
+         } : m),
       } : s));
 
       const suggestionsPromise = generateFollowUpSuggestions(response.content, previewRoute.intent).catch(() => []);
