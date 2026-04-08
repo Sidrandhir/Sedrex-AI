@@ -53,6 +53,7 @@ import { isSupabaseConfigured as initialConfigured, supabase } from './services/
 import { getProjectIndex } from './services/codebaseContext';
 import { analytics } from './services/analyticsService';
 import { storageService } from './services/storageService';
+import { warmPyodide } from './services/pyodideService';
 
 const Dashboard = lazy(() => import('./components/Dashboard'));
 const Pricing = lazy(() => import('./components/Pricing'));
@@ -142,6 +143,13 @@ const App: React.FC = () => {
     });
     return unsub;
   }, []);
+
+  useEffect(() => {
+    // Kick off Pyodide worker in the background on app boot.
+    // The worker downloads ~8MB of WASM once; all subsequent Python
+    // runs are instant because the runtime stays alive in the worker.
+    warmPyodide();
+  }, []); // runs once on mount
 
   useEffect(() => {
     const handler = (e: PromiseRejectionEvent) => {
