@@ -67,9 +67,9 @@ const MAX_HISTORY: Record<string, number> = {
 // ── SESSION 7 FIX: Cache is now 30s for non-live intents ──────────
 const RESPONSE_CACHE_TTL_MS = 30_000;
 
-const CIRCUIT_FAIL_THRESHOLD = 6;
-const CIRCUIT_FAIL_WINDOW_MS = 30_000;
-const CIRCUIT_OPEN_MS        = 20_000;
+const CIRCUIT_FAIL_THRESHOLD = 12;     // FIX: was 6 — verification + retry failures tripped this too fast
+const CIRCUIT_FAIL_WINDOW_MS = 60_000; // FIX: was 30s — widen window to match key cooldown rhythm
+const CIRCUIT_OPEN_MS        = 10_000; // FIX: was 20s — recover faster, 10s is enough
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -253,7 +253,7 @@ const MAX_QUEUED_REQUESTS = Number(
 const requestQueue = new KeyedConcurrentQueue(MAX_CONCURRENT_REQUESTS, MAX_QUEUED_REQUESTS);
 
 const REQUEST_RATE_WINDOW_MS = 60_000;
-const REQUEST_RATE_MAX       = 30;
+const REQUEST_RATE_MAX       = 120;   // FIX: was 30 — each msg = 3 API calls (main+title+suggestions), 30 was only 10 real messages
 const API_KEY_COOLDOWN_MS    = 65_000; // Gemini rate limits reset every 60s; 65s ensures the window has cleared
 
 // ── Gemini API key pool ───────────────────────────────────────────
@@ -360,15 +360,18 @@ const inFlightByFingerprint = new Map<string, Promise<SedrexResponse>>();
 const clientRequestWindows  = new Map<string, number[]>();
 
 function isClientRateLimited(clientId: string): boolean {
+  // FIX: Use a stable primary-only key so table sub-requests (which get a unique
+  // effectiveQueueKey with timestamp) don't inflate the same client's count.
+  const stableId = clientId.split(':tbl:')[0];
   const now  = Date.now();
-  const list = clientRequestWindows.get(clientId) ?? [];
+  const list = clientRequestWindows.get(stableId) ?? [];
   const kept = list.filter((ts) => now - ts <= REQUEST_RATE_WINDOW_MS);
   if (kept.length >= REQUEST_RATE_MAX) {
-    clientRequestWindows.set(clientId, kept);
+    clientRequestWindows.set(stableId, kept);
     return true;
   }
   kept.push(now);
-  clientRequestWindows.set(clientId, kept);
+  clientRequestWindows.set(stableId, kept);
   return false;
 }
 
@@ -1566,11 +1569,11 @@ async function processRequest(
           if (gc) groundingChunks.push(...(gc as GroundingChunk[]));
         }
 
-        if ((isTablePrompt || isCodeRequest) && /max/i.test(finishReason) && attempt < MAX_RETRIES - 1) {
-          if (!isCodeRequest) {
-            dynamicMaxTokens = Math.min(Math.round(dynamicMaxTokens * 2.0), 20000);
-          }
-          await sleep(Math.min(600 * (attempt + 1), 2500));
+        if (/max/i.test(finishReason) && attempt < MAX_RETRIES - 1) {
+          // FIX: MAX_TOKENS is not an API failure — never count toward circuit breaker
+          // Expand budget and retry silently for all intents, not just table/code
+          dynamicMaxTokens = Math.min(Math.round(dynamicMaxTokens * 1.5), 65536);
+          await sleep(Math.min(400 * (attempt + 1), 2000));
           continue;
         }
 
@@ -1588,9 +1591,16 @@ async function processRequest(
       // Upgrades confidence label to "✓ Verified" on pass,
       // or downgrades to moderate/low if issues are found.
       // Silent on failure — never degrades the primary response.
-      const verKey = getApiKey();
-      const verification = await verifyResponse(content, prompt, intent as QueryIntent, rawConfidence, verKey);
-      const confidence = verification.confidence;
+      // FIX: verifyResponse is a secondary call — its failures must NEVER affect the circuit
+      // breaker or primary key health. Wrap in try/catch and use rawConfidence as fallback.
+      let confidence = rawConfidence;
+      try {
+        const verKey = getApiKey();
+        const verification = await verifyResponse(content, prompt, intent as QueryIntent, rawConfidence, verKey);
+        confidence = verification.confidence;
+      } catch {
+        // Silent degradation — primary response is already complete and correct
+      }
 
       const latency    = Date.now() - startTime;
       markSuccess();
@@ -1699,8 +1709,11 @@ async function processRequest(
       }
 
       if (isRetryable && attempt < MAX_RETRIES - 1) {
+        // FIX: Only non-429, non-model-not-found retryable errors count as circuit failures.
+        // 429s are quota events — unrelated to service health, should never open the circuit.
         const is429ForCircuit = /429|resource exhausted|rate limit|quota/.test(msg);
-        if (!is429ForCircuit) markRetryableFailure();
+        const isModelIssue    = isModelNotFound(msgRaw);
+        if (!is429ForCircuit && !isModelIssue) markRetryableFailure();
         const backoff = Math.min(1500 * 2 ** attempt, 20_000);
         console.warn(`[SEDREX] Retryable error (attempt ${attempt + 1}/${MAX_RETRIES}). Retry in ${backoff}ms…`);
         await sleep(backoff);
@@ -1723,7 +1736,8 @@ async function processRequest(
 
       logError(msg, true, routing.model);
       const is429Final = /429|resource exhausted|rate limit|quota/.test(msg);
-      if (isRetryable && !is429Final) markRetryableFailure();
+      const isModelIssue = isModelNotFound(msgRaw);
+      if (isRetryable && !is429Final && !isModelIssue) markRetryableFailure();
       return buildSafeModeResponse(prompt, routing, normalizeErrorMessage(err));
     }
   }
@@ -1769,7 +1783,7 @@ export const generateFollowUpSuggestions = async (
     }
     markApiKeySuccess(apiKey);
     return [];
-  } catch { markApiKeyFailure(apiKey); return []; }
+  } catch { /* FIX: secondary call — never poison primary key pool */ return []; }
 };
 
 // ── Local title fallback ─────────────────────────────────────────
@@ -1858,7 +1872,7 @@ export const generateChatTitle = async (firstMessage: string): Promise<string> =
     markApiKeySuccess(apiKey);
     return isGeneric ? _localTitle(firstMessage) : title;
   } catch {
-    markApiKeyFailure(apiKey);
+    // FIX: title gen is secondary — failure must not cool down keys for primary calls
     return _localTitle(firstMessage);
   }
 };
