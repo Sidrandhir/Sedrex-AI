@@ -69,6 +69,7 @@ const UpgradeModal      = lazy(() => import('./components/UpgradeModal'));
 const LibraryView       = lazy(() => import('./components/LibraryView'));
 const ArtifactsView     = lazy(() => import('./components/ArtifactsView'));
 import { InstallBanner, UpdateBanner, usePWALaunchAction } from './components/InstallPrompt';
+import CookieConsent from './components/CookieConsent';
 import { trackWebVitals, upgradeClicked, upgradeCompleted, pricingViewed } from './services/posthogService';
 
 const LazyFallback = () => (
@@ -114,6 +115,7 @@ const App: React.FC = () => {
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const didAutoCreate = useRef(false);
   const { startThinking, clearTimers } = useThinkingSteps();
 
   // ── Stripe checkout return detection ───────────────────────────
@@ -821,6 +823,18 @@ const App: React.FC = () => {
     if (window.innerWidth < 1024) setIsSidebarOpen(false);
   }, [user]);
 
+  // Auto-create a new chat when user is logged in but has no active session
+  // (covers brand-new users and edge cases where session restore finds nothing)
+  useEffect(() => {
+    if (!user || isAuthChecking || activeSessionId || didAutoCreate.current) return;
+    const timer = setTimeout(() => {
+      if (activeSessionId || didAutoCreate.current) return;
+      didAutoCreate.current = true;
+      handleNewChat();
+    }, 600); // 600ms lets the session-loading effects settle first
+    return () => clearTimeout(timer);
+  }, [user, isAuthChecking, activeSessionId, handleNewChat]);
+
   const handleSelectSession = useCallback((id: string) => {
     setActiveSessionId(id);
     try { localStorage.setItem('sedrex_cache_active_session', id); } catch { }
@@ -1100,6 +1114,7 @@ const App: React.FC = () => {
         <Toast toasts={toasts} onRemove={removeToast} />
         <UpdateBanner />
         <InstallBanner />
+        <CookieConsent />
       </div>
     </ErrorBoundary>
   );
