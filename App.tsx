@@ -147,10 +147,14 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Kick off Pyodide worker in the background on app boot.
-    // The worker downloads ~8MB of WASM once; all subsequent Python
-    // runs are instant because the runtime stays alive in the worker.
-    warmPyodide();
+    // Warm Pyodide after the browser becomes idle so it never competes
+    // with the critical render path. Falls back to a 1.5s delay on Safari.
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(() => warmPyodide(), { timeout: 4000 });
+    } else {
+      const t = setTimeout(warmPyodide, 1500);
+      return () => clearTimeout(t);
+    }
   }, []); // runs once on mount
 
   useEffect(() => {

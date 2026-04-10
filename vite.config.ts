@@ -72,13 +72,29 @@ export default defineConfig(({ mode }) => {
         },
       },
       build: {
+        target:               'esnext',  // modern browsers — smaller output, no legacy polyfills
+        sourcemap:            false,      // no source maps in prod → smaller deploy
+        cssCodeSplit:         true,       // per-route CSS chunks
+        reportCompressedSize: false,      // skip gzip size reporting → faster builds
+        chunkSizeWarningLimit: 1500,
         rollupOptions: {
           output: {
-            manualChunks: {
-              'vendor-react':    ['react', 'react-dom'],
-              'vendor-markdown': ['react-markdown', 'remark-gfm'],
-              'vendor-charts':   ['recharts'],
-              'vendor-supabase': ['@supabase/supabase-js'],
+            manualChunks(id) {
+              // React core — always needed first
+              if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) return 'vendor-react';
+              // Supabase — auth/db, loaded early but not in the critical path
+              if (id.includes('node_modules/@supabase')) return 'vendor-supabase';
+              // Markdown rendering — needed for chat, but separate from react
+              if (id.includes('node_modules/react-markdown') || id.includes('node_modules/remark')) return 'vendor-markdown';
+              // Recharts — lazy-loaded via ChartRenderer, Rollup will auto-chunk it;
+              // explicit entry here ensures it never bleeds into vendor-react
+              if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) return 'vendor-charts';
+              // PostHog — analytics, non-critical
+              if (id.includes('node_modules/posthog-js')) return 'vendor-posthog';
+              // Stripe — only on billing/pricing pages
+              if (id.includes('node_modules/@stripe')) return 'vendor-stripe';
+              // highlight.js — code syntax, lazy enough as is
+              if (id.includes('node_modules/highlight.js')) return 'vendor-hljs';
             },
           },
         },
