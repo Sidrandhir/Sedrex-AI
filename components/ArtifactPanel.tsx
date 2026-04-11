@@ -648,7 +648,8 @@ const DiagramViewer = memo(({ artifact }: { artifact: Artifact }) => {
         mermaid.initialize({
           startOnLoad: false,
           theme: 'dark',
-          securityLevel: 'antiscript',
+          securityLevel: 'loose',
+          htmlLabels: false,
           maxTextSize: 500000,
           flowchart: { htmlLabels: false, useMaxWidth: true, rankSpacing: 50, nodeSpacing: 30 },
           maxEdges: 500,
@@ -656,7 +657,7 @@ const DiagramViewer = memo(({ artifact }: { artifact: Artifact }) => {
         const id = 'ap-' + Math.random().toString(36).slice(2, 9);
         const sanitized = fullContent
           .split('\n')
-          .filter((line: string) => !line.trim().startsWith('//') && !line.trim().startsWith('#'))
+          .filter((line: string) => !line.trim().startsWith('//') && !line.trim().startsWith('%%'))
           .join('\n')
           .replace(/^[\w./\-]+\.mmd\s*\n/m, '')
           .trim();
@@ -691,7 +692,7 @@ const DiagramViewer = memo(({ artifact }: { artifact: Artifact }) => {
       {error ? (
         <div style={{ padding: 20 }}><div style={{ color: '#f87171', marginBottom: 12, fontSize: 13 }}>⚠ {error}</div><pre style={{ fontSize: 11, opacity: 0.6, overflowX: 'auto', color: 'var(--text-secondary)' }}>{fullContent}</pre></div>
       ) : svg ? (
-        <div className="ap-code-scroll" style={{ padding: 20, display: 'flex', justifyContent: 'center' }}><div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } }) }} style={{ maxWidth: '100%' }} /></div>
+        <div className="ap-code-scroll" style={{ padding: 20, display: 'flex', justifyContent: 'center' }}><div dangerouslySetInnerHTML={{ __html: svg }} style={{ maxWidth: '100%' }} /></div>
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}><div className="ap-spinner" /></div>
       )}
