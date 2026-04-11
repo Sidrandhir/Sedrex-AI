@@ -16,6 +16,7 @@ import type { ConfidenceSignal } from '../services/aiService';
 import ArtifactCard from './ArtifactCard';
 import { RunButton, CodeRunner } from './CodeRunner';
 import { ThinkingSteps } from './ThinkingSteps';
+import { AgentActivityLog } from './AgentActivityLog';
 import { getArtifacts, extractArtifactFromResponse, extractAllArtifactsFromResponse, registerEphemeralArtifact } from '../services/artifactStore';
 // recharts is heavy (~400KB) — lazy-load so it never blocks initial render
 const ChartRenderer = lazy(() => import('./ChartRenderer'));
@@ -1162,8 +1163,10 @@ const MessageItem = memo(
         {/* ── ASSISTANT ─────────────────────────────────────────── */}
         {!isUser && (
           <div className="message-assistant-body">
-            {/* Typing indicator — only when no content yet */}
-            {isStreaming && !msg.content && !(msg.thinkingState && msg.thinkingState.phase != 'idle') && (
+            {/* Typing indicator — suppressed when activity log or thinking steps are active */}
+            {isStreaming && !msg.content &&
+              !(msg.agentActivity && msg.agentActivity.length > 0) &&
+              !(msg.thinkingState && msg.thinkingState.phase !== 'idle') && (
               <div className="typing-dots">
                 <div className="typing-dot" />
                 <div className="typing-dot" />
@@ -1171,7 +1174,17 @@ const MessageItem = memo(
               </div>
             )}
 
-            {msg.thinkingState && msg.thinkingState.phase !== 'idle' && (
+            {/* AgentActivityLog — shown for new messages with real pipeline events */}
+            {msg.agentActivity && msg.agentActivity.length > 0 && (
+              <AgentActivityLog
+                items={msg.agentActivity}
+                isLoading={isStreaming && !msg.content}
+              />
+            )}
+
+            {/* ThinkingSteps — shown for old messages without agentActivity (backward compat) */}
+            {!(msg.agentActivity && msg.agentActivity.length > 0) &&
+              msg.thinkingState && msg.thinkingState.phase !== 'idle' && (
               <ThinkingSteps
                 phase={msg.thinkingState.phase}
                 steps={msg.thinkingState.steps}

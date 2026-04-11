@@ -27,7 +27,7 @@ export default defineConfig(({ mode }) => {
         // In production, set all SEDREX_* vars in your .env / hosting dashboard.
         //
         'process.env.SEDREX_MAX_CONCURRENT_REQUESTS': JSON.stringify(
-          env.SEDREX_MAX_CONCURRENT_REQUESTS || '8'
+          env.SEDREX_MAX_CONCURRENT_REQUESTS || '25'
         ),
         'process.env.SEDREX_MAX_QUEUED_REQUESTS': JSON.stringify(
           env.SEDREX_MAX_QUEUED_REQUESTS || '1000'
@@ -36,19 +36,19 @@ export default defineConfig(({ mode }) => {
           env.SEDREX_RATE_WINDOW_MS || '60000'
         ),
         'process.env.SEDREX_RATE_MAX_PER_WINDOW': JSON.stringify(
-          env.SEDREX_RATE_MAX_PER_WINDOW || '60'
+          env.SEDREX_RATE_MAX_PER_WINDOW || '120'
         ),
         'process.env.SEDREX_API_KEY_COOLDOWN_MS': JSON.stringify(
           env.SEDREX_API_KEY_COOLDOWN_MS || '30000'
         ),
         'process.env.SEDREX_CIRCUIT_FAIL_THRESHOLD': JSON.stringify(
-          env.SEDREX_CIRCUIT_FAIL_THRESHOLD || '10'
+          env.SEDREX_CIRCUIT_FAIL_THRESHOLD || '25'
         ),
         'process.env.SEDREX_CIRCUIT_FAIL_WINDOW_MS': JSON.stringify(
           env.SEDREX_CIRCUIT_FAIL_WINDOW_MS || '30000'
         ),
         'process.env.SEDREX_CIRCUIT_OPEN_MS': JSON.stringify(
-          env.SEDREX_CIRCUIT_OPEN_MS || '20000'
+          env.SEDREX_CIRCUIT_OPEN_MS || '10000'
         ),
         // ── Cache TTL ─────────────────────────────────────────────
         // Set to 0 in dev (no stale responses).

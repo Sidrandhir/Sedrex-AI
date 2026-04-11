@@ -18,11 +18,12 @@ import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import MessageInput from './components/MessageInput';
 import Toast, { ToastMessage } from './components/Toast';
-import { ChatSession, Message, SedrexRoute, UserStats, User, AIModel, MessageImage, AttachedDocument } from './types';
+import { ChatSession, Message, SedrexRoute, UserStats, User, AIModel, MessageImage, AttachedDocument, AgentActivity } from './types';
 import { getAIResponse, generateChatTitle, routePrompt, generateFollowUpSuggestions } from './services/aiService';
 import { getStats } from './services/storageService';
 import { getCurrentUser, logout } from './services/authService';
 import { useThinkingSteps } from './hooks/useThinkingSteps';
+import { agentEventBus } from './services/agentEventBus';
 import { getAdminStats } from './services/analyticsService';
 import { api } from './services/apiService';
 import { persistenceService } from './services/persistenceService';
@@ -476,6 +477,7 @@ const App: React.FC = () => {
       ...s,
       messages: [...currentHistory, {
         id: assistantId, role: 'assistant', content: '', timestamp: Date.now(), model: previewRoute.model,
+        agentActivity: [],
         thinkingState: {
           phase: 'idle',
           steps: [],
@@ -510,6 +512,34 @@ const App: React.FC = () => {
         ));
       }
     })();
+
+    // Subscribe to agent events — pipe each into the message's agentActivity[]
+    agentEventBus.clear();
+    let unsubActivity: (() => void) | null = null;
+    unsubActivity = agentEventBus.subscribe((event) => {
+      setSessions(prev => prev.map(s => s.id === sessionId ? {
+        ...s,
+        messages: s.messages.map(m => {
+          if (m.id !== assistantId) return m;
+          const current: AgentActivity[] = m.agentActivity ?? [];
+          if (event.status === 'running') {
+            // Avoid duplicates — if any item with this id exists, skip
+            if (current.some(item => item.id === event.id)) return m;
+            return { ...m, agentActivity: [...current, {
+              id: event.id, type: event.type, status: 'running' as const,
+              icon: event.icon, label: event.label, detail: event.detail,
+              badge: event.badge, startedAt: event.timestamp,
+            }]};
+          }
+          // Mark matching running item as done
+          return { ...m, agentActivity: current.map(item =>
+            item.id === event.id && item.status === 'running'
+              ? { ...item, status: 'done' as const, doneAt: event.timestamp, detail: event.detail }
+              : item
+          )};
+        })
+      } : s));
+    });
 
     let accumulatedText = '';
     let flushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -554,6 +584,17 @@ const App: React.FC = () => {
       if (flushTimer) clearTimeout(flushTimer);
 
       let finalContent = response.content;
+
+      if (response.routingContext?.engine === 'safe-mode') {
+        addToast('Sedrex is experiencing high demand. Please retry in a few seconds.', 'info');
+        setSessions(prev => prev.map(s => s.id === sessionId ? {
+          ...s,
+          messages: s.messages.filter(m => m.id !== assistantId),
+        } : s));
+        setIsLoading(false);
+        return;
+      }
+
 
       // ══════════════════════════════════════════════════════════════
       // SESSION 8: ARTIFACT EXTRACTION WITH BOOLEAN FLAG
@@ -664,6 +705,7 @@ const App: React.FC = () => {
           }
          } : m),
       } : s));
+      unsubActivity?.();
 
       const suggestionsPromise = generateFollowUpSuggestions(response.content, previewRoute.intent).catch(() => []);
       const savedMsg = await api.saveMessage(sessionId, {
@@ -739,11 +781,12 @@ const App: React.FC = () => {
     } catch (error: any) {
       if (flushTimer) clearTimeout(flushTimer);
       if (error.name !== 'AbortError') {
+        addToast('Sedrex is experiencing high demand. Your request is safe — please retry in a moment.', 'info');
         setSessions(prev => prev.map(s => s.id === sessionId ? {
           ...s,
           messages: s.messages.map(m => m.id === assistantId ? {
             ...m,
-            content: 'SEDREX is handling high traffic right now. Your request is safe — please press Regenerate in a few seconds.',
+            content: 'Something went wrong. Please try again.',
           } : m),
         } : s));
         analytics.logQuery({

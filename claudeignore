@@ -1,0 +1,73 @@
+# .claudeignore — Free token savings for Claude Code
+# Claude won't read these files — keeps context clean
+
+# Dependencies
+node_modules/
+.pnp/
+.yarn/
+
+# Build output
+dist/
+build/
+.next/
+.vite/
+*.tsbuildinfo
+
+# Lock files (never need to read these)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+*.local
+
+# Environment (never read — security)
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Cache
+.cache/
+.parcel-cache/
+*.cache
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# Generated/minified
+*.min.js
+*.min.css
+*.map
+
+# Assets Claude doesn't need to read
+public/
+*.svg
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.ico
+*.woff
+*.woff2
+*.ttf
+*.eot

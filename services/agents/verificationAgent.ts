@@ -20,6 +20,7 @@
 
 import { QueryIntent } from "../../types";
 import { ConfidenceSignal } from "../aiService";
+import { agentEventBus } from "../agentEventBus";
 
 // ── Verification thresholds ───────────────────────────────────────
 // Only run verification for high-stakes intents.
@@ -121,6 +122,7 @@ export async function verifyResponse(
   }
 
   try {
+    agentEventBus.emit({ id: 'verify', type: 'verify', status: 'running', icon: '🔎', label: 'Verifying answer', detail: 'Fact-checking response for accuracy', badge: 'Verify', timestamp: Date.now() });
     const snippet = content.slice(0, MAX_VERIFY_CHARS);
     const check   = await runGeminiVerification(originalPrompt, snippet, intent, geminiApiKey);
 
@@ -147,6 +149,8 @@ export async function verifyResponse(
       };
     }
 
+    agentEventBus.emit({ id: 'verify', type: 'verify', status: 'done', icon: '🔎', label: 'Verification complete', detail: check.verdict === 'pass' ? 'All checks passed' : (check.note ?? 'Minor issues found'), timestamp: Date.now() });
+
     return {
       content,
       confidence:       finalConfidence,
@@ -155,6 +159,7 @@ export async function verifyResponse(
     };
 
   } catch {
+    agentEventBus.emit({ id: 'verify', type: 'verify', status: 'done', icon: '🔎', label: 'Verification complete', detail: 'Check completed', timestamp: Date.now() });
     // Verification failure is always silent — never degrades primary response
     return {
       content,

@@ -67,9 +67,9 @@ const MAX_HISTORY: Record<string, number> = {
 // ── SESSION 7 FIX: Cache is now 30s for non-live intents ──────────
 const RESPONSE_CACHE_TTL_MS = 30_000;
 
-const CIRCUIT_FAIL_THRESHOLD = 12;     // FIX: was 6 — verification + retry failures tripped this too fast
-const CIRCUIT_FAIL_WINDOW_MS = 60_000; // FIX: was 30s — widen window to match key cooldown rhythm
-const CIRCUIT_OPEN_MS        = 10_000; // FIX: was 20s — recover faster, 10s is enough
+const CIRCUIT_FAIL_THRESHOLD = parseInt(process.env.SEDREX_CIRCUIT_FAIL_THRESHOLD ?? '25', 10);
+const CIRCUIT_FAIL_WINDOW_MS = parseInt(process.env.SEDREX_CIRCUIT_FAIL_WINDOW_MS  ?? '60000', 10);
+const CIRCUIT_OPEN_MS        = parseInt(process.env.SEDREX_CIRCUIT_OPEN_MS         ?? '10000', 10);
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -455,7 +455,7 @@ function buildSafeModeContent(intent: QueryIntent, prompt: string, reason: strin
 
   if (intent === "coding") {
     return [
-      "SEDREX is in safe mode due to high traffic.",
+      "Sedrex is experiencing high demand — your request will retry automatically.",
       "", `**Your request:** ${clipped}`, "",
       "**Immediate Steps**",
       "1. Reproduce once with the smallest input that still fails.",
@@ -466,7 +466,7 @@ function buildSafeModeContent(intent: QueryIntent, prompt: string, reason: strin
     ].join("\n");
   }
   return [
-    "SEDREX is in safe mode due to high traffic.",
+    "Sedrex is experiencing high demand — your request will retry automatically.",
     "", `**Your request:** ${clipped}`, "",
     "**Best Next Action**",
     "1. Break the request into one specific objective.",

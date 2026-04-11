@@ -24,6 +24,7 @@ import { resolveRoute, PROVIDERS, MODELS }                      from '../provide
 import { callCodingAgent    }                                   from './codingAgent';
 import { callReasoningAgent }                                   from './reasoningAgent';
 import { callRAGAgent       }                                   from './ragAgent';
+import { agentEventBus }                                        from '../agentEventBus';
 
 // ── Dispatch result ───────────────────────────────────────────────
 
@@ -109,6 +110,11 @@ export async function dispatch(
   const intent    = (routing.intent as string) ?? 'general';
   const agentType = intentToAgentType(intent);
 
+  // Emit route analysis event immediately — always fires, zero latency
+  const _routeNow = Date.now();
+  agentEventBus.emit({ id: 'route', type: 'route', status: 'running', icon: '⚡', label: 'Analysing query', detail: intent, timestamp: _routeNow });
+  agentEventBus.emit({ id: 'route', type: 'route', status: 'done',    icon: '⚡', label: 'Analysing query', detail: intent, timestamp: _routeNow + 1 });
+
   // Image generation must never go through agent dispatch — aiService handles it directly.
   if (routing.intent === 'image_generation') {
     return {
@@ -169,6 +175,7 @@ export async function dispatch(
 
   // ── CODING agent ─────────────────────────────────────────────────
   if (agentType === 'coding') {
+    agentEventBus.emit({ id: 'agent', type: 'agent', status: 'running', icon: '⚙️', label: 'Preparing code solution', detail: 'Specialist agent engaged', badge: 'Code', timestamp: Date.now() });
     const result = await callCodingAgent(
       prompt, history, documents, sessionContext,
       Math.max(maxTokens, 16000),
@@ -177,6 +184,7 @@ export async function dispatch(
     );
 
     if (result.text) {
+      agentEventBus.emit({ id: 'agent', type: 'agent', status: 'done', icon: '⚙️', label: 'Code solution ready', detail: 'Solution prepared', timestamp: Date.now() });
       return {
         text:                 result.text,
         inputTokens:          result.inputTokens,
@@ -190,6 +198,7 @@ export async function dispatch(
       };
     }
 
+    agentEventBus.emit({ id: 'agent', type: 'agent', status: 'done', icon: '⚙️', label: 'Code solution ready', detail: 'Solution prepared', timestamp: Date.now() });
     return geminiDirectResult('coding', buildAgentSystemPrompt('coding', {
       sessionContext: sessionContext || undefined,
       hasLongContext,
@@ -198,12 +207,14 @@ export async function dispatch(
 
   // ── REASONING agent ──────────────────────────────────────────────
   if (agentType === 'reasoning') {
+    agentEventBus.emit({ id: 'agent', type: 'agent', status: 'running', icon: '🧠', label: 'Reasoning through problem', detail: 'Multi-step analysis active', badge: 'Reason', timestamp: Date.now() });
     const result = await callReasoningAgent(
       prompt, history, documents, sessionContext,
       maxTokens, temperature, onStreamChunk, signal,
     );
 
     if (result.text) {
+      agentEventBus.emit({ id: 'agent', type: 'agent', status: 'done', icon: '🧠', label: 'Analysis complete', detail: 'Reasoning finished', timestamp: Date.now() });
       return {
         text:                 result.text,
         inputTokens:          result.inputTokens,
@@ -217,6 +228,7 @@ export async function dispatch(
       };
     }
 
+    agentEventBus.emit({ id: 'agent', type: 'agent', status: 'done', icon: '🧠', label: 'Analysis complete', detail: 'Reasoning finished', timestamp: Date.now() });
     return geminiDirectResult('reasoning', buildAgentSystemPrompt('reasoning', {
       sessionContext: sessionContext || undefined,
       hasLongContext,
@@ -225,6 +237,7 @@ export async function dispatch(
 
   // ── MATH agent (sub-route of reasoning, uses o4-mini) ────────────
   if (agentType === 'math') {
+    agentEventBus.emit({ id: 'agent', type: 'agent', status: 'running', icon: '🔢', label: 'Computing solution', detail: 'Mathematical reasoning active', badge: 'Math', timestamp: Date.now() });
     const result = await callReasoningAgent(
       prompt, history, documents, sessionContext,
       maxTokens, 0.1,
@@ -233,6 +246,7 @@ export async function dispatch(
     );
 
     if (result.text) {
+      agentEventBus.emit({ id: 'agent', type: 'agent', status: 'done', icon: '🔢', label: 'Calculation complete', detail: 'Solution verified', timestamp: Date.now() });
       return {
         text:                 result.text,
         inputTokens:          result.inputTokens,
@@ -246,6 +260,7 @@ export async function dispatch(
       };
     }
 
+    agentEventBus.emit({ id: 'agent', type: 'agent', status: 'done', icon: '🔢', label: 'Calculation complete', detail: 'Solution verified', timestamp: Date.now() });
     return geminiDirectResult('math', buildAgentSystemPrompt('reasoning', {
       sessionContext: sessionContext || undefined,
     }));
@@ -253,11 +268,13 @@ export async function dispatch(
 
   // ── RAG / Live agent ─────────────────────────────────────────────
   if (agentType === 'rag') {
+    agentEventBus.emit({ id: 'search', type: 'search', status: 'running', icon: '🌐', label: 'Searching the web', detail: 'Fetching live data from the web', badge: 'Live', timestamp: Date.now() });
     const result = await callRAGAgent(
       prompt, history, documents, sessionContext,
       maxTokens, onStreamChunk, signal,
     );
 
+    agentEventBus.emit({ id: 'search', type: 'search', status: 'done', icon: '🌐', label: 'Sources found', detail: 'Live grounding active — web results integrated', timestamp: Date.now() });
     return {
       text:                 result.text,
       inputTokens:          result.inputTokens,

@@ -49,6 +49,21 @@ export interface GroundingChunk {
 
 export type QueryIntent = 'reasoning' | 'coding' | 'math' | 'live' | 'research' | 'general' | 'image_generation';
 
+// ── Agent Activity — real pipeline events shown in the UI ─────────
+// Each item is a real event emitted by an agent/service.
+// 'running' = in progress, 'done' = completed.
+export interface AgentActivity {
+  id:        string;
+  type:      'route' | 'agent' | 'search' | 'verify' | 'done';
+  status:    'running' | 'done';
+  icon:      string;
+  label:     string;
+  detail:    string;
+  badge?:    string;
+  startedAt: number;
+  doneAt?:   number;
+}
+
 export interface RoutingContext {
   reason: string;
   confidence: number;
@@ -96,6 +111,8 @@ export interface Message {
   };
   // Thinking content shown in collapsible reasoning block
   thinkingContent?: string;
+  // Real pipeline events shown as activity log (replaces ThinkingSteps on new messages)
+  agentActivity?: AgentActivity[];
   thinkingState?: {
     phase: 'idle' | 'planning' | 'thinking' | 'answering' | 'done';
     steps: Array<{
