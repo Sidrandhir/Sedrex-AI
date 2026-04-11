@@ -163,6 +163,21 @@
 .markdown-body > *:first-child { margin-top: 0 !important; }
 .markdown-body > *:last-child  { margin-bottom: 0 !important; }
 
+.streaming-raw {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 0.75rem 1rem;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
 /* ── Paragraphs ─────────────────────────────────────────────────── */
 .markdown-body p {
   margin: 0 0 1.1em;

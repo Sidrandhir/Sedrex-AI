@@ -18,7 +18,7 @@
 //   phase === 'done'      → compact completed steps (always visible)
 // ══════════════════════════════════════════════════════════════════
 
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { ThinkingStep, ThinkingPhase } from '../hooks/useThinkingSteps';
 
 // ── Props ──────────────────────────────────────────────────────────
@@ -112,6 +112,8 @@ export const ThinkingSteps = memo(({
 
   if (phase === 'idle') return null;
 
+  const [isExpanded, setIsExpanded] = useState(false);
+
   const isThinking  = phase === 'thinking';
   const isAnswering = phase === 'answering';
   const isDone      = phase === 'done';
@@ -148,19 +150,31 @@ export const ThinkingSteps = memo(({
 
       {/* ── Compact summary (answering / done) ───────────────────── */}
       {showCompact && steps.length > 0 && (
-        <div className="tsx-compact-row">
-          <span className="tsx-compact-icon">✓</span>
-          <span className="tsx-compact-text">
-            {steps.length} reasoning step{steps.length !== 1 ? 's' : ''} completed
-          </span>
-          <div className="tsx-compact-chips">
-            {steps.map(s => (
-              <span key={s.id} className="tsx-compact-chip" title={s.detail}>
-                {s.icon}
-              </span>
-            ))}
+        <>
+          <div className="tsx-compact-row" onClick={() => setIsExpanded(e => !e)}>
+            <span className="tsx-compact-icon">✓</span>
+            <span className="tsx-compact-text">
+              {steps.length} reasoning step{steps.length !== 1 ? 's' : ''} completed
+            </span>
+            <div className="tsx-compact-chips">
+              {steps.map(s => (
+                <span key={s.id} className="tsx-compact-chip" title={s.detail}>
+                  {s.icon}
+                </span>
+              ))}
+            </div>
+            <span className="tsx-toggle-btn">{isExpanded ? '▲' : '▼'}</span>
           </div>
-        </div>
+          {isExpanded && (
+            <div className="tsx-steps-container tsx-steps-expanded">
+              <div className="tsx-steps-list">
+                {steps.map(step => (
+                  <StepRow key={step.id} step={step} isActive={false} isThinking={false} />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* CSS — self-contained, zero ChatArea.css modifications needed */}
@@ -396,6 +410,20 @@ export const ThinkingSteps = memo(({
           cursor: default;
         }
         .tsx-compact-chip:hover { opacity: 0.85; }
+
+        .tsx-compact-row { cursor: pointer; user-select: none; }
+        .tsx-compact-row:hover { opacity: 0.85; }
+        .tsx-toggle-btn {
+          font-size: 9px;
+          color: var(--text-secondary, #6b7280);
+          opacity: 0.5;
+          margin-left: auto;
+          flex-shrink: 0;
+        }
+        .tsx-steps-expanded {
+          margin-top: 4px;
+          animation: tsx-fade-in 0.18s ease both;
+        }
       `}</style>
     </div>
   );

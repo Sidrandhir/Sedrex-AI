@@ -1210,7 +1210,7 @@ const MessageItem = memo(
                   const openFence = (c.match(/```/g) || []).length % 2 !== 0;
                   const openTable = /\|[^\n]+\|/.test(c) && !/\|[-:\s|]+\|/.test(c);
                   if (openFence || openTable) {
-                    return <span className="streaming-raw">{c}</span>;
+                    return <pre className="streaming-raw">{c}</pre>;
                   }
                   return (
                     <ReactMarkdown remarkPlugins={remarkPlugins} components={localMdComponents}>
