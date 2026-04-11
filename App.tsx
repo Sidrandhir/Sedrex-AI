@@ -432,7 +432,8 @@ const App: React.FC = () => {
     md += `*Exported on ${new Date().toLocaleString()}*\n\n---\n\n`;
     activeSession.messages.forEach(msg => {
       const role = msg.role === 'user' ? '**You**' : '**SEDREX**';
-      md += `### ${role}\n\n${msg.content}\n\n---\n\n`;
+      const exportContent = msg.content.replace(/\[ARTIFACT:[^\]]+\]/g, '').replace(/\n{3,}/g, '\n\n').trim();
+      md += `### ${role}\n\n${exportContent}\n\n---\n\n`;
     });
     const filename = `${(activeSession.title || 'chat').replace(/[^a-z0-9]/gi, '_')}_sedrex_export.md`;
 
