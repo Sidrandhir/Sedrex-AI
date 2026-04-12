@@ -35,6 +35,7 @@ export interface ThinkingState {
   phase:           ThinkingPhase;
   steps:           ThinkingStep[];
   activeStepIndex: number;
+  totalTimeMs?:    number;
 }
 
 // ── Config ─────────────────────────────────────────────────────────
@@ -213,6 +214,7 @@ export function useThinkingSteps() {
   ): AsyncGenerator<ThinkingState> {
 
     clearTimers();
+    const startTime = Date.now();
 
     // ── 1. Planning ────────────────────────────────────────────────
     yield { phase: 'planning', steps: [], activeStepIndex: -1 };
@@ -293,6 +295,7 @@ export function useThinkingSteps() {
         phase:           'answering',
         steps:           steps.map(s => ({ ...s, status: 'done' })),
         activeStepIndex: steps.length,
+        totalTimeMs:     Date.now() - startTime,
       };
     }
   }

@@ -1,102 +1,115 @@
 // services/billingService.ts
 // ══════════════════════════════════════════════════════════════════
-// SEDREX — Billing Service (Frontend)
+// SEDREX — Billing Service (Razorpay)
 //
-// Calls the Supabase Edge Functions for Stripe operations.
-// All API keys stay server-side — this file never touches them.
+// Razorpay modal-based checkout — no server redirect needed.
+// Razorpay script is loaded dynamically on first checkout call.
+// API key (VITE_RAZORPAY_KEY_ID) is the public key_id — safe in browser.
 // ══════════════════════════════════════════════════════════════════
 
-import { supabase } from './supabaseClient';
 import { TIER_CONFIG, TierId } from './tierConfig';
 
-// ── Base URL for Edge Functions ───────────────────────────────────
-function edgeFunctionUrl(name: string): string {
-  const base = import.meta.env.VITE_SUPABASE_URL ?? '';
-  return `${base}/functions/v1/${name}`;
+// ── Razorpay type shim ────────────────────────────────────────────
+
+interface RazorpayOptions {
+  key:          string;
+  amount:       number;
+  currency:     string;
+  name:         string;
+  description:  string;
+  plan_id:      string;
+  prefill:      { name: string; email: string };
+  theme:        { color: string };
+  handler:      (response: RazorpayPaymentResponse) => void;
+  modal:        { ondismiss: () => void };
 }
 
-// ── Auth header from current session ─────────────────────────────
-async function getAuthHeader(): Promise<Record<string, string>> {
-  const { data: { session } } = await supabase!.auth.getSession();
-  return session?.access_token
-    ? { Authorization: `Bearer ${session.access_token}` }
-    : {};
+interface RazorpayPaymentResponse {
+  razorpay_payment_id:    string;
+  razorpay_subscription_id?: string;
+  razorpay_signature?:    string;
 }
 
-// ── Create Stripe Checkout Session ────────────────────────────────
+declare global {
+  interface Window {
+    Razorpay: new (options: RazorpayOptions) => { open: () => void };
+  }
+}
+
+// ── Load Razorpay script on demand ────────────────────────────────
+
+function loadRazorpayScript(): Promise<void> {
+  if (typeof window.Razorpay !== 'undefined') return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload  = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Razorpay. Check your internet connection.'));
+    document.head.appendChild(script);
+  });
+}
+
+// ── Create Razorpay Checkout ──────────────────────────────────────
 /**
- * Redirects the user to Stripe Checkout to subscribe.
- * @param userId  Supabase user UUID
- * @param email   User's email (pre-fills Stripe form)
- * @param tier    'pro' | 'enterprise'
+ * Opens the Razorpay payment modal for a subscription plan.
+ * @param userId    Supabase user UUID (for future webhook correlation)
+ * @param email     User's email — pre-fills the Razorpay form
+ * @param name      User's display name — pre-fills the Razorpay form
+ * @param tier      'pro' | 'team'
+ * @param onSuccess Called with the tier after successful payment
+ * @param onFailure Called with an error message if payment fails
  */
 export async function startCheckout(
-  userId: string,
-  email:  string,
-  tier:   TierId = 'pro',
+  _userId:         string,
+  email:           string,
+  name:            string,
+  tier:            TierId = 'pro',
+  onSuccess:       (tier: TierId) => void,
+  onFailure:       (message: string) => void,
+  planIdOverride?: string,
+  amountOverride?: number,
 ): Promise<void> {
-  const cfg = TIER_CONFIG[tier];
-  if (!cfg.stripePriceId || cfg.stripePriceId.startsWith('price_FILL')) {
-    throw new Error(
-      `Stripe price ID for "${tier}" tier is not configured yet. ` +
-      'Set stripePriceId in services/tierConfig.ts.',
-    );
+  const cfg    = TIER_CONFIG[tier];
+  const planId = planIdOverride || cfg.planId;
+
+  if (!planId) {
+    throw new Error(`Razorpay plan ID for "${tier}" tier is not configured.`);
   }
 
-  const headers = await getAuthHeader();
-  const res = await fetch(edgeFunctionUrl('create-checkout-session'), {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json', ...headers },
-    body:    JSON.stringify({ userId, email, priceId: cfg.stripePriceId, tier }),
-  });
-
-  const json = await res.json();
-  if (!res.ok || json.error) {
-    throw new Error(json.error ?? 'Failed to create checkout session');
+  const keyId = import.meta.env.VITE_RAZORPAY_KEY_ID as string | undefined;
+  if (!keyId || keyId.startsWith('rzp_test_FILL')) {
+    throw new Error('Razorpay key ID is not configured. Set VITE_RAZORPAY_KEY_ID in your .env file.');
   }
 
-  // Hard redirect to Stripe Checkout
-  if (json.url) {
-    window.location.href = json.url;
-  }
+  await loadRazorpayScript();
+
+  const options: RazorpayOptions = {
+    key:         keyId,
+    amount:      amountOverride ?? (cfg.pricePaisa ?? 0),
+    currency:    'INR',
+    name:        'Sedrex AI',
+    description: cfg.name,
+    plan_id:     planId,
+    prefill:     { name: name || email, email },
+    theme:       { color: '#10B981' },
+    handler: (_response: RazorpayPaymentResponse) => {
+      onSuccess(tier);
+    },
+    modal: {
+      ondismiss: () => { /* user closed modal — no action needed */ },
+    },
+  };
+
+  new window.Razorpay(options).open();
 }
 
-// ── Open Stripe Customer Portal (manage / cancel) ─────────────────
+// ── Billing portal (no Razorpay equivalent) ───────────────────────
 /**
- * Redirects the user to Stripe's self-service billing portal.
- * They can cancel, update payment method, download invoices.
+ * Razorpay has no self-service billing portal.
+ * Rejects with a support contact message — caller should show as toast.
  */
-export async function openBillingPortal(userId: string): Promise<void> {
-  const headers = await getAuthHeader();
-  const res = await fetch(edgeFunctionUrl('create-portal-session'), {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json', ...headers },
-    body:    JSON.stringify({ userId }),
-  });
-
-  const json = await res.json();
-  if (!res.ok || json.error) {
-    throw new Error(json.error ?? 'Failed to open billing portal');
-  }
-
-  if (json.url) {
-    window.location.href = json.url;
-  }
-}
-
-// ── Handle post-checkout URL params ──────────────────────────────
-/**
- * Call this on app mount to detect Stripe redirect return.
- * Returns: 'success' | 'cancelled' | 'portal_return' | null
- */
-export function detectCheckoutReturn(): 'success' | 'cancelled' | 'portal_return' | null {
-  const params = new URLSearchParams(window.location.search);
-  const billing = params.get('billing');
-  if (billing === 'success' || billing === 'cancelled' || billing === 'portal_return') {
-    // Clean the URL so the param doesn't persist on refresh
-    const clean = window.location.pathname;
-    window.history.replaceState({}, '', clean);
-    return billing as 'success' | 'cancelled' | 'portal_return';
-  }
-  return null;
+export function openBillingPortal(_userId: string): Promise<void> {
+  return Promise.reject(
+    new Error('To manage or cancel your subscription, email support@sedrex.ai'),
+  );
 }

@@ -58,6 +58,11 @@ export default defineConfig(({ mode }) => {
           env.SEDREX_RESPONSE_CACHE_TTL_MS || '0'
         ),
 
+        // ── Razorpay (public key — safe in browser) ───────────────
+        'import.meta.env.VITE_RAZORPAY_KEY_ID': JSON.stringify(
+          env.VITE_RAZORPAY_KEY_ID || ''
+        ),
+
         // ── API Key Pool (multi-key rotation) ─────────────────────
         'process.env.GEMINI_KEY_1': JSON.stringify(env.GEMINI_KEY_1 || geminiKey),
         'process.env.GEMINI_KEY_2': JSON.stringify(env.GEMINI_KEY_2 || ''),

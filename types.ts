@@ -123,6 +123,7 @@ export interface Message {
       status: 'pending' | 'active' | 'done';
     }>;
     activeStepIndex: number;
+    totalTimeMs?: number;
   };
 }
 
@@ -138,7 +139,7 @@ export interface ChatSession {
   preferredModel?: AIModel | 'auto';
 }
 
-export type UserTier = 'free' | 'pro' | 'enterprise';
+export type UserTier = 'free' | 'pro' | 'team' | 'enterprise';
 
 export interface DailyUsage {
   date: string;

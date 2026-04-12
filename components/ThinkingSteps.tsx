@@ -27,6 +27,7 @@ interface ThinkingStepsProps {
   phase:           ThinkingPhase;
   steps:           ThinkingStep[];
   activeStepIndex: number;
+  totalTimeMs?:    number;
 }
 
 // ── Sub-components ─────────────────────────────────────────────────
@@ -108,6 +109,7 @@ export const ThinkingSteps = memo(({
   phase,
   steps,
   activeStepIndex,
+  totalTimeMs,
 }: ThinkingStepsProps) => {
 
   if (phase === 'idle') return null;
@@ -154,7 +156,10 @@ export const ThinkingSteps = memo(({
           <div className="tsx-compact-row" onClick={() => setIsExpanded(e => !e)}>
             <span className="tsx-compact-icon">✓</span>
             <span className="tsx-compact-text">
-              {steps.length} reasoning step{steps.length !== 1 ? 's' : ''} completed
+              {steps.length} reasoning step{steps.length !== 1 ? 's' : ''}
+              {totalTimeMs != null && totalTimeMs > 0
+                ? ` · ${(totalTimeMs / 1000).toFixed(1)}s`
+                : ' completed'}
             </span>
             <div className="tsx-compact-chips">
               {steps.map(s => (

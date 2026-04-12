@@ -1179,6 +1179,7 @@ const MessageItem = memo(
                 phase={msg.thinkingState.phase}
                 steps={msg.thinkingState.steps}
                 activeStepIndex={msg.thinkingState.activeStepIndex}
+                totalTimeMs={msg.thinkingState.totalTimeMs}
               />
             )}
 

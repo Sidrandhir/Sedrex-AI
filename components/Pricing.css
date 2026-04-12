@@ -12,7 +12,7 @@
 }
 
 .pricing-inner {
-  max-width: 1060px;
+  max-width: 1120px;
   margin: 0 auto;
 }
 
@@ -180,16 +180,33 @@
   color: #10b981;
   letter-spacing: 0.02em;
 }
+.pricing-launch-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: rgba(251, 146, 60, 0.12);
+  border: 1px solid rgba(251, 146, 60, 0.3);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #fb923c;
+  margin-bottom: 8px;
+  margin-top: 4px;
+}
 
 /* ── Tier cards grid ───────────────────────────────── */
 .pricing-cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  align-items: start;
   margin-bottom: 48px;
 }
-@media (max-width: 820px) {
-  .pricing-cards { grid-template-columns: 1fr; max-width: 460px; margin-left: auto; margin-right: auto; }
+@media (max-width: 1200px) {
+  .pricing-cards { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .pricing-cards { grid-template-columns: 1fr; }
 }
 
 /* ── Card base ─────────────────────────────────────── */
@@ -243,10 +260,15 @@
   color: #10b981;
   border: 1px solid rgba(16, 185, 129, 0.3);
 }
-.pricing-card-pill.enterprise {
+.pricing-card-pill.enterprise-pill {
   background: rgba(168, 85, 247, 0.12);
   color: #a855f7;
   border: 1px solid rgba(168, 85, 247, 0.25);
+}
+.pricing-card-pill.team-pill {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.25);
 }
 
 /* ── Card tier label ───────────────────────────────── */
@@ -257,9 +279,23 @@
   text-transform: uppercase;
   margin-bottom: 12px;
 }
-.pricing-tier-label.free       { color: var(--text-secondary); }
-.pricing-tier-label.pro        { color: #10b981; }
-.pricing-tier-label.enterprise { color: #a855f7; }
+.pricing-tier-label { color: var(--text-secondary); }
+.pricing-card.pro        .pricing-tier-label { color: #10b981; }
+.pricing-card.team       .pricing-tier-label { color: #60a5fa; }
+.pricing-card.enterprise .pricing-tier-label { color: #a855f7; }
+
+/* ── Card tagline ──────────────────────────────────── */
+.pricing-card-tagline {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  opacity: 0.7;
+}
+
+/* ── Card top section ──────────────────────────────── */
+.pricing-card-top {
+  margin-bottom: 20px;
+}
 
 /* ── Price row ─────────────────────────────────────── */
 .pricing-price-row {
@@ -293,6 +329,10 @@
   font-weight: 600;
   margin-bottom: 12px;
   min-height: 16px;
+}
+.pricing-price-sub--muted {
+  color: var(--text-secondary);
+  opacity: 0.5;
 }
 
 .pricing-card-desc {
@@ -333,9 +373,8 @@
   font-size: 10px;
   font-weight: 800;
 }
-.pricing-feature-icon.free       { background: rgba(107, 114, 128, 0.15); color: #6b7280; }
-.pricing-feature-icon.pro        { background: rgba(16, 185, 129, 0.15);  color: #10b981; }
-.pricing-feature-icon.enterprise { background: rgba(168, 85, 247, 0.15);  color: #a855f7; }
+.pricing-feature-icon         { background: rgba(107, 114, 128, 0.15); color: #6b7280; }
+.pricing-feature-icon.accent  { background: rgba(16, 185, 129, 0.15);  color: #10b981; }
 
 /* ── CTA Buttons ───────────────────────────────────── */
 .pricing-cta {
@@ -377,6 +416,21 @@
   transform: none;
   box-shadow: none;
 }
+.pricing-cta.team-cta {
+  background: linear-gradient(135deg, #3b82f6, #60a5fa);
+  color: #fff;
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+}
+.pricing-cta.team-cta:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 28px rgba(59, 130, 246, 0.42);
+}
+.pricing-cta.team-cta:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
 .pricing-cta.enterprise-cta {
   background: transparent;
   border: 1px solid rgba(168, 85, 247, 0.4);
@@ -391,17 +445,36 @@
   cursor: not-allowed;
 }
 
+/* ── Team card ─────────────────────────────────────── */
+.pricing-card.team {
+  border-color: rgba(59, 130, 246, 0.2);
+}
+.pricing-card.team:hover {
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2), 0 8px 40px rgba(59, 130, 246, 0.1);
+}
+
+/* ── Bottom tagline ────────────────────────────────── */
+.pricing-bottom-tagline {
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  margin-top: 40px;
+  padding-bottom: 32px;
+  font-style: italic;
+}
+
 /* ── Feature comparison table ──────────────────────── */
 .pricing-table-section {
   margin-bottom: 48px;
 }
 .pricing-table-heading {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  margin-bottom: 16px;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+  margin-bottom: 20px;
+  text-align: center;
 }
 .pricing-table-wrap {
   border-radius: 20px;
@@ -429,6 +502,7 @@
 .pricing-table th.col-free       { color: var(--text-secondary); }
 .pricing-table th.col-pro        { color: #10b981; }
 .pricing-table th.col-enterprise { color: #a855f7; }
+.pricing-table th.col-team       { color: #60a5fa; }
 .pricing-table th.col-feature    { color: var(--text-secondary); width: 220px; }
 
 .pricing-table tbody tr {
@@ -465,6 +539,8 @@
 .pricing-table td.cell-check-enterprise { color: #a855f7; font-weight: 800; }
 .pricing-table td.cell-cross  { color: var(--text-secondary); opacity: 0.35; }
 .pricing-table td.cell-text   { color: var(--text-secondary); font-size: 12px; }
+.pricing-table td.cell-val-check { color: #10b981; font-weight: 700; }
+.pricing-table td.cell-val-cross { color: var(--text-secondary); opacity: 0.25; }
 
 /* ── FAQ accordion ─────────────────────────────────── */
 .pricing-faq-section {

@@ -12,7 +12,7 @@
 
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense, startTransition } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
-import { startCheckout, openBillingPortal, detectCheckoutReturn } from './services/billingService';
+import { startCheckout, openBillingPortal } from './services/billingService';
 import { preflightCheck } from './services/usageLimitService';
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
@@ -119,18 +119,6 @@ const App: React.FC = () => {
   const didAutoCreate = useRef(false);
   const { startThinking, clearTimers } = useThinkingSteps();
 
-  // ── Stripe checkout return detection ───────────────────────────
-  useEffect(() => {
-    const result = detectCheckoutReturn();
-    if (result === 'success') {
-      addToast('Upgrade successful! Welcome to Pro.', 'success');
-      upgradeCompleted('pro');
-      // Reload user stats so tier badge updates immediately
-      if (user) getStats(user.id).then(s => s && setUserStats(s));
-    } else if (result === 'cancelled') {
-      addToast('Upgrade cancelled. You can upgrade anytime.', 'info');
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addToast = useCallback(
     (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -212,12 +200,51 @@ const App: React.FC = () => {
   });
 
   // ── Stripe upgrade handler ──────────────────────────────────────
-  const handleUpgrade = useCallback(async () => {
+  const handleUpgrade = useCallback(async (planIdOverride?: string, amountOverride?: number) => {
     if (!user) { setShowAuth(true); return; }
     setShowUpgradeModal(false);
     upgradeClicked('upgrade_handler', user.tier ?? 'free');
     try {
-      await startCheckout(user.id, user.email, 'pro');
+      await startCheckout(
+        user.id,
+        user.email,
+        user.email,
+        'pro',
+        async (tier) => {
+          await api.updateTier(tier as any);
+          addToast('Upgrade successful! Welcome to Pro.', 'success');
+          if (user) getStats(user.id).then(s => s && setUserStats(s));
+          upgradeCompleted(tier);
+        },
+        (msg) => addToast(msg, 'error'),
+        planIdOverride,
+        amountOverride,
+      );
+    } catch (err: any) {
+      addToast(err.message ?? 'Could not open checkout. Please try again.', 'error');
+    }
+  }, [user]);
+
+  // ── Team upgrade ───────────────────────────────────────────────
+  const handleUpgradeTeam = useCallback(async (planIdOverride?: string, amountOverride?: number) => {
+    if (!user) { setShowAuth(true); return; }
+    upgradeClicked('upgrade_handler', user.tier ?? 'free');
+    try {
+      await startCheckout(
+        user.id,
+        user.email,
+        user.email,
+        'team',
+        async (tier) => {
+          await api.updateTier(tier as any);
+          addToast('Upgrade successful! Welcome to Team.', 'success');
+          if (user) getStats(user.id).then(s => s && setUserStats(s));
+          upgradeCompleted(tier);
+        },
+        (msg) => addToast(msg, 'error'),
+        planIdOverride,
+        amountOverride,
+      );
     } catch (err: any) {
       addToast(err.message ?? 'Could not open checkout. Please try again.', 'error');
     }
@@ -229,14 +256,13 @@ const App: React.FC = () => {
     setShowUpgradeModal(true);
   }, []);
 
-  // ── Stripe portal handler (manage subscription / cancel) ───────
+  // ── Billing portal handler (manage subscription / cancel) ───────
   const handleManageBilling = useCallback(async () => {
     if (!user) return;
     try {
       await openBillingPortal(user.id);
     } catch (err: any) {
-      // If no Stripe customer yet, fall back to checkout
-      handleUpgrade();
+      addToast(err.message, 'info');
     }
   }, [user]);
 
@@ -1055,7 +1081,7 @@ const App: React.FC = () => {
                     </Suspense>
                   ) : view === 'pricing' ? (
                     <Suspense fallback={<LazyFallback />}>
-                      <Pricing onUpgrade={handleUpgrade} onClose={() => handleSetView('chat')} currentTier={user?.tier} />
+                      <Pricing onUpgrade={handleUpgrade} onUpgradeTeam={handleUpgradeTeam} onClose={() => handleSetView('chat')} currentTier={user?.tier} />
                     </Suspense>
                   ) : view === 'billing' ? (
                     <Suspense fallback={<LazyFallback />}>

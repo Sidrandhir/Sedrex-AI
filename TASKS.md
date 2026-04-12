@@ -6,33 +6,29 @@
 
 ## 🔴 CRITICAL — Pre-Launch (Before April 17)
 
-### BUG-001: Mermaid Empty Shapes Fix
-- [ ] In `ArtifactPanel.tsx`, find Mermaid init/render config
-- [ ] Add `htmlLabels: false` to Mermaid config object
-- [ ] Test with: flowchart, sequence diagram, ER diagram
-- [ ] Verify text appears inside all shape types
-- **SPEC:** No spec needed — surgical one-line fix
-- **Files:** `src/components/ArtifactPanel.tsx`
+### BUG-001: Mermaid Empty Shapes Fix ✅ DONE
+- [x] In `ArtifactPanel.tsx`, find Mermaid init/render config
+- [x] Add `htmlLabels: false` to Mermaid config object
+- [x] Fix `#` filter stripping label lines — changed to `%%` comment filter only
+- [x] Add `ADD_TAGS: ['style']` to DOMPurify to preserve Mermaid theme CSS
+- **Files:** `components/ArtifactPanel.tsx`
 
-### BUG-002: Safe Mode False Positives — Phase 1 Quick Fix
-- [ ] Read `SPECS/safe-mode-fix.md` fully before starting
-- [ ] In `vite.config.ts` — update circuit breaker defaults (threshold 10→25, open_ms 20000→10000)
-- [ ] In `usageLimitService.ts` — add graceful queue message instead of hard safe mode
-- [ ] In `App.tsx` — replace safe mode UI with "High demand, queuing your request..." toast
-- [ ] Test: simulate 15 rapid requests and verify no safe mode trigger
-- **SPEC:** `SPECS/safe-mode-fix.md`
-- **Files:** `vite.config.ts`, `src/services/usageLimitService.ts`, `src/App.tsx`
+### BUG-002: Safe Mode False Positives — Phase 1 Quick Fix ✅ DONE
+- [x] In `vite.config.ts` — updated circuit breaker defaults (threshold 10→25, open_ms 20000→10000)
+- [x] In `aiService.ts` — circuit breaker now reads from `process.env` (was hardcoded)
+- [x] In `App.tsx` — replaced safe mode UI with toast + message removal (no hard block)
+- **Files:** `vite.config.ts`, `services/aiService.ts`, `App.tsx`
 
-### FEAT-001: Claude-style Thinking + Execution Animation
-- [ ] Read `SPECS/thinking-animation.md` fully before starting
-- [ ] Step 1: Create `src/components/ThinkingPanel.tsx` (collapsible, animated)
-- [ ] Step 2: Enhance `src/hooks/useThinkingSteps.ts` — add step types + timing
-- [ ] Step 3: Fix code blocks in `ChatArea.tsx` — contained box, not full-width
-- [ ] Step 4: Wire `agentEventBus` events → ThinkingPanel props
-- [ ] Step 5: Wire ThinkingPanel into `ChatArea.tsx` above each assistant message
+### FEAT-001: Claude-style Thinking + Execution Animation ✅ DONE
+- [x] `ThinkingSteps.tsx` created — collapsible, animated step rows
+- [x] `useThinkingSteps.ts` — async generator, planning + fallback steps, timing
+- [x] Code blocks fixed in `ChatArea.tsx` — contained box, `streaming-raw` pre element
+- [x] `AgentActivityLog` removed — `ThinkingSteps` is now primary UI (no suppression)
+- [x] `ThinkingSteps` wired into `ChatArea.tsx` above each assistant message
+- [x] `totalTimeMs` added — compact row shows "N steps · X.Xs" on completion
 - [ ] Step 6: Test with slow model (Gemini) — verify steps appear + collapse on complete
-- **SPEC:** `SPECS/thinking-animation.md`
-- **Files:** New `ThinkingPanel.tsx`, `useThinkingSteps.ts`, `ChatArea.tsx`, `agentEventBus.ts`
+- [ ] FEAT-001 Step 5: Verify mobile (375px) — check tsx-step-label ellipsis + code overflow
+- **Files:** `components/ThinkingSteps.tsx`, `hooks/useThinkingSteps.ts`, `components/ChatArea.tsx`, `types.ts`
 
 ---
 
@@ -53,13 +49,14 @@
 - [ ] Error boundary per preview — no full panel crash
 - **Files:** `ArtifactPanel.tsx`, new `SandboxPreview.tsx`
 
-### FEAT-004: Stripe Setup
-- [ ] Pro plan: $12/month product in Stripe dashboard
-- [ ] Team plan: $49/month product in Stripe dashboard
-- [ ] Update `billingService.ts` with real price IDs
-- [ ] Test checkout flow end-to-end in test mode
-- [ ] Test billing portal redirect
-- **Files:** `src/services/billingService.ts`, `.env`
+### FEAT-004: Razorpay Billing ✅ DONE (replaces Stripe)
+- [x] `billingService.ts` — full rewrite with Razorpay modal checkout (dynamic script load)
+- [x] `tierConfig.ts` — Pro (plan_ScHyEEXa8uICDo, ₹1,999/mo) + Team (plan_ScI1NOvr0NH9iP, ₹4,999/mo)
+- [x] `App.tsx` — `handleUpgrade()` + `handleUpgradeTeam()` wired with Razorpay callbacks
+- [x] `types.ts` + `Pricing.tsx` — `UserTier` updated with `'team'`
+- [ ] Add `VITE_RAZORPAY_KEY_ID=rzp_live_...` to `.env` and Vercel dashboard (manual — secret)
+- [ ] Create yearly plan IDs in Razorpay dashboard and wire into `billingService.ts`
+- **Files:** `services/billingService.ts`, `services/tierConfig.ts`, `App.tsx`
 
 ### FEAT-005: RLS Verification on All Supabase Tables
 - [ ] Run verification script against production Supabase
