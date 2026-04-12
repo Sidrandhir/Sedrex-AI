@@ -347,6 +347,7 @@ const MermaidBlock = memo(({ code }: { code: string }) => {
           startOnLoad: false,
           theme: 'dark',
           securityLevel: 'antiscript',
+          htmlLabels: false,
           maxTextSize: 500000,
           flowchart: {
             htmlLabels: false,

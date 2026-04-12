@@ -11,7 +11,8 @@
 - [x] Add `htmlLabels: false` to Mermaid config object
 - [x] Fix `#` filter stripping label lines — changed to `%%` comment filter only
 - [x] Add `ADD_TAGS: ['style']` to DOMPurify to preserve Mermaid theme CSS
-- **Files:** `components/ArtifactPanel.tsx`
+- [x] Add top-level `htmlLabels: false` to `ChatArea.tsx` mermaid.initialize (was missing — only had it inside `flowchart`, leaving sequence/class/state diagrams broken)
+- **Files:** `components/ArtifactPanel.tsx`, `components/ChatArea.tsx`
 
 ### BUG-002: Safe Mode False Positives — Phase 1 Quick Fix ✅ DONE
 - [x] In `vite.config.ts` — updated circuit breaker defaults (threshold 10→25, open_ms 20000→10000)
