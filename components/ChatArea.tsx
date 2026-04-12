@@ -1680,11 +1680,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)',
               textAlign: 'center',
             }}>
-              <div style={{ fontWeight: 600, fontSize: 14, color: '#ef4444', marginBottom: 6 }}>
-                You've used your 100 free requests this month
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 14 }}>
-                Resets on {remainingRequests?.resetsAt ? new Date(remainingRequests.resetsAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'next month'} or upgrade to Pro for uninterrupted access.
+              <div style={{ fontWeight: 600, fontSize: 14, color: '#ef4444', marginBottom: 14 }}>
+                You've reached your daily limit. Come back after 12 AM or upgrade to Pro.
               </div>
               {onUpgrade && (
                 <button
@@ -1709,7 +1706,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               fontSize: 12,
             }}>
               <span style={{ color: 'var(--text-secondary)' }}>
-                ⚡ Unlock Claude &amp; GPT-4o — upgrade for ₹999/mo
+                ⚡ You're on the free plan — upgrade for ₹999/mo
               </span>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                 {onUpgrade && (
@@ -1733,16 +1730,6 @@ const ChatArea: React.FC<ChatAreaProps> = ({
             </div>
           )}
 
-          {/* STATE 1 — Usage footer (all tiers except enterprise) */}
-          {!isEnterprise && remainingRequests && (
-            <div style={{
-              textAlign: 'center', fontSize: 11,
-              color: 'var(--text-secondary)', opacity: 0.45,
-              padding: '4px 0 8px',
-            }}>
-              {`${remainingRequests.used}/${remainingRequests.limit ?? '∞'} requests used this month`}
-            </div>
-          )}
         </div>
       </div>
 

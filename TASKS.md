@@ -90,7 +90,11 @@
 - [x] Fix 3: ChatArea footer — unified line using `remainingRequests.used` for all tiers (`ChatArea.tsx`)
 - [x] Fix 4: `handleSendMessage()` — hard early return if `canSend.allowed === false` (`App.tsx`)
 - [x] Fix 5: Hard stop banner copy — "100 free requests this month" + "Resets on [date]" using `remainingRequests.resetsAt` (`ChatArea.tsx`)
-- **Free tier enforcement fully complete.**
+- [x] UI cleanup: removed STATE 1 usage footer (`ChatArea.tsx`)
+- [x] UI cleanup: nudge banner copy → "You're on the free plan — upgrade for ₹999/mo" (`ChatArea.tsx`)
+- [x] UI cleanup: hard stop banner → "You've reached your daily limit. Come back after 12 AM or upgrade to Pro." — reset date line removed (`ChatArea.tsx`)
+- [x] UI cleanup: UsageBar sidebar — removed "X/100 messages" numbers, shows only progress bar + upgrade button + blocked msg (`UsageBar.tsx`)
+- **Free tier enforcement + UI fully complete.**
 - **Files:** `App.tsx`, `services/aiService.ts`, `services/tierConfig.ts`, `components/ChatArea.tsx`
 
 ### FEAT-005: RLS Verification on All Supabase Tables

@@ -7,7 +7,7 @@
 
 import React, { memo, useRef, useEffect } from 'react';
 import { UserStats } from '../types';
-import { getUsageSummary, formatUsage, getUsageColor } from '../services/usageLimitService';
+import { getUsageSummary, getUsageColor } from '../services/usageLimitService';
 import { getTierConfig } from '../services/tierConfig';
 
 interface UsageBarProps {
@@ -50,9 +50,7 @@ export const UsageBar = memo(({ stats, onUpgradeClick }: UsageBarProps) => {
     <div className="usage-bar-wrap">
       {/* Label row */}
       <div className="usage-bar-header">
-        <span className="usage-bar-label">
-          {check ? formatUsage(check, unit) : cfg.name}
-        </span>
+        <span className="usage-bar-label">{cfg.name}</span>
         {(isFree || isBlocked || isWarning) && cfg.id !== 'enterprise' && (
           <button
             type="button"
