@@ -13,7 +13,7 @@
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense, startTransition } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { startCheckout, openBillingPortal } from './services/billingService';
-import { preflightCheck } from './services/usageLimitService';
+import { preflightCheck, checkCanSendMessage, getRemainingRequests } from './services/usageLimitService';
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import MessageInput from './components/MessageInput';
@@ -833,6 +833,7 @@ const App: React.FC = () => {
 
   const handleSendMessage = async (content: string, images?: MessageImage[], docs?: AttachedDocument[]) => {
     if (!user || !activeSessionId || !activeSession || isLoading) return;
+    if (canSend && !canSend.allowed) return;
     try {
       setSessions(prev => prev.map(s => s.id === activeSessionId ? {
         ...s, messages: s.messages.map(m => ({ ...m, suggestions: undefined })),
@@ -972,6 +973,9 @@ const App: React.FC = () => {
     setShowSurvey(false);
   };
 
+  const canSend   = checkCanSendMessage(userStats);
+  const remaining = getRemainingRequests(userStats);
+
   if (isAuthChecking)
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center gap-4 bg-[var(--bg-primary)]">
@@ -1074,6 +1078,10 @@ const App: React.FC = () => {
                       theme={theme}
                       onThemeToggle={handleThemeToggle}
                       onSuggestionClick={txt => handleSendMessage(txt)}
+                      userStats={userStats}
+                      canSend={canSend}
+                      remainingRequests={remaining}
+                      onUpgrade={() => handleShowUpgrade()}
                     />
                   ) : view === 'dashboard' ? (
                     <Suspense fallback={<LazyFallback />}>

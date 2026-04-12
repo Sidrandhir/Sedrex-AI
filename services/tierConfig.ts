@@ -49,6 +49,7 @@ export interface TierConfig {
   maxFilesPerMsg:    number;  // max simultaneous file attachments
   maxConversations:  number;  // total conversations stored
   contextWindowMsgs: number;  // how many prior messages sent to AI
+  allowedModels:    string[];  // model IDs this tier can access
   // ── Features ───────────────────────────────────────────────────
   features: TierFeatures;
 }
@@ -67,13 +68,14 @@ export const TIER_CONFIG: Record<TierId, TierConfig> = {
     pricePaisa:     0,
     planId:         '',
 
-    monthlyMessages:   30,
+    monthlyMessages:   100,
     dailyMessages:     10,
     monthlyTokens:     50_000,
     maxFileSizeMB:     5,
     maxFilesPerMsg:    1,
     maxConversations:  20,
     contextWindowMsgs: 10,
+    allowedModels:     ['gemini-flash', 'deepseek-chat'],
 
     features: {
       codeExecution:       true,
@@ -105,13 +107,14 @@ export const TIER_CONFIG: Record<TierId, TierConfig> = {
     regularPricePaisa:   199900,
     regularPriceDisplay: '₹1,999',
 
-    monthlyMessages:   2_000,
-    dailyMessages:     200,
+    monthlyMessages:   400,
+    dailyMessages:     Infinity,
     monthlyTokens:     2_000_000,
     maxFileSizeMB:     25,
     maxFilesPerMsg:    5,
     maxConversations:  500,
     contextWindowMsgs: 20,
+    allowedModels:     ['gemini-flash', 'deepseek-chat', 'gpt-4o', 'claude-sonnet'],
 
     features: {
       codeExecution:       true,
@@ -143,13 +146,14 @@ export const TIER_CONFIG: Record<TierId, TierConfig> = {
     regularPricePaisa:   499900,
     regularPriceDisplay: '₹4,999',
 
-    monthlyMessages:   5_000,
-    dailyMessages:     500,
+    monthlyMessages:   1_500,
+    dailyMessages:     Infinity,
     monthlyTokens:     5_000_000,
     maxFileSizeMB:     50,
     maxFilesPerMsg:    10,
     maxConversations:  Infinity,
     contextWindowMsgs: 30,
+    allowedModels:     ['gemini-flash', 'deepseek-chat', 'gpt-4o', 'claude-sonnet'],
 
     features: {
       codeExecution:       true,
@@ -175,13 +179,14 @@ export const TIER_CONFIG: Record<TierId, TierConfig> = {
     pricePaisa:     null,
     planId:         '',
 
-    monthlyMessages:   10_000,
-    dailyMessages:     1_000,
-    monthlyTokens:     10_000_000,
+    monthlyMessages:   Infinity,
+    dailyMessages:     Infinity,
+    monthlyTokens:     Infinity,
     maxFileSizeMB:     50,
     maxFilesPerMsg:    10,
     maxConversations:  Infinity,
     contextWindowMsgs: 50,
+    allowedModels:     ['gemini-flash', 'deepseek-chat', 'gpt-4o', 'claude-sonnet'],
 
     features: {
       codeExecution:       true,
@@ -203,15 +208,17 @@ export const TIER_CONFIG: Record<TierId, TierConfig> = {
 // ── Helpers ───────────────────────────────────────────────────────
 
 export function getTierConfig(tier?: string | null): TierConfig {
-  const id = (tier ?? 'free') as TierId;
+  const normalized = tier === 'admin' ? 'enterprise' : (tier ?? 'free');
+  const id = normalized as TierId;
   return TIER_CONFIG[id] ?? TIER_CONFIG.free;
 }
 
 /** Legacy shim kept for backward compatibility */
 export const TIER_LIMITS: Record<string, number> = {
-  free: TIER_CONFIG.free.monthlyMessages,
-  pro:  TIER_CONFIG.pro.monthlyMessages,
-  team: TIER_CONFIG.team.monthlyMessages,
+  free:       TIER_CONFIG.free.monthlyMessages,
+  pro:        TIER_CONFIG.pro.monthlyMessages,
+  team:       TIER_CONFIG.team.monthlyMessages,
+  enterprise: TIER_CONFIG.enterprise.monthlyMessages,
 };
 
 export function getMonthlyLimit(tier?: string): number {

@@ -58,6 +58,41 @@
 - [ ] Create yearly plan IDs in Razorpay dashboard and wire into `billingService.ts`
 - **Files:** `services/billingService.ts`, `services/tierConfig.ts`, `App.tsx`
 
+### FEAT-004b: Tier Enforcement Audit [x] DONE
+<!-- COMPLETED:
+  1. Built complete tier gating system across tierConfig.ts, aiService.ts, agentOrchestrator.ts, usageLimitService.ts, ChatArea.tsx
+  2. Added DeepSeek provider, isProviderAvailable() helper, tier-aware routing, basic mode fallback, usage UI states
+  3. Next: wire canSend + userStats props from App.tsx to ChatArea, and pass userTier to agentOrchestrator.dispatch()
+-->
+- [x] Full diagnosis complete — model routing, key pool, usage checks, tier config all mapped
+- [x] Set real monthly/daily limits in `tierConfig.ts` — free: 10/day 100/mo, pro: 400/mo, team: 1500/mo, enterprise: unlimited
+- [x] Added `allowedModels` per tier in `tierConfig.ts`
+- [x] Added `PROVIDER_DEEPSEEK`, `isProviderAvailable()`, `callDeepSeekProvider()` in `aiService.ts`
+- [x] Added Gemini search grounding signal expansion in `aiService.ts`
+- [x] Added `userTier` + `isBasicMode` params to `agentOrchestrator.dispatch()` — free/basic → Gemini fast-path
+- [x] Added `checkCanSendMessage()`, `getRemainingRequests()`, `isInBasicMode()` to `usageLimitService.ts`
+- [x] Added all 5 usage UI states to `ChatArea.tsx` (hard stop, nudge, basic mode banner, basic mode modal, footer)
+- [ ] Wire `canSend` + `userStats` + `remainingRequests` props from `App.tsx` → `ChatArea`
+- [ ] Pass `userTier` + `isBasicMode` to `agentOrchestrator.dispatch()` call in `aiService.ts`
+- [ ] Add server-side enforcement via Supabase RLS or Edge Function (FEAT-007)
+- **Files:** `services/tierConfig.ts`, `services/aiService.ts`, `services/agents/agentOrchestrator.ts`, `services/usageLimitService.ts`, `components/ChatArea.tsx`, `.env`
+
+### FEAT-004c: App.tsx Wiring [x] DONE
+- [x] Imported `checkCanSendMessage`, `getRemainingRequests` in `App.tsx`
+- [x] Derived `canSend` + `remaining` above return statement from existing `userStats` state
+- [x] Passed `userStats`, `canSend`, `remainingRequests`, `onUpgrade` to `<ChatArea>`
+- [x] Added `userTier` + `isBasicMode` optional params to `getAIResponse` + `processRequest` in `aiService.ts`
+- [x] Threaded `userTier` + `isBasicMode` through to `agentDispatch()` call
+- [x] Bug fix: `admin` tier → maps to `enterprise` in `getTierConfig()` (`tierConfig.ts`)
+- [x] Bug fix: free tier usage footer shows `monthlyMessagesSent` (trigger-populated) instead of broken `dailyHistory` (`ChatArea.tsx`)
+- [x] Fix 1: `checkCanSendMessage()` — free tier checks `monthlyMessagesSent >= 100`, not daily count (`usageLimitService.ts`)
+- [x] Fix 2: `getRemainingRequests()` — free tier returns monthly used/limit/reset, not daily (`usageLimitService.ts`)
+- [x] Fix 3: ChatArea footer — unified line using `remainingRequests.used` for all tiers (`ChatArea.tsx`)
+- [x] Fix 4: `handleSendMessage()` — hard early return if `canSend.allowed === false` (`App.tsx`)
+- [x] Fix 5: Hard stop banner copy — "100 free requests this month" + "Resets on [date]" using `remainingRequests.resetsAt` (`ChatArea.tsx`)
+- **Free tier enforcement fully complete.**
+- **Files:** `App.tsx`, `services/aiService.ts`, `services/tierConfig.ts`, `components/ChatArea.tsx`
+
 ### FEAT-005: RLS Verification on All Supabase Tables
 - [ ] Run verification script against production Supabase
 - [ ] Check: `messages`, `conversations`, `artifacts`, `user_stats`, `usage_logs`

@@ -2,7 +2,8 @@ import React, {
   useRef, useEffect, useState, useCallback, useMemo, memo, lazy, Suspense,
 } from 'react';
 import DOMPurify from 'dompurify';
-import { Message, AIModel, SedrexRoute, ChatSession, GroundingChunk, MessageImage } from '../types';
+import { Message, AIModel, SedrexRoute, ChatSession, GroundingChunk, MessageImage, UserStats } from '../types';
+import type { CanSendResult, RemainingRequests } from '../services/usageLimitService';
 import { Icons } from '../constants';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -41,6 +42,10 @@ interface ChatAreaProps {
   theme: 'light' | 'dark';
   onThemeToggle: () => void;
   onSuggestionClick?: (text: string) => void;
+  userStats?: UserStats | null;
+  canSend?: CanSendResult | null;
+  remainingRequests?: RemainingRequests | null;
+  onUpgrade?: () => void;
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1393,6 +1398,7 @@ const MessageItem = memo(
 const ChatArea: React.FC<ChatAreaProps> = ({
   session, isLoading, onExport, onToggleSidebar, isSidebarOpen,
   onRegenerate, onEditMessage, onFeedback, theme, onThemeToggle, onSuggestionClick,
+  userStats, canSend, remainingRequests, onUpgrade,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const messages = session?.messages ?? [];
@@ -1404,6 +1410,17 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
   const [submittedFeedback, setSubmittedFeedback] = useState<Set<string>>(new Set());
+
+  // ── Tier UI state — session/local storage gated ───────────────
+  const [nudgeDismissed,       setNudgeDismissed]       = useState(() => sessionStorage.getItem('sx_nudge_dismissed') === '1');
+  const [basicBannerDismissed, setBasicBannerDismissed] = useState(() => sessionStorage.getItem('sx_basic_banner_dismissed') === '1');
+  const [basicModalDismissed,  setBasicModalDismissed]  = useState(() => localStorage.getItem('sx_basic_modal_dismissed') === '1');
+
+  const tier       = userStats?.tier ?? 'free';
+  const isBasicMode = canSend?.isBasicMode ?? false;
+  const isHardStop  = canSend ? !canSend.allowed && !canSend.isBasicMode : false;
+  const isFree      = tier === 'free';
+  const isEnterprise= tier === 'enterprise';
 
   const handleFeedbackGuarded = useCallback((id: string, fb: 'good' | 'bad' | null) => {
     if (fb !== null && submittedFeedback.has(id)) return;
@@ -1524,8 +1541,76 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     []
   );
 
+  // ── Derived renewal date string ────────────────────────────────
+  const renewalDate = remainingRequests?.resetsAt
+    ? new Date(remainingRequests.resetsAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
+    : 'next month';
+
   return (
     <div className="chat-root">
+
+      {/* STATE 4 — Basic mode top banner (pro/team over monthly limit) */}
+      {isBasicMode && !basicBannerDismissed && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '8px 16px', gap: 8,
+          background: 'rgba(251,191,36,0.08)', borderBottom: '1px solid rgba(251,191,36,0.2)',
+          fontSize: 12, color: '#fbbf24',
+        }}>
+          <span>Basic mode active — full access renews {renewalDate}</span>
+          <button
+            type="button"
+            onClick={() => { setBasicBannerDismissed(true); sessionStorage.setItem('sx_basic_banner_dismissed', '1'); }}
+            style={{ background: 'none', border: 'none', color: '#fbbf24', cursor: 'pointer', padding: '0 4px', fontSize: 14, lineHeight: 1 }}
+            aria-label="Dismiss"
+          >×</button>
+        </div>
+      )}
+
+      {/* STATE 5 — Basic mode modal (shown once ever when limit first crossed) */}
+      {isBasicMode && !basicModalDismissed && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 100,
+          background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 24,
+        }}>
+          <div style={{
+            background: 'var(--bg-primary, #0f0f1a)', border: '1px solid var(--border, rgba(255,255,255,0.1))',
+            borderRadius: 16, padding: '28px 24px', maxWidth: 400, width: '100%', textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 28, marginBottom: 12 }}>⚡</div>
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8, color: 'var(--text-primary)' }}>
+              You've used all your requests this month
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20, lineHeight: 1.6 }}>
+              You can still chat — switched to basic mode until {renewalDate}.
+              Responses continue on our core engine.
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+              {onUpgrade && (
+                <button
+                  type="button"
+                  onClick={() => { setBasicModalDismissed(true); localStorage.setItem('sx_basic_modal_dismissed', '1'); onUpgrade(); }}
+                  style={{
+                    background: 'var(--accent, #10B981)', color: '#fff',
+                    border: 'none', borderRadius: 8, padding: '9px 20px',
+                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  }}
+                >Upgrade plan</button>
+              )}
+              <button
+                type="button"
+                onClick={() => { setBasicModalDismissed(true); localStorage.setItem('sx_basic_modal_dismissed', '1'); }}
+                style={{
+                  background: 'transparent', color: 'var(--text-secondary)',
+                  border: '1px solid var(--border, rgba(255,255,255,0.12))', borderRadius: 8,
+                  padding: '9px 20px', fontSize: 13, cursor: 'pointer',
+                }}
+              >Continue in basic mode</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Top controls */}
       <div className="chat-controls">
@@ -1587,6 +1672,77 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           {/* NOTE: Global typing dots removed — MessageItem renders its own
                dots when isStreaming && !msg.content. Showing both caused
                the double-loading-dot bug on new chats. */}
+
+          {/* STATE 3 — Free hard stop (daily/monthly limit hit) */}
+          {isHardStop && (
+            <div style={{
+              margin: '16px 0 8px', padding: '16px 20px', borderRadius: 12,
+              background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)',
+              textAlign: 'center',
+            }}>
+              <div style={{ fontWeight: 600, fontSize: 14, color: '#ef4444', marginBottom: 6 }}>
+                You've used your 100 free requests this month
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 14 }}>
+                Resets on {remainingRequests?.resetsAt ? new Date(remainingRequests.resetsAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'next month'} or upgrade to Pro for uninterrupted access.
+              </div>
+              {onUpgrade && (
+                <button
+                  type="button"
+                  onClick={onUpgrade}
+                  style={{
+                    background: 'var(--accent, #10B981)', color: '#fff',
+                    border: 'none', borderRadius: 8, padding: '8px 20px',
+                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  }}
+                >Upgrade to Pro →</button>
+              )}
+            </div>
+          )}
+
+          {/* STATE 2 — Free upgrade nudge (once per session, after ≥1 message) */}
+          {isFree && !isHardStop && !nudgeDismissed && messages.length >= 1 && !isLoading && (
+            <div style={{
+              margin: '12px 0 4px', padding: '10px 14px', borderRadius: 10,
+              background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+              fontSize: 12,
+            }}>
+              <span style={{ color: 'var(--text-secondary)' }}>
+                ⚡ Unlock Claude &amp; GPT-4o — upgrade for ₹999/mo
+              </span>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                {onUpgrade && (
+                  <button
+                    type="button"
+                    onClick={onUpgrade}
+                    style={{
+                      background: 'var(--accent, #10B981)', color: '#fff',
+                      border: 'none', borderRadius: 6, padding: '5px 12px',
+                      fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                    }}
+                  >Upgrade →</button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { setNudgeDismissed(true); sessionStorage.setItem('sx_nudge_dismissed', '1'); }}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0 2px', fontSize: 14, lineHeight: 1 }}
+                  aria-label="Dismiss"
+                >×</button>
+              </div>
+            </div>
+          )}
+
+          {/* STATE 1 — Usage footer (all tiers except enterprise) */}
+          {!isEnterprise && remainingRequests && (
+            <div style={{
+              textAlign: 'center', fontSize: 11,
+              color: 'var(--text-secondary)', opacity: 0.45,
+              padding: '4px 0 8px',
+            }}>
+              {`${remainingRequests.used}/${remainingRequests.limit ?? '∞'} requests used this month`}
+            </div>
+          )}
         </div>
       </div>
 

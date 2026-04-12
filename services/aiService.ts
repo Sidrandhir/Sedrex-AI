@@ -306,9 +306,27 @@ const PROVIDER_CLAUDE = {
     !(_vite.VITE_CLAUDE_KEY || '').startsWith('sk-ant-...') &&
     (_vite.VITE_CLAUDE_KEY || _proc.ANTHROPIC_API_KEY || '').length > 20,
 };
+const PROVIDER_DEEPSEEK = {
+  key:       _vite.VITE_DEEPSEEK_KEY || _proc.DEEPSEEK_API_KEY || "",
+  modelChat:     "deepseek-chat",
+  modelReasoner: "deepseek-reasoner",
+  available: !!(_vite.VITE_DEEPSEEK_KEY || _proc.DEEPSEEK_API_KEY) &&
+    (_vite.VITE_DEEPSEEK_KEY || _proc.DEEPSEEK_API_KEY || '').length > 10,
+};
 if (import.meta.env.DEV) {
   console.log("[SEDREX] Precision Engine:", PROVIDER_OPENAI.available ? "✅ configured" : "⏳ using core fallback");
   console.log("[SEDREX] Code Engine:", PROVIDER_CLAUDE.available ? "✅ configured" : "⏳ using core fallback");
+  console.log("[SEDREX] Reasoning Engine:", PROVIDER_DEEPSEEK.available ? "✅ configured" : "⏳ using core fallback");
+}
+
+// ── Provider availability — checked at runtime, zero code changes needed when keys are added ──
+export function isProviderAvailable(provider: 'gemini' | 'deepseek' | 'openai' | 'claude'): boolean {
+  switch (provider) {
+    case 'gemini':   return apiKeyPool.length > 0;
+    case 'deepseek': return PROVIDER_DEEPSEEK.available;
+    case 'openai':   return PROVIDER_OPENAI.available;
+    case 'claude':   return PROVIDER_CLAUDE.available;
+  }
 }
 
 // ── Gemini key rotation ───────────────────────────────────────────
@@ -1139,6 +1157,83 @@ async function callClaudeProvider(
   };
 }
 
+async function callDeepSeekProvider(
+  prompt: string,
+  history: Message[],
+  systemInstruction: string,
+  maxTokens: number,
+  temperature: number,
+  useReasoner = false,
+  onStreamChunk?: (text: string) => void,
+  signal?: AbortSignal,
+): Promise<{ text: string; inputTokens: number; outputTokens: number } | null> {
+  if (!PROVIDER_DEEPSEEK.available) return null;
+  const model = useReasoner ? PROVIDER_DEEPSEEK.modelReasoner : PROVIDER_DEEPSEEK.modelChat;
+  const cleanHistory = sanitizeConversationHistory(history);
+  const messages = [
+    { role: "system" as const, content: systemInstruction },
+    ...cleanHistory.slice(-MAX_HISTORY.general).map((m) => ({
+      role: (m.role === "assistant" ? "assistant" : "user") as "assistant" | "user",
+      content: m.role === 'assistant'
+        ? (m.content ?? '').replace(/\[ARTIFACT:[^\]]+\]/g, '[code artifact generated]')
+        : (m.content ?? ''),
+    })),
+    { role: "user" as const, content: prompt },
+  ];
+
+  const res = await fetch("https://api.deepseek.com/v1/chat/completions", {
+    method: "POST", signal,
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${PROVIDER_DEEPSEEK.key}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      max_tokens: maxTokens,
+      temperature,
+      stream: !!onStreamChunk,
+    }),
+  });
+
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e.error?.message || `DeepSeek API error ${res.status}`);
+  }
+
+  if (onStreamChunk && res.body) {
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let fullText  = ""; let inputTokens = 0; let outputTokens = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const lines = decoder.decode(value).split("\n")
+        .filter((l) => l.startsWith("data: ") && l !== "data: [DONE]");
+      for (const line of lines) {
+        try {
+          const json  = JSON.parse(line.slice(6));
+          const chunk = json.choices?.[0]?.delta?.content || "";
+          if (chunk) { fullText += chunk; onStreamChunk(chunk); }
+          if (json.usage) {
+            inputTokens  = json.usage.prompt_tokens;
+            outputTokens = json.usage.completion_tokens;
+          }
+        } catch { /* skip malformed SSE lines */ }
+      }
+    }
+    return { text: fullText, inputTokens, outputTokens };
+  }
+
+  const data = await res.json();
+  return {
+    text:         data.choices[0]?.message?.content || "",
+    inputTokens:  data.usage?.prompt_tokens         || 0,
+    outputTokens: data.usage?.completion_tokens      || 0,
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // MAIN ENTRY POINT
 // ═══════════════════════════════════════════════════════════════════
@@ -1153,7 +1248,9 @@ export const getAIResponse = async (
   personification = "",
   onStreamChunk?:   (text: string) => void,
   signal?:          AbortSignal,
-  queueKey = "global",
+  queueKey    = "global",
+  userTier    = "free",
+  isBasicMode = false,
 ): Promise<SedrexResponse> => {
   const clientId = (queueKey?.split(":")[0] || "global").trim() || "global";
 
@@ -1190,7 +1287,7 @@ export const getAIResponse = async (
     .add(
       () => processRequest(
         prompt, history, manualModel, onRouting, images, documents,
-        personification, onStreamChunk, signal,
+        personification, onStreamChunk, signal, [], userTier, isBasicMode,
       ),
       effectiveQueueKey,
     )
@@ -1225,6 +1322,8 @@ async function processRequest(
   onStreamChunk?:   (text: string) => void,
   signal?:          AbortSignal,
   artifacts:        any[] = [],
+  userTier          = 'free',
+  isBasicMode       = false,
 ): Promise<SedrexResponse> {
   if (signal?.aborted) throw new DOMException("Request aborted before processing", "AbortError");
 
@@ -1265,7 +1364,7 @@ async function processRequest(
   const sedrexIntent = mapQueryIntentToSedrexIntent(intent);
 
   const isProductQuery    = /\b(buy now|add to cart|where to buy|cheapest price|order online|cod|cash on delivery)\b/i.test(prompt);
-  const freshnessSignals  = /(latest|today|current|right now|this week|this month|breaking|newly|updated)/i;
+  const freshnessSignals  = /(latest|today|current|right now|this week|this month|breaking|newly|updated|news|price|what happened|2025|2026)/i;
   const isTablePrompt     = TABLE_PATTERNS.test(prompt) ||
     /^\s*(build|create|make|write)\s*(a\s+)?table\s*$/i.test(prompt.trim());
   const isGenuinelyLive   = intent === "live" && !TABLE_PATTERNS.test(prompt) && !isTablePrompt;
@@ -1449,6 +1548,8 @@ async function processRequest(
         genConfig.temperature,
         onStreamChunk,
         signal,
+        userTier,
+        isBasicMode,
       );
 
       if (agentResult.text) {

@@ -39,6 +39,11 @@ export interface AgentDispatchResult {
   isFallback:           boolean;
   overrideSystemPrompt: string | null;
   groundingChunks?:     any[];
+  metadata?: {
+    tier:        string;
+    isBasicMode: boolean;
+    model:       string;              // internal model name — never shown to user
+  };
 }
 
 // ── Gemini-direct fast-path result ───────────────────────────────
@@ -105,6 +110,8 @@ export async function dispatch(
   temperature:   number,
   onStreamChunk: ((text: string) => void) | undefined,
   signal:        AbortSignal | undefined,
+  userTier:      string  = 'free',
+  isBasicMode:   boolean = false,
 ): Promise<AgentDispatchResult> {
 
   const intent    = (routing.intent as string) ?? 'general';
@@ -122,6 +129,29 @@ export async function dispatch(
       inputTokens: 0, outputTokens: 0, isFallback: false,
       overrideSystemPrompt: null, model: '', label: '',
     };
+  }
+
+  // TIER GATE — free tier and basic mode always use Gemini only.
+  // Pro/Team/Enterprise skip this and fall through to full dispatch.
+  // When keys are added later, paid tiers automatically unlock — zero code changes.
+  const isRestrictedTier = userTier === 'free' || isBasicMode;
+  if (isRestrictedTier) {
+    const agentTypeR = intentToAgentType(intent);
+    const hasLongCtx = documents.length > 0 || history.length > 6;
+    const meta = { tier: userTier, isBasicMode, model: MODELS.GEMINI_FLASH };
+    if (agentTypeR === 'rag') {
+      return {
+        ...geminiDirectResult('rag', buildAgentSystemPrompt('live', { sessionContext: sessionContext || undefined })),
+        provider: 'gemini-search', label: 'Gemini 2.0 Flash + Search', metadata: meta,
+      };
+    }
+    if (agentTypeR === 'coding') {
+      return { ...geminiDirectResult('coding', buildAgentSystemPrompt('coding', { sessionContext: sessionContext || undefined, hasLongContext: hasLongCtx })), metadata: meta };
+    }
+    if (agentTypeR === 'reasoning' || agentTypeR === 'math') {
+      return { ...geminiDirectResult(agentTypeR, buildAgentSystemPrompt('reasoning', { sessionContext: sessionContext || undefined, hasLongContext: hasLongCtx })), metadata: meta };
+    }
+    return { ...geminiDirectResult('general', null), metadata: meta };
   }
 
   // SESSION 7: Fast-path — if no external provider keys exist, skip ALL

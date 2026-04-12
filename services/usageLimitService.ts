@@ -129,3 +129,106 @@ export function getUsageColor(status: LimitStatus): string {
   if (status === 'warning') return '#f59e0b';  // amber
   return '#10B981';                            // green
 }
+
+// ── Tier-aware functions ──────────────────────────────────────────
+
+export interface CanSendResult {
+  allowed:     boolean;
+  isBasicMode: boolean;  // true = pro/team over monthly limit, chat continues on Gemini
+  reason?:     string;   // only set when allowed=false
+}
+
+/**
+ * Pre-flight check before sending a message.
+ * Pass the already-fetched UserStats — avoids extra DB round-trip.
+ */
+export function checkCanSendMessage(stats: UserStats | null): CanSendResult {
+  if (!stats) return { allowed: true, isBasicMode: false };
+
+  const tier = stats.tier ?? 'free';
+  const cfg  = getTierConfig(tier);
+
+  // Enterprise — always allowed, never basic mode
+  if (tier === 'enterprise') return { allowed: true, isBasicMode: false };
+
+  // Free — monthly limit only (daily not tracked reliably via trigger)
+  if (tier === 'free') {
+    if (stats.monthlyMessagesSent >= 100) {
+      return {
+        allowed:     false,
+        isBasicMode: false,
+        reason:      `You've used your 100 free requests this month. Upgrade to Pro for more.`,
+      };
+    }
+    return { allowed: true, isBasicMode: false };
+  }
+
+  // Pro / Team — monthly limit exceeded → basic mode (chat continues on Gemini)
+  if (isLimitEnforced(cfg.monthlyMessages) && stats.monthlyMessagesSent >= cfg.monthlyMessages) {
+    return { allowed: true, isBasicMode: true };
+  }
+
+  return { allowed: true, isBasicMode: false };
+}
+
+/**
+ * No-op — usage is incremented automatically by Supabase trigger
+ * `trg_message_increments_stats` on every message insert.
+ * No manual increment needed here.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function incrementUsage(_userId: string, _tier: string): Promise<void> {
+  return;
+}
+
+export interface RemainingRequests {
+  used:     number;
+  limit:    number | null;  // null = unlimited
+  resetsAt: string;         // ISO date string
+}
+
+/**
+ * Returns remaining request counts for the UI footer.
+ * No DB call — derives from already-fetched stats.
+ */
+export function getRemainingRequests(stats: UserStats | null): RemainingRequests | null {
+  if (!stats) return null;
+  const tier = stats.tier ?? 'free';
+  if (tier === 'enterprise') return null; // unlimited — show nothing
+
+  const cfg = getTierConfig(tier);
+
+  if (tier === 'free') {
+    // Monthly reset — same as pro/team (trigger populates monthly_messages, not daily)
+    const nextMonth = new Date();
+    nextMonth.setMonth(nextMonth.getMonth() + 1, 1);
+    nextMonth.setHours(0, 0, 0, 0);
+    return {
+      used:     stats.monthlyMessagesSent,
+      limit:    100,
+      resetsAt: nextMonth.toISOString(),
+    };
+  }
+
+  // Pro / Team — monthly reset (approximate: 1st of next month)
+  const nextMonth = new Date();
+  nextMonth.setMonth(nextMonth.getMonth() + 1, 1);
+  nextMonth.setHours(0, 0, 0, 0);
+  return {
+    used:     stats.monthlyMessagesSent,
+    limit:    isLimitEnforced(cfg.monthlyMessages) ? cfg.monthlyMessages : null,
+    resetsAt: nextMonth.toISOString(),
+  };
+}
+
+/**
+ * True when a Pro/Team user has exceeded their monthly limit
+ * and is now in basic mode (Gemini-only, chat still works).
+ */
+export function isInBasicMode(stats: UserStats | null): boolean {
+  if (!stats) return false;
+  const tier = stats.tier ?? 'free';
+  if (tier === 'free' || tier === 'enterprise') return false;
+  const cfg = getTierConfig(tier);
+  return isLimitEnforced(cfg.monthlyMessages) && stats.monthlyMessagesSent >= cfg.monthlyMessages;
+}
